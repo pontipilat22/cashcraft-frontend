@@ -50,6 +50,7 @@ export interface Debt {
   name: string;
   amount: number;
   isIncludedInTotal?: boolean;
+  dueDate?: string; // Дата возврата долга
   createdAt: string;
   updatedAt: string;
 } 

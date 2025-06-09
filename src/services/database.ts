@@ -66,17 +66,32 @@ export class DatabaseService {
         );
 
         // Создаем таблицу долгов
-        db.execSync(
-          `CREATE TABLE IF NOT EXISTS debts (
-            id TEXT PRIMARY KEY NOT NULL,
-            type TEXT NOT NULL, -- 'owe' (я должен) или 'owed' (мне должны)
-            name TEXT NOT NULL, -- имя человека
+        db.execSync(`
+          CREATE TABLE IF NOT EXISTS debts (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            name TEXT NOT NULL,
             amount REAL NOT NULL,
             isIncludedInTotal INTEGER DEFAULT 1,
+            dueDate TEXT,
             createdAt TEXT NOT NULL,
             updatedAt TEXT NOT NULL
-          );`
-        );
+          )
+        `);
+        
+        // Проверяем, есть ли колонка dueDate в таблице debts (для миграции)
+        try {
+          const tableInfo = db.getAllSync("PRAGMA table_info(debts)");
+          const hasDueDateColumn = tableInfo.some((col: any) => col.name === 'dueDate');
+          
+          if (!hasDueDateColumn) {
+            // Добавляем колонку dueDate в существующую таблицу
+            db.execSync('ALTER TABLE debts ADD COLUMN dueDate TEXT');
+            console.log('Added dueDate column to debts table');
+          }
+        } catch (error) {
+          console.error('Error checking/adding dueDate column:', error);
+        }
 
         // Проверяем, есть ли счета в БД
         const accounts = db.getAllSync('SELECT COUNT(*) as count FROM accounts');
@@ -543,13 +558,14 @@ export class DatabaseService {
     const now = new Date().toISOString();
     try {
       db.runSync(
-        `INSERT INTO debts (id, type, name, amount, isIncludedInTotal, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?)` ,
+        `INSERT INTO debts (id, type, name, amount, isIncludedInTotal, dueDate, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
         id,
         debt.type,
         debt.name,
         debt.amount,
         debt.isIncludedInTotal !== false ? 1 : 0,
+        null,
         now,
         now
       );
@@ -561,21 +577,25 @@ export class DatabaseService {
 
   static async updateDebt(id: string, updates: { name?: string; amount?: number }): Promise<void> {
     const now = new Date().toISOString();
-    const fields: string[] = [];
-    const values: any[] = [];
-    
-    Object.entries(updates).forEach(([key, value]) => {
-      fields.push(`${key} = ?`);
-      values.push(value);
-    });
-    
-    if (fields.length === 0) return;
-    
-    values.push(now, id);
-    
+    const fields = [];
+    const values = [];
+
+    if (updates.name !== undefined) {
+      fields.push('name = ?');
+      values.push(updates.name);
+    }
+    if (updates.amount !== undefined) {
+      fields.push('amount = ?');
+      values.push(updates.amount);
+    }
+
+    fields.push('updatedAt = ?');
+    values.push(now);
+    values.push(id);
+
     try {
       db.runSync(
-        `UPDATE debts SET ${fields.join(', ')}, updatedAt = ? WHERE id = ?`,
+        `UPDATE debts SET ${fields.join(', ')} WHERE id = ?`,
         ...values
       );
     } catch (error) {

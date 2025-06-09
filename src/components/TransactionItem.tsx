@@ -54,6 +54,47 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
   const isIncome = transaction.type === 'income';
   const amountColor = isIncome ? '#4CAF50' : colors.text;
   
+  // Определяем тип долговой операции
+  const getDebtType = (description?: string) => {
+    if (!description) return null;
+    
+    // Сначала проверяем новый формат с префиксом
+    const match = description.match(/\[DEBT:(give|return|borrow|payback)\]/);
+    if (match) return match[1];
+    
+    // Для старых транзакций проверяем по ключевым словам
+    const lowerDesc = description.toLowerCase();
+    if (lowerDesc.includes('дал в долг') || lowerDesc.includes('дала в долг')) return 'give';
+    if (lowerDesc.includes('получил долг') || lowerDesc.includes('получила долг')) return 'return';
+    if (lowerDesc.includes('взял в долг') || lowerDesc.includes('взяла в долг')) return 'borrow';
+    if (lowerDesc.includes('вернул долг') || lowerDesc.includes('вернула долг')) return 'payback';
+    
+    return null;
+  };
+  
+  const debtType = getDebtType(transaction.description);
+  
+  // Получаем иконку и цвет для долговой операции
+  const getDebtIconAndColor = () => {
+    switch (debtType) {
+      case 'give':
+        return { icon: 'arrow-up-circle', color: '#2196F3' };
+      case 'return':
+        return { icon: 'checkmark-circle', color: '#4CAF50' };
+      case 'borrow':
+        return { icon: 'arrow-down-circle', color: '#9C27B0' };
+      case 'payback':
+        return { icon: 'checkmark-circle', color: '#FF5252' };
+      default:
+        return null;
+    }
+  };
+  
+  const debtIconData = getDebtIconAndColor();
+  
+  // Убираем префикс [DEBT:type] из отображаемого описания
+  const displayDescription = transaction.description?.replace(/\[DEBT:\w+\]\s*/, '');
+  
   return (
     <Animated.View
       style={[
@@ -79,7 +120,11 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
         delayLongPress={500}
       >
         <View style={styles.leftSection}>
-          {category ? (
+          {debtIconData ? (
+            <View style={[styles.categoryIcon, { backgroundColor: debtIconData.color + '20' }]}>
+              <Ionicons name={debtIconData.icon as any} size={24} color={debtIconData.color} />
+            </View>
+          ) : category ? (
             <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
               <Ionicons name={category.icon as any} size={24} color={category.color} />
             </View>
@@ -95,11 +140,16 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
           
           <View style={styles.info}>
             <Text style={[styles.categoryName, { color: colors.text }]}>
-              {category?.name || (isIncome ? 'Доход' : 'Расход')}
+              {debtType ? (
+                debtType === 'give' ? 'Дал в долг' :
+                debtType === 'return' ? 'Получил долг' :
+                debtType === 'borrow' ? 'Взял в долг' :
+                'Вернул долг'
+              ) : (category?.name || (isIncome ? 'Доход' : 'Расход'))}
             </Text>
-            {Boolean(transaction.description) && (
+            {Boolean(displayDescription) && (
               <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={1}>
-                {transaction.description}
+                {displayDescription}
               </Text>
             )}
             {Boolean(account) && (

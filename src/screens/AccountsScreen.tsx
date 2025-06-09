@@ -17,6 +17,7 @@ import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AccountsStackParamList } from '../navigation/AccountsNavigator';
 import { DatabaseService } from '../services/database';
+import { useFocusEffect } from '@react-navigation/native';
 
 type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
 
@@ -43,10 +44,30 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
 
   const stats = getStatistics();
 
-  // Загружаем долги
+  // Загружаем долги при фокусе экрана
+  useFocusEffect(
+    React.useCallback(() => {
+      loadDebts();
+      
+      // Добавляем слушатель для обновления долгов
+      const unsubscribe = navigation.addListener('focus', () => {
+        loadDebts();
+      });
+      
+      return unsubscribe;
+    }, [navigation])
+  );
+
+  // Следим за изменениями в DataContext для обновления долгов при сбросе
   useEffect(() => {
-    loadDebts();
-  }, []);
+    // Проверяем признаки сброса данных
+    if (accounts.length === 1 && accounts[0].name === 'Наличные' && accounts[0].balance === 0) {
+      // Небольшая задержка чтобы БД успела обновиться
+      setTimeout(() => {
+        loadDebts();
+      }, 100);
+    }
+  }, [accounts]);
 
   const loadDebts = async () => {
     const allDebts = await DatabaseService.getDebts();

@@ -44,19 +44,45 @@ export const FABMenu: React.FC<FABMenuProps> = ({
         duration: 200,
         useNativeDriver: true,
       }),
-    ]).start();
-    
-    setIsOpen(!isOpen);
+    ]).start(() => {
+      setIsOpen(toValue === 1);
+    });
   };
 
   const handleOptionPress = (action: () => void) => {
-    toggleMenu();
-    setTimeout(action, 200);
+    Animated.parallel([
+      Animated.timing(animationValue, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rotateValue, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsOpen(false);
+      action();
+    });
   };
 
   const handleClose = () => {
     if (isOpen) {
-      toggleMenu();
+      Animated.parallel([
+        Animated.timing(animationValue, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotateValue, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setIsOpen(false);
+      });
     }
   };
 

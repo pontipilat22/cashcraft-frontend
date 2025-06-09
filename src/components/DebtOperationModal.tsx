@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { DatabaseService } from '../services/database';
-import { Debt } from '../types';
+import { Debt, Account } from '../types';
 
 type OperationType = 'give' | 'return' | 'borrow' | 'payback';
 
@@ -46,6 +47,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const [showPersonPicker, setShowPersonPicker] = useState(false);
   const [existingDebts, setExistingDebts] = useState<Debt[]>([]);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+  const [transactionDate, setTransactionDate] = useState(new Date());
 
   // Загружаем существующие долги при открытии
   useEffect(() => {
@@ -121,8 +123,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         await DatabaseService.createDebt({
           type: operationType === 'give' ? 'owed' : 'owe',
           name: personName,
-          amount: amountNum,
-          isIncludedInTotal: false,
+          amount: parseFloat(amount)
         });
 
         // Создаем транзакцию
@@ -131,8 +132,8 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           type: operationType === 'give' ? 'expense' : 'income',
           accountId: selectedAccountId,
           categoryId: operationType === 'give' ? 'other_expense' : 'other_income',
-          description: description.trim() || `${operationType === 'give' ? 'Дал в долг' : 'Взял в долг'}: ${personName}`,
-          date: selectedDate.toISOString(),
+          description: `[DEBT:${operationType}] ${description.trim() || `${operationType === 'give' ? 'Дал в долг' : 'Взял в долг'}: ${personName}`}`,
+          date: transactionDate.toISOString(),
         });
       } else {
         // Погашаем долг
@@ -162,8 +163,8 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           type: operationType === 'return' ? 'income' : 'expense',
           accountId: selectedAccountId,
           categoryId: operationType === 'return' ? 'other_income' : 'other_expense',
-          description: description.trim() || `${operationType === 'return' ? 'Получил долг' : 'Вернул долг'}: ${personName}`,
-          date: selectedDate.toISOString(),
+          description: `[DEBT:${operationType}] ${description.trim() || `${operationType === 'return' ? 'Получил долг' : 'Вернул долг'}: ${personName}`}`,
+          date: transactionDate.toISOString(),
         });
       }
 
@@ -172,6 +173,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
       
       // Очищаем форму
       resetForm();
+      Alert.alert('Успех', 'Операция успешно выполнена');
       onOperationComplete?.();
       onClose();
     } catch (error) {
@@ -186,6 +188,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
     setDescription('');
     setSelectedDate(new Date());
     setSelectedDebt(null);
+    setTransactionDate(new Date());
   };
 
   const handleClose = () => {
@@ -196,7 +199,8 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const handleSelectDebt = (debt: Debt) => {
     setSelectedDebt(debt);
     setPerson(debt.name);
-    setAmount(debt.amount.toString());
+    // Не заполняем сумму автоматически, чтобы можно было ввести частичную сумму
+    // setAmount(debt.amount.toString());
     setShowPersonPicker(false);
   };
 
@@ -249,6 +253,11 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
                 Сумма
+                {selectedDebt && (
+                  <Text style={{ fontSize: 12 }}>
+                    {' '}(долг: {selectedDebt.amount.toLocaleString('ru-RU')} ₽)
+                  </Text>
+                )}
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: colors.primary }]}>
@@ -261,9 +270,15 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                   placeholder="0"
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
-                  editable={!selectedDebt}
+                  // Убираем ограничение на редактирование
+                  // editable={!selectedDebt}
                 />
               </View>
+              {selectedDebt && amount && parseFloat(amount) > selectedDebt.amount && (
+                <Text style={{ color: '#FF5252', fontSize: 12, marginTop: 4 }}>
+                  Сумма больше долга
+                </Text>
+              )}
             </View>
 
             {/* Человек */}
@@ -326,7 +341,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                 <View style={styles.selectorContent}>
                   <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
                   <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {formatDate(selectedDate)}
+                    {formatDate(transactionDate)}
                   </Text>
                 </View>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
@@ -368,20 +383,45 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         </View>
       </KeyboardAvoidingView>
 
-      {/* Date Picker */}
+      {/* Date Picker Modal */}
       {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, date) => {
-            if (Platform.OS === 'android') {
-              setShowDatePicker(false);
-            }
-            if (date) setSelectedDate(date);
-          }}
-          maximumDate={new Date()}
-        />
+        <Modal
+          visible={showDatePicker}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.datePickerModal}>
+            <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Отмена</Text>
+                </TouchableOpacity>
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>Выберите дату</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Готово</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={transactionDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => {
+                  if (date) {
+                    setTransactionDate(date);
+                  }
+                  if (Platform.OS === 'android') {
+                    setShowDatePicker(false);
+                  }
+                }}
+                maximumDate={new Date()}
+                textColor={colors.text}
+                themeVariant={isDark ? 'dark' : 'light'}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </Modal>
       )}
 
       {/* Person Picker for return operations */}
@@ -407,7 +447,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                   style={[styles.pickerItem, { backgroundColor: colors.background }]}
                   onPress={() => handleSelectDebt(debt)}
                 >
-                  <View>
+                  <View style={styles.debtInfo}>
                     <Text style={[styles.pickerItemText, { color: colors.text }]}>
                       {debt.name}
                     </Text>
@@ -415,9 +455,14 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                       {debt.createdAt ? new Date(debt.createdAt).toLocaleDateString('ru-RU') : ''}
                     </Text>
                   </View>
-                  <Text style={[styles.pickerItemBalance, { color: colors.primary }]}>
-                    {debt.amount.toLocaleString('ru-RU')} ₽
-                  </Text>
+                  <View style={styles.debtAmountInfo}>
+                    <Text style={[styles.pickerItemBalance, { color: colors.primary }]}>
+                      {debt.amount.toLocaleString('ru-RU')} ₽
+                    </Text>
+                    <Text style={[styles.debtLabel, { color: colors.textSecondary }]}>
+                      осталось
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -471,7 +516,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   modalContent: {
     borderTopLeftRadius: 20,
@@ -559,7 +604,7 @@ const styles = StyleSheet.create({
   pickerOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   pickerContent: {
     borderTopLeftRadius: 20,
@@ -589,5 +634,42 @@ const styles = StyleSheet.create({
   debtDate: {
     fontSize: 12,
     marginTop: 4,
+  },
+  debtInfo: {
+    flex: 1,
+  },
+  debtAmountInfo: {
+    alignItems: 'flex-end',
+  },
+  debtLabel: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  datePickerModal: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  datePickerContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  datePickerButton: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 }); 

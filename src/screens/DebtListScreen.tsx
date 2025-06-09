@@ -41,29 +41,31 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
     setActionsModalVisible(true);
   };
 
-  const renderDebt = ({ item }: { item: Debt }) => (
-    <TouchableOpacity 
-      style={[styles.debtItem, { backgroundColor: colors.card }]}
-      onLongPress={() => handleLongPress(item)}
-      delayLongPress={500}
-    >
-      <View style={styles.debtInfo}>
-        <View style={styles.debtDetails}>
-          <Text style={[styles.debtName, { color: colors.text }]}>{item.name}</Text>
-          <Text style={[styles.debtDate, { color: colors.textSecondary }]}>
-            {item.createdAt ? new Date(item.createdAt).toLocaleDateString('ru-RU', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            }) : ''}
+  const renderDebt = ({ item }: { item: Debt }) => {
+    return (
+      <TouchableOpacity 
+        style={[styles.debtItem, { backgroundColor: colors.card }]}
+        onLongPress={() => handleLongPress(item)}
+        delayLongPress={500}
+      >
+        <View style={styles.debtInfo}>
+          <View style={styles.debtDetails}>
+            <Text style={[styles.debtName, { color: colors.text }]}>{item.name}</Text>
+            <Text style={[styles.debtDate, { color: colors.textSecondary }]}>
+              {item.createdAt ? new Date(item.createdAt).toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              }) : ''}
+            </Text>
+          </View>
+          <Text style={[styles.debtAmount, { color: colors.primary }]}>
+            {item.amount.toLocaleString('ru-RU')} ₽
           </Text>
         </View>
-        <Text style={[styles.debtAmount, { color: colors.primary }]}>
-          {item.amount.toLocaleString('ru-RU')} ₽
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (

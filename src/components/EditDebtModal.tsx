@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard, TouchableWithoutFeedback, ScrollView, Alert } from 'react-native';
+import {
+  Modal,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
-import { useData } from '../context/DataContext';
 import { DatabaseService } from '../services/database';
 import { Debt } from '../types';
-import { Picker } from '@react-native-picker/picker';
 
 interface EditDebtModalProps {
   visible: boolean;
@@ -14,228 +24,278 @@ interface EditDebtModalProps {
   onSave: () => void;
 }
 
-export const EditDebtModal: React.FC<EditDebtModalProps> = ({ visible, debt, mode, onClose, onSave }) => {
+export const EditDebtModal: React.FC<EditDebtModalProps> = ({ 
+  visible, 
+  debt, 
+  mode, 
+  onClose, 
+  onSave 
+}) => {
   const { colors } = useTheme();
-  const { accounts, refreshData } = useData();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [payAmount, setPayAmount] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Фильтруем счета для отображения
-  const availableAccounts = accounts.filter(acc => 
-    acc.type === 'cash' || acc.type === 'card' || acc.type === 'bank'
-  );
 
   useEffect(() => {
     if (debt) {
       setName(debt.name);
       setAmount(debt.amount.toString());
-      setPayAmount('');
     }
-    // Выбираем счет по умолчанию
-    if (availableAccounts.length > 0) {
-      const defaultAccount = availableAccounts.find(acc => acc.isDefault) || availableAccounts[0];
-      setSelectedAccountId(defaultAccount.id);
-    }
-  }, [debt, availableAccounts]);
+  }, [debt]);
 
   const handleSave = async () => {
     if (!debt) return;
+    
+    if (!name.trim()) {
+      Alert.alert('Ошибка', 'Введите имя');
+      return;
+    }
+    
+    if (!amount || parseFloat(amount) <= 0) {
+      Alert.alert('Ошибка', 'Введите корректную сумму');
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      if (mode === 'edit') {
-        await DatabaseService.updateDebt(debt.id, {
-          name: name.trim(),
-          amount: parseFloat(amount),
-        });
-      } else {
-        // Частичное погашение
-        const paymentAmount = parseFloat(payAmount);
-        const newAmount = debt.amount - paymentAmount;
-        
-        // Проверяем достаточность средств при списании
-        if (debt.type === 'owe' && selectedAccountId) {
-          const account = accounts.find(acc => acc.id === selectedAccountId);
-          if (account && account.balance < paymentAmount) {
-            Alert.alert('Ошибка', 'Недостаточно средств на счете');
-            setLoading(false);
-            return;
-          }
-        }
-        
-        // Создаём транзакцию
-        if (selectedAccountId) {
-          await DatabaseService.createTransaction({
-            amount: paymentAmount,
-            type: debt.type === 'owed' ? 'income' : 'expense',
-            accountId: selectedAccountId,
-            categoryId: debt.type === 'owed' ? 'other_income' : 'other_expense',
-            description: `Погашение долга: ${debt.name}`,
-            date: new Date().toISOString(),
-          });
-          // Обновляем данные для отображения нового баланса
-          await refreshData();
-        }
-        
-        if (newAmount <= 0) {
-          await DatabaseService.deleteDebt(debt.id);
-        } else {
-          await DatabaseService.updateDebt(debt.id, {
-            amount: newAmount,
-          });
-        }
-      }
+      await DatabaseService.updateDebt(debt.id, {
+        ...debt,
+        name,
+        amount: Number(amount),
+      });
       onSave();
-      onClose();
+      handleClose();
     } catch (error) {
       console.error('Error updating debt:', error);
+      Alert.alert('Ошибка', 'Не удалось обновить долг');
     } finally {
       setLoading(false);
     }
   };
 
-  const title = mode === 'edit' ? 'Редактировать долг' : 'Частичное погашение';
+  const handleClose = () => {
+    setName('');
+    setAmount('');
+    onClose();
+  };
+
+  if (!debt) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={[styles.container, { backgroundColor: colors.card }]}>
-              <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-              
-              {mode === 'edit' ? (
-                <>
-                  <TextInput
-                    style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                    placeholder="Имя"
-                    placeholderTextColor={colors.textSecondary}
-                    value={name}
-                    onChangeText={setName}
-                  />
-                  <TextInput
-                    style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                    placeholder="Сумма"
-                    placeholderTextColor={colors.textSecondary}
-                    value={amount}
-                    onChangeText={setAmount}
-                    keyboardType="numeric"
-                  />
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.debtInfo, { color: colors.text }]}>
-                    {debt?.name}: {debt?.amount.toLocaleString('ru-RU')} ₽
-                  </Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                    placeholder="Сумма погашения"
-                    placeholderTextColor={colors.textSecondary}
-                    value={payAmount}
-                    onChangeText={setPayAmount}
-                    keyboardType="numeric"
-                  />
-                  {availableAccounts.length > 0 && (
-                    <View style={[styles.pickerContainer, { borderColor: colors.border }]}>
-                      <Text style={[styles.pickerLabel, { color: colors.textSecondary }]}>
-                        {debt?.type === 'owed' ? 'Зачислить на счет:' : 'Списать со счета:'}
-                      </Text>
-                      <Picker
-                        selectedValue={selectedAccountId}
-                        onValueChange={setSelectedAccountId}
-                        style={[styles.picker, { color: colors.text }]}
-                      >
-                        {availableAccounts.map(account => (
-                          <Picker.Item 
-                            key={account.id} 
-                            label={account.name} 
-                            value={account.id} 
-                          />
-                        ))}
-                      </Picker>
-                    </View>
-                  )}
-                </>
-              )}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalContainer}
+      >
+        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>
+              Редактировать долг
+            </Text>
+            <TouchableOpacity onPress={handleClose}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
 
-              <View style={styles.buttonRow}>
-                <TouchableOpacity 
-                  style={[styles.button, { backgroundColor: colors.primary }]} 
-                  onPress={handleSave} 
-                  disabled={loading || (mode === 'partial' && !payAmount)}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>
-                    {mode === 'edit' ? 'Сохранить' : 'Погасить'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, { backgroundColor: colors.border }]} onPress={onClose}>
-                  <Text style={{ color: colors.text }}>Отмена</Text>
-                </TouchableOpacity>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Тип долга - только для отображения */}
+            <View style={styles.typeInfo}>
+              <View style={[styles.typeInfoCard, { backgroundColor: colors.background }]}>
+                <Ionicons 
+                  name={debt.type === 'owed' ? 'arrow-up-circle' : 'arrow-down-circle'} 
+                  size={24} 
+                  color={debt.type === 'owed' ? '#4CAF50' : '#FF5252'} 
+                />
+                <Text style={[styles.typeInfoText, { color: colors.text }]}>
+                  {debt.type === 'owed' ? 'Мне должны' : 'Я должен'}
+                </Text>
               </View>
             </View>
-          </TouchableWithoutFeedback>
+
+            {/* Сумма */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Сумма
+              </Text>
+              <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={[styles.currencySymbol, { color: colors.primary }]}>
+                  ₽
+                </Text>
+                <TextInput
+                  style={[styles.amountTextInput, { color: colors.text }]}
+                  value={amount}
+                  onChangeText={setAmount}
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* Человек */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {debt.type === 'owed' ? 'Кто должен' : 'Кому должен'}
+              </Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderColor: colors.border,
+                }]}
+                value={name}
+                onChangeText={setName}
+                placeholder="Имя человека"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            {/* Дата создания */}
+            {debt.createdAt && (
+              <View style={styles.infoContainer}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
+                  Дата создания
+                </Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>
+                  {new Date(debt.createdAt).toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
+              onPress={handleClose}
+            >
+              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.button, 
+                styles.saveButton, 
+                { backgroundColor: colors.primary }
+              ]}
+              onPress={handleSave}
+              disabled={loading || !name.trim() || !amount || parseFloat(amount) === 0}
+            >
+              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
-  container: {
-    width: '90%',
-    borderRadius: 16,
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
+    maxHeight: '80%',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   title: {
     fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 16,
-    textAlign: 'center',
+    fontWeight: '600',
   },
-  debtInfo: {
+  typeInfo: {
+    marginBottom: 20,
+  },
+  typeInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  typeInfoText: {
     fontSize: 16,
+    fontWeight: '500',
+  },
+  inputContainer: {
     marginBottom: 16,
-    textAlign: 'center',
+  },
+  label: {
+    fontSize: 14,
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
-    marginBottom: 12,
     fontSize: 16,
   },
-  buttonRow: {
+  amountInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  currencySymbol: {
+    fontSize: 24,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  amountTextInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '500',
+  },
+  infoContainer: {
+    marginBottom: 16,
+  },
+  infoLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 16,
+  },
+  footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 20,
+    gap: 10,
   },
   button: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginHorizontal: 4,
   },
-  pickerContainer: {
+  cancelButton: {
     borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 12,
-    paddingHorizontal: 12,
   },
-  pickerLabel: {
-    fontSize: 12,
-    marginTop: 8,
+  saveButton: {},
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
-  picker: {
-    height: 50,
+  inputError: {
+    borderColor: '#F44336',
   },
 }); 
