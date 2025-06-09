@@ -330,7 +330,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
             <View style={{ paddingHorizontal: 16 }}>
               <TouchableOpacity 
                 style={[styles.debtCard, { backgroundColor: colors.card }]}
-                onPress={() => navigation.navigate('DebtList', { type: 'owed', onUpdate: loadDebts })}
+                onPress={() => navigation.navigate('DebtList', { type: 'owed' })}
               >
                 <Ionicons name="trending-up-outline" size={32} color={colors.primary} />
                 <View style={styles.debtCardContent}>
@@ -343,7 +343,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.debtCard, { backgroundColor: colors.card }]}
-                onPress={() => navigation.navigate('DebtList', { type: 'owe', onUpdate: loadDebts })}
+                onPress={() => navigation.navigate('DebtList', { type: 'owe' })}
               >
                 <Ionicons name="trending-down-outline" size={32} color={colors.primary} />
                 <View style={styles.debtCardContent}>

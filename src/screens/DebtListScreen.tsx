@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { DatabaseService } from '../services/database';
 import { Debt } from '../types';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DebtActionsModal } from '../components/DebtActionsModal';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface DebtListScreenProps {
   route: {
     params: {
       type: 'owe' | 'owed';
-      onUpdate?: () => void;
     };
   };
   navigation: any;
@@ -18,22 +18,24 @@ interface DebtListScreenProps {
 
 export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigation }) => {
   const { colors } = useTheme();
-  const { type, onUpdate } = route.params;
+  const { type } = route.params;
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [actionsModalVisible, setActionsModalVisible] = useState(false);
 
-  useEffect(() => {
-    loadDebts();
-  }, []);
+  // Загружаем долги при фокусе экрана
+  useFocusEffect(
+    React.useCallback(() => {
+      loadDebts();
+    }, [type])
+  );
 
   const loadDebts = async () => {
     setLoading(true);
     const allDebts = await DatabaseService.getDebts();
     setDebts(allDebts.filter(d => d.type === type));
     setLoading(false);
-    if (onUpdate) onUpdate();
   };
 
   const handleLongPress = (debt: Debt) => {
