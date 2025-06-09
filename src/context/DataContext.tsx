@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Account, Transaction, Category } from '../types';
+import { Account, Transaction, Category, Debt } from '../types';
 import { DatabaseService } from '../services/database';
 import { SyncService } from '../services/sync';
 
@@ -45,6 +45,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalBalance, setTotalBalance] = useState(0);
 
   // Инициализация БД и загрузка данных
   useEffect(() => {
@@ -59,45 +60,41 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await DatabaseService.initDatabase();
       await refreshData();
     } catch (error) {
-      console.error('Error initializing app:', error);
+      console.error('Error initializing data:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const refreshData = async () => {
-    try {
-      const [accountsData, transactionsData, categoriesData] = await Promise.all([
-        DatabaseService.getAccounts(),
-        DatabaseService.getTransactions(),
-        DatabaseService.getCategories()
-      ]);
-      setAccounts(accountsData);
-      setTransactions(transactionsData);
-      setCategories(categoriesData);
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    }
-  };
-
-  // Расчет общего баланса (только для включенных счетов)
-  const totalBalance = accounts.reduce((sum, account) => {
-    // Пропускаем счета не включенные в общий баланс
-    if (account.isIncludedInTotal === false) {
-      return sum;
-    }
+    const [accounts, transactions, categories] = await Promise.all([
+      DatabaseService.getAccounts(),
+      DatabaseService.getTransactions(),
+      DatabaseService.getCategories()
+    ]);
     
-    if (account.type === 'debt' || account.type === 'credit') {
-      return sum - account.balance;
-    }
-    return sum + account.balance;
-  }, 0);
+    setAccounts(accounts);
+    setTransactions(transactions);
+    setCategories(categories);
+    
+    // Считаем общий баланс только по счетам
+    const accountsTotal = accounts
+      .filter(acc => acc.isIncludedInTotal !== false)
+      .reduce((sum, account) => sum + account.balance, 0);
+    
+    setTotalBalance(accountsTotal);
+  };
 
   // Методы для работы со счетами
   const createAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const newAccount = await DatabaseService.createAccount(account);
       setAccounts(prev => [newAccount, ...prev]);
+      
+      // Обновляем общий баланс
+      if (newAccount.isIncludedInTotal !== false) {
+        setTotalBalance(prev => prev + newAccount.balance);
+      }
     } catch (error) {
       console.error('Error creating account:', error);
       throw error;
@@ -106,10 +103,31 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateAccount = async (id: string, updates: Partial<Account>) => {
     try {
+      const oldAccount = accounts.find(acc => acc.id === id);
+      if (!oldAccount) return;
+      
       await DatabaseService.updateAccount(id, updates);
       setAccounts(prev => prev.map(acc => 
         acc.id === id ? { ...acc, ...updates } : acc
       ));
+      
+      // Обновляем общий баланс если изменился баланс или включение в общий баланс
+      if (updates.balance !== undefined || updates.isIncludedInTotal !== undefined) {
+        const newAccount = { ...oldAccount, ...updates };
+        
+        // Убираем старый баланс из общего
+        let newTotalBalance = totalBalance;
+        if (oldAccount.isIncludedInTotal !== false) {
+          newTotalBalance -= oldAccount.balance;
+        }
+        
+        // Добавляем новый баланс к общему
+        if (newAccount.isIncludedInTotal !== false) {
+          newTotalBalance += newAccount.balance;
+        }
+        
+        setTotalBalance(newTotalBalance);
+      }
     } catch (error) {
       console.error('Error updating account:', error);
       throw error;
@@ -118,9 +136,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const deleteAccount = async (id: string) => {
     try {
+      const accountToDelete = accounts.find(acc => acc.id === id);
+      if (!accountToDelete) return;
+      
       await DatabaseService.deleteAccount(id);
       setAccounts(prev => prev.filter(acc => acc.id !== id));
       setTransactions(prev => prev.filter(trans => trans.accountId !== id));
+      
+      // Обновляем общий баланс если счет был включен в него
+      if (accountToDelete.isIncludedInTotal !== false) {
+        setTotalBalance(prev => prev - accountToDelete.balance);
+      }
     } catch (error) {
       console.error('Error deleting account:', error);
       throw error;
@@ -142,6 +168,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ? { ...acc, balance: acc.balance + balanceChange }
             : acc
         ));
+        
+        // Обновляем общий баланс если счет включен в него
+        if (account.isIncludedInTotal !== false) {
+          setTotalBalance(prev => prev + balanceChange);
+        }
       }
     } catch (error) {
       console.error('Error creating transaction:', error);
@@ -182,12 +213,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setTransactions(prev => prev.filter(trans => trans.id !== id));
       
       // Обновляем баланс счета
-      const balanceChange = transaction.type === 'income' ? -transaction.amount : transaction.amount;
-      setAccounts(prev => prev.map(acc => 
-        acc.id === transaction.accountId 
-          ? { ...acc, balance: acc.balance + balanceChange }
-          : acc
-      ));
+      const account = accounts.find(acc => acc.id === transaction.accountId);
+      if (account) {
+        const balanceChange = transaction.type === 'income' ? -transaction.amount : transaction.amount;
+        setAccounts(prev => prev.map(acc => 
+          acc.id === transaction.accountId 
+            ? { ...acc, balance: acc.balance + balanceChange }
+            : acc
+        ));
+        
+        // Обновляем общий баланс если счет включен в него
+        if (account.isIncludedInTotal !== false) {
+          setTotalBalance(prev => prev + balanceChange);
+        }
+      }
     } catch (error) {
       console.error('Error deleting transaction:', error);
       throw error;

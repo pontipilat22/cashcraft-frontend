@@ -1,152 +1,535 @@
 import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Switch, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import {
+  Modal,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
+import { useData } from '../context/DataContext';
 import { DatabaseService } from '../services/database';
 
 interface AddDebtModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onDebtCreated?: () => void;
 }
 
-export const AddDebtModal: React.FC<AddDebtModalProps> = ({ visible, onClose, onSave }) => {
-  const { colors } = useTheme();
-  const [type, setType] = useState<'owe' | 'owed'>('owed');
-  const [name, setName] = useState('');
+export const AddDebtModal: React.FC<AddDebtModalProps> = ({
+  visible,
+  onClose,
+  onDebtCreated,
+}) => {
+  const { colors, isDark } = useTheme();
+  const { accounts } = useData();
+  
+  const [debtType, setDebtType] = useState<'owe' | 'owed'>('owe');
   const [amount, setAmount] = useState('');
-  const [isIncludedInTotal, setIsIncludedInTotal] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [person, setPerson] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleSave = async () => {
-    if (!name.trim() || !amount) return;
-    setLoading(true);
-    await DatabaseService.createDebt({
-      type,
-      name: name.trim(),
-      amount: parseFloat(amount),
-      isIncludedInTotal,
-    });
-    setLoading(false);
-    setName('');
+    if (!person.trim()) {
+      Alert.alert('Ошибка', 'Введите имя человека');
+      return;
+    }
+    
+    if (!amount || parseFloat(amount) <= 0) {
+      Alert.alert('Ошибка', 'Введите корректную сумму');
+      return;
+    }
+    
+    try {
+      await DatabaseService.createDebt({
+        type: debtType,
+        amount: parseFloat(amount),
+        name: person.trim(),
+        isIncludedInTotal: false,
+      });
+      
+      // Очищаем форму
+      setAmount('');
+      setPerson('');
+      setDescription('');
+      setSelectedAccountId(null);
+      setDueDate(null);
+      setDebtType('owe');
+      
+      onDebtCreated?.();
+      onClose();
+    } catch (error) {
+      console.error('Error creating debt:', error);
+      Alert.alert('Ошибка', 'Не удалось создать долг');
+    }
+  };
+
+  const handleClose = () => {
     setAmount('');
-    setType('owed');
-    setIsIncludedInTotal(true);
-    onSave();
+    setPerson('');
+    setDescription('');
+    setSelectedAccountId(null);
+    setDueDate(null);
+    setDebtType('owe');
     onClose();
   };
 
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (selectedDate) {
+      setDueDate(selectedDate);
+    }
+  };
+
+  const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={[styles.container, { backgroundColor: colors.card }]}> 
-              <Text style={[styles.title, { color: colors.text }]}>Добавить долг</Text>
-              <View style={styles.typeRow}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalContainer}
+      >
+        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>
+              Новый долг
+            </Text>
+            <TouchableOpacity onPress={handleClose}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Тип долга */}
+            <View style={styles.typeContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Тип долга
+              </Text>
+              <View style={[styles.typeSwitch, { backgroundColor: colors.background }]}>
                 <TouchableOpacity
-                  style={[styles.typeButton, type === 'owed' && { backgroundColor: colors.primary + '22' }]}
-                  onPress={() => setType('owed')}
+                  style={[
+                    styles.typeButton,
+                    debtType === 'owe' && { backgroundColor: '#FF5252' },
+                  ]}
+                  onPress={() => setDebtType('owe')}
                 >
-                  <Text style={{ color: colors.text }}>Мне должны</Text>
+                  <Text style={[
+                    styles.typeButtonText,
+                    { color: debtType === 'owe' ? '#fff' : colors.text }
+                  ]}>
+                    Я должен
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.typeButton, type === 'owe' && { backgroundColor: colors.primary + '22' }]}
-                  onPress={() => setType('owe')}
+                  style={[
+                    styles.typeButton,
+                    debtType === 'owed' && { backgroundColor: '#4CAF50' },
+                  ]}
+                  onPress={() => setDebtType('owed')}
                 >
-                  <Text style={{ color: colors.text }}>Я должен</Text>
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                placeholder={type === 'owed' ? 'Кто должен?' : 'Кому должен?'}
-                placeholderTextColor={colors.textSecondary}
-                value={name}
-                onChangeText={setName}
-              />
-              <TextInput
-                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                placeholder="Сумма"
-                placeholderTextColor={colors.textSecondary}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="numeric"
-              />
-              <View style={styles.switchRow}>
-                <Text style={{ color: colors.text }}>Учитывать в общем балансе</Text>
-                <Switch
-                  value={isIncludedInTotal}
-                  onValueChange={setIsIncludedInTotal}
-                  trackColor={{ false: '#767577', true: colors.primary }}
-                />
-              </View>
-              <View style={styles.buttonRow}>
-                <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleSave} disabled={loading}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>Сохранить</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, { backgroundColor: colors.border }]} onPress={onClose}>
-                  <Text style={{ color: colors.text }}>Отмена</Text>
+                  <Text style={[
+                    styles.typeButtonText,
+                    { color: debtType === 'owed' ? '#fff' : colors.text }
+                  ]}>
+                    Мне должны
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableWithoutFeedback>
+
+            {/* Сумма */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Сумма
+              </Text>
+              <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={[styles.currencySymbol, { color: debtType === 'owed' ? '#4CAF50' : '#FF5252' }]}>
+                  ₽
+                </Text>
+                <TextInput
+                  style={[styles.amountTextInput, { color: colors.text }]}
+                  value={amount}
+                  onChangeText={setAmount}
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* Человек */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {debtType === 'owe' ? 'Кому я должен' : 'Кто мне должен'}
+              </Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderColor: colors.border,
+                }]}
+                value={person}
+                onChangeText={setPerson}
+                placeholder="Имя человека"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            {/* Описание */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                За что (необязательно)
+              </Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderColor: colors.border,
+                }]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Например: За обед"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            {/* Дата возврата */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Дата возврата (необязательно)
+              </Text>
+              <TouchableOpacity
+                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <View style={styles.selectorContent}>
+                  <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
+                  <Text style={[styles.selectorText, { color: colors.text }]}>
+                    {dueDate ? formatDate(dueDate) : 'Не указана'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Связанный счет */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Связанный счет (необязательно)
+              </Text>
+              <TouchableOpacity
+                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => setShowAccountPicker(true)}
+              >
+                <Text style={[styles.selectorText, { color: colors.text }]}>
+                  {selectedAccount?.name || 'Не выбран'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
+              onPress={handleClose}
+            >
+              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.button, 
+                styles.saveButton, 
+                { backgroundColor: debtType === 'owed' ? '#4CAF50' : '#FF5252' }
+              ]}
+              onPress={handleSave}
+              disabled={!amount || parseFloat(amount) === 0 || !person.trim()}
+            >
+              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+
+      {/* Date Picker */}
+      {showDatePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={dueDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+      {showDatePicker && Platform.OS === 'ios' && (
+        <Modal
+          visible={showDatePicker}
+          transparent={true}
+          animationType="slide"
+        >
+          <TouchableOpacity
+            style={styles.datePickerOverlay}
+            activeOpacity={1}
+            onPress={() => setShowDatePicker(false)}
+          >
+            <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
+              <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
+                <TouchableOpacity onPress={() => {
+                  setDueDate(null);
+                  setShowDatePicker(false);
+                }}>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Сбросить</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Готово</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={dueDate || new Date()}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                minimumDate={new Date()}
+                themeVariant={isDark ? 'dark' : 'light'}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Account Picker */}
+      <Modal
+        visible={showAccountPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAccountPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAccountPicker(false)}
+        >
+          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.pickerTitle, { color: colors.text }]}>
+              Выберите счет
+            </Text>
+            <ScrollView>
+              <TouchableOpacity
+                style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                onPress={() => {
+                  setSelectedAccountId(null);
+                  setShowAccountPicker(false);
+                }}
+              >
+                <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                  Не выбран
+                </Text>
+              </TouchableOpacity>
+              {accounts.filter(acc => acc.type !== 'savings').map(account => (
+                <TouchableOpacity
+                  key={account.id}
+                  style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                  onPress={() => {
+                    setSelectedAccountId(account.id);
+                    setShowAccountPicker(false);
+                  }}
+                >
+                  <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                    {account.name}
+                  </Text>
+                  <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
+                    {account.balance.toLocaleString('ru-RU')} ₽
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  container: {
-    width: '90%',
-    borderRadius: 16,
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
+    maxHeight: '80%',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   title: {
     fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 16,
-    textAlign: 'center',
+    fontWeight: '600',
   },
-  typeRow: {
+  typeContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  typeSwitch: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 16,
+    borderRadius: 8,
+    padding: 4,
   },
   typeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginHorizontal: 6,
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  typeButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  inputContainer: {
+    marginBottom: 16,
   },
   input: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
-    marginBottom: 12,
     fontSize: 16,
   },
-  switchRow: {
+  amountInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  buttonRow: {
+  currencySymbol: {
+    fontSize: 24,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  amountTextInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '500',
+  },
+  selector: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+  },
+  selectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  selectorText: {
+    fontSize: 16,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    gap: 10,
   },
   button: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginHorizontal: 4,
+  },
+  cancelButton: {
+    borderWidth: 1,
+  },
+  saveButton: {},
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  pickerContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '60%',
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  pickerItemText: {
+    fontSize: 16,
+  },
+  pickerItemBalance: {
+    fontSize: 14,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  datePickerContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  datePickerButton: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 }); 

@@ -16,7 +16,8 @@ import { TransactionItem } from '../components/TransactionItem';
 import { TransactionActionsModal } from '../components/TransactionActionsModal';
 import { EditTransactionModal } from '../components/EditTransactionModal';
 import { AddTransactionModal } from '../components/AddTransactionModal';
-import { FAB } from '../components/FAB';
+import { FABMenu } from '../components/FABMenu';
+import { AddDebtModal } from '../components/AddDebtModal';
 import { Transaction } from '../types';
 
 export const TransactionsScreen = () => {
@@ -27,6 +28,8 @@ export const TransactionsScreen = () => {
   const [showActionsModal, setShowActionsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDebtModal, setShowDebtModal] = useState(false);
+  const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
 
   // Фильтрация транзакций по поиску
   const filteredTransactions = useMemo(() => {
@@ -116,6 +119,20 @@ export const TransactionsScreen = () => {
     );
   };
 
+  const handleQuickIncome = () => {
+    setTransactionType('income');
+    setShowAddModal(true);
+  };
+
+  const handleQuickExpense = () => {
+    setTransactionType('expense');
+    setShowAddModal(true);
+  };
+
+  const handleQuickDebt = () => {
+    setShowDebtModal(true);
+  };
+
   const renderHeader = () => (
     <View>
       <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
@@ -200,11 +217,21 @@ export const TransactionsScreen = () => {
         stickySectionHeadersEnabled={false}
       />
 
-      <FAB onPress={() => setShowAddModal(true)} />
+      <FABMenu
+        onIncomePress={handleQuickIncome}
+        onExpensePress={handleQuickExpense}
+        onDebtPress={handleQuickDebt}
+      />
 
       <AddTransactionModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
+        initialType={transactionType}
+      />
+      
+      <AddDebtModal
+        visible={showDebtModal}
+        onClose={() => setShowDebtModal(false)}
       />
 
       <TransactionActionsModal

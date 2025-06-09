@@ -556,6 +556,31 @@ export class DatabaseService {
     }
   }
 
+  static async updateDebt(id: string, updates: { name?: string; amount?: number }): Promise<void> {
+    const now = new Date().toISOString();
+    const fields: string[] = [];
+    const values: any[] = [];
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      fields.push(`${key} = ?`);
+      values.push(value);
+    });
+    
+    if (fields.length === 0) return;
+    
+    values.push(now, id);
+    
+    try {
+      db.runSync(
+        `UPDATE debts SET ${fields.join(', ')}, updatedAt = ? WHERE id = ?`,
+        ...values
+      );
+    } catch (error) {
+      console.error('Error updating debt:', error);
+      throw error;
+    }
+  }
+
   static async deleteDebt(id: string): Promise<void> {
     try {
       db.runSync('DELETE FROM debts WHERE id = ?', id);

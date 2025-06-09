@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
-import { FAB } from '../components/FAB';
+import { FABMenu } from '../components/FABMenu';
 import { AddAccountModal } from '../components/AddAccountModal';
 import { EditAccountModal } from '../components/EditAccountModal';
 import { AccountTypeSelector } from '../components/AccountTypeSelector';
@@ -32,6 +32,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [actionsModalVisible, setActionsModalVisible] = useState(false);
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [debtModalVisible, setDebtModalVisible] = useState(false);
+  const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [debts, setDebts] = useState<Debt[]>([]);
   const [selectedAccountType, setSelectedAccountType] = useState<AccountType>('cash');
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -48,6 +49,13 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     const allDebts = await DatabaseService.getDebts();
     setDebts(allDebts);
   };
+
+  // Считаем суммы долгов
+  const debtTotals = useMemo(() => {
+    const owed = debts.filter(d => d.type === 'owed').reduce((sum, d) => sum + d.amount, 0);
+    const owe = debts.filter(d => d.type === 'owe').reduce((sum, d) => sum + d.amount, 0);
+    return { owed, owe };
+  }, [debts]);
 
   // Группируем счета по типам
   const groupedAccounts = {
@@ -202,6 +210,20 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     return String(account.name || '');
   };
 
+  const handleQuickIncome = () => {
+    setTransactionType('income');
+    setTransactionModalVisible(true);
+  };
+
+  const handleQuickExpense = () => {
+    setTransactionType('expense');
+    setTransactionModalVisible(true);
+  };
+
+  const handleQuickDebt = () => {
+    setDebtModalVisible(true);
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
@@ -279,18 +301,28 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
             <View style={{ paddingHorizontal: 16 }}>
               <TouchableOpacity 
                 style={[styles.debtCard, { backgroundColor: colors.card }]}
-                onPress={() => navigation.navigate('DebtList', { type: 'owed' })}
+                onPress={() => navigation.navigate('DebtList', { type: 'owed', onUpdate: loadDebts })}
               >
                 <Ionicons name="trending-up-outline" size={32} color={colors.primary} />
-                <Text style={[styles.debtCardTitle, { color: colors.text }]}>Мне должны</Text>
+                <View style={styles.debtCardContent}>
+                  <Text style={[styles.debtCardTitle, { color: colors.text }]}>Мне должны</Text>
+                  <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
+                    {debtTotals.owed.toLocaleString('ru-RU')} ₽
+                  </Text>
+                </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.debtCard, { backgroundColor: colors.card }]}
-                onPress={() => navigation.navigate('DebtList', { type: 'owe' })}
+                onPress={() => navigation.navigate('DebtList', { type: 'owe', onUpdate: loadDebts })}
               >
                 <Ionicons name="trending-down-outline" size={32} color={colors.primary} />
-                <Text style={[styles.debtCardTitle, { color: colors.text }]}>Я должен</Text>
+                <View style={styles.debtCardContent}>
+                  <Text style={[styles.debtCardTitle, { color: colors.text }]}>Я должен</Text>
+                  <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
+                    {debtTotals.owe.toLocaleString('ru-RU')} ₽
+                  </Text>
+                </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -317,7 +349,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         <View style={{ height: 100 }}></View>
       </ScrollView>
 
-      <FAB onPress={() => setTransactionModalVisible(true)} />
+      <FABMenu
+        onIncomePress={handleQuickIncome}
+        onExpensePress={handleQuickExpense}
+        onDebtPress={handleQuickDebt}
+      />
 
       <AccountTypeSelector
         visible={typeSelectorVisible}
@@ -350,13 +386,13 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       <AddTransactionModal
         visible={transactionModalVisible}
         onClose={() => setTransactionModalVisible(false)}
+        initialType={transactionType}
       />
 
       <AddDebtModal
         visible={debtModalVisible}
         onClose={() => setDebtModalVisible(false)}
-        onSave={() => {
-          // TODO: Refresh debts data
+        onDebtCreated={() => {
           setDebtModalVisible(false);
           loadDebts();
         }}
@@ -423,10 +459,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  debtCardTitle: {
+  debtCardContent: {
     flex: 1,
+    marginLeft: 12,
+  },
+  debtCardTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 12,
+  },
+  debtCardAmount: {
+    fontSize: 14,
+    marginTop: 4,
   },
 }); 

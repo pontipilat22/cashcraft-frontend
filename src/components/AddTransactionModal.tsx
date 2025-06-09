@@ -20,11 +20,13 @@ import { useData } from '../context/DataContext';
 interface AddTransactionModalProps {
   visible: boolean;
   onClose: () => void;
+  initialType?: 'income' | 'expense';
 }
 
 export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   visible,
   onClose,
+  initialType,
 }) => {
   const { colors, isDark } = useTheme();
   const { accounts, categories, createTransaction } = useData();
@@ -38,6 +40,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // Устанавливаем тип транзакции при открытии
+  React.useEffect(() => {
+    if (visible && initialType) {
+      setIsIncome(initialType === 'income');
+    }
+  }, [visible, initialType]);
   
   // Устанавливаем счет по умолчанию при открытии модального окна
   React.useEffect(() => {

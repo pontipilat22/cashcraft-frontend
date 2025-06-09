@@ -6,7 +6,7 @@ import { BalanceHeader } from './BottomTabNavigator';
 
 export type AccountsStackParamList = {
   AccountsMain: undefined;
-  DebtList: { type: 'owe' | 'owed' };
+  DebtList: { type: 'owe' | 'owed'; onUpdate?: () => void };
 };
 
 const Stack = createStackNavigator<AccountsStackParamList>();
