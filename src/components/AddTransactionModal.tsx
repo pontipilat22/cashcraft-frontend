@@ -41,9 +41,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   
   // Устанавливаем счет по умолчанию при открытии модального окна
   React.useEffect(() => {
-    if (visible && accounts.length > 0) {
-      const defaultAccount = accounts.find(acc => acc.isDefault);
-      setSelectedAccountId(defaultAccount?.id || accounts[0].id);
+    const availableAccounts = accounts.filter(acc => acc.type !== 'savings');
+    if (visible && availableAccounts.length > 0) {
+      const defaultAccount = availableAccounts.find(acc => acc.isDefault);
+      setSelectedAccountId(defaultAccount?.id || availableAccounts[0].id);
     }
   }, [visible, accounts]);
   
@@ -52,9 +53,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   
   // Устанавливаем счет по умолчанию или первый счет
   React.useEffect(() => {
-    if (accounts.length > 0 && !selectedAccountId) {
-      const defaultAccount = accounts.find(acc => acc.isDefault);
-      setSelectedAccountId(defaultAccount?.id || accounts[0].id);
+    const availableAccounts = accounts.filter(acc => acc.type !== 'savings');
+    if (availableAccounts.length > 0 && !selectedAccountId) {
+      const defaultAccount = availableAccounts.find(acc => acc.isDefault);
+      setSelectedAccountId(defaultAccount?.id || availableAccounts[0].id);
     }
   }, [accounts]);
   
@@ -417,7 +419,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               Выберите счет
             </Text>
             <ScrollView>
-              {accounts.map(account => (
+              {accounts.filter(acc => acc.type !== 'savings').map(account => (
                 <TouchableOpacity
                   key={account.id}
                   style={[styles.pickerItem, { backgroundColor: colors.background }]}

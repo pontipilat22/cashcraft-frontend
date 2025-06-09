@@ -95,9 +95,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
-          styles.container, 
+          styles.container,
           {
             backgroundColor: isDark ? '#232323' : '#fff',
             borderWidth: isPressed ? 1 : 0,
@@ -107,7 +107,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             shadowOpacity: 0.18,
             shadowRadius: 8,
             elevation: 8,
-          }
+          },
         ]}
         activeOpacity={0.7}
         onPress={onPress}
@@ -116,23 +116,84 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         onLongPress={handleLongPress}
         delayLongPress={500}
       >
-        <View style={styles.row}>
-          <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}> 
-            <Ionicons name={getIcon()} size={24} color="#fff" />
-          </View>
-          <View style={styles.textBlock}>
-            <Text style={[styles.title, { color: isDark ? '#fff' : '#232323' }]} numberOfLines={1}>
-              {account.name}
-            </Text>
-            {account.type === 'card' && account.cardNumber && (
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}> 
-                {account.cardNumber}
+        {account.type === 'savings' && account.targetAmount ? (
+          <View style={[styles.progressFill, {
+            width: `${getProgress()}%`,
+            backgroundColor: colors.primary,
+          }]} />
+        ) : null}
+        <View style={styles.content}>
+          {account.type === 'savings' && account.targetAmount ? (
+            <View style={styles.row}>
+              <View style={[
+                styles.iconCircle,
+                {
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.07)',
+                },
+              ]}>
+                <Ionicons
+                  name={getIcon()}
+                  size={24}
+                  color={isDark ? '#fff' : '#232323'}
+                />
+              </View>
+              <View style={styles.textBlock}>
+                <Text
+                  style={[
+                    styles.title,
+                    {
+                      color: isDark ? '#fff' : '#232323',
+                      fontWeight: '700',
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {account.name}
+                </Text>
+                <Text
+                  style={{
+                    color: isDark ? '#fff' : '#232323',
+                    fontWeight: '500',
+                    marginTop: 2,
+                  }}
+                >
+                  ₽{account.balance} / ₽{account.targetAmount}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  color: isDark ? '#fff' : '#232323',
+                  fontWeight: '700',
+                  fontSize: 18,
+                  marginLeft: 8,
+                  textShadowColor: isDark ? 'rgba(0,0,0,0.15)' : 'transparent',
+                  textShadowOffset: { width: 0, height: 1 },
+                  textShadowRadius: 2,
+                }}
+              >
+                {Math.floor(getProgress())}%
               </Text>
-            )}
-          </View>
-          <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}> 
-            {formatBalance(account.balance)}
-          </Text>
+            </View>
+          ) : (
+            <View style={styles.row}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}> 
+                <Ionicons name={getIcon()} size={24} color="#fff" />
+              </View>
+              <View style={styles.textBlock}>
+                <Text style={[styles.title, { color: isDark ? '#fff' : '#232323' }]} numberOfLines={1}>
+                  {account.name}
+                </Text>
+                {account.type === 'card' && account.cardNumber && (
+                  <Text style={[styles.subtitle, { color: colors.textSecondary }]}> 
+                    {account.cardNumber}
+                  </Text>
+                )}
+              </View>
+              <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}> 
+                {formatBalance(account.balance)}
+              </Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -141,17 +202,24 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 18, // большее скругление
-    paddingVertical: 14, // чуть меньше padding
-    paddingHorizontal: 16,
+    borderRadius: 12,
     marginBottom: 12,
-    marginHorizontal: 12, // чуть меньше отступы
-    // maxWidth убираем
-    alignSelf: 'stretch',
+    maxWidth: 380,
+    alignSelf: 'center',
+    width: '95%',
+    marginHorizontal: 8,
+    overflow: 'hidden',
   },
-  row: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   iconCircle: {
     width: 40,
@@ -161,9 +229,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  textBlock: {
+  titleWrapper: {
     flex: 1,
-    justifyContent: 'center',
   },
   title: {
     fontSize: 16,
@@ -173,15 +240,21 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
   },
-  balance: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
   defaultIndicator: {
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  balanceContainer: {
+    marginBottom: 8,
+  },
+  balance: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  targetAmount: {
+    fontSize: 13,
+    marginTop: 4,
   },
   progressContainer: {
     height: 4,
@@ -191,5 +264,25 @@ const styles = StyleSheet.create({
   progressBar: {
     height: '100%',
     borderRadius: 2,
+  },
+  progressFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    borderRadius: 12,
+    zIndex: 0,
+  },
+  content: {
+    padding: 16,
+    zIndex: 1,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  textBlock: {
+    flex: 1,
+    justifyContent: 'center',
   },
 }); 
