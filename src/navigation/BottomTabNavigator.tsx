@@ -5,7 +5,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 
-import { AccountsScreen } from '../screens/AccountsScreen';
+import { AccountsNavigator } from './AccountsNavigator';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
 import { MoreScreen } from '../screens/MoreScreen';
 
@@ -18,7 +18,7 @@ export type BottomTabParamList = {
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 // Компонент для отображения баланса в заголовке
-const BalanceHeader: React.FC = () => {
+export const BalanceHeader: React.FC = () => {
   const { colors } = useTheme();
   const { totalBalance } = useData();
 
@@ -73,7 +73,7 @@ export const BottomTabNavigator: React.FC = () => {
     >
       <Tab.Screen 
         name="Accounts" 
-        component={AccountsScreen}
+        component={AccountsNavigator}
         options={{ 
           title: 'Счета',
           headerTitle: () => <BalanceHeader />

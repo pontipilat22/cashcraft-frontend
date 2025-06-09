@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { AccountSection } from '../components/AccountSection';
@@ -10,10 +10,20 @@ import { EditAccountModal } from '../components/EditAccountModal';
 import { AccountTypeSelector } from '../components/AccountTypeSelector';
 import { AccountActionsModal } from '../components/AccountActionsModal';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { AccountType, Account } from '../types';
+import { AccountType, Account, Debt } from '../types';
 import { AddTransactionModal } from '../components/AddTransactionModal';
+import { AddDebtModal } from '../components/AddDebtModal';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { AccountsStackParamList } from '../navigation/AccountsNavigator';
+import { DatabaseService } from '../services/database';
 
-export const AccountsScreen: React.FC = () => {
+type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
+
+interface AccountsScreenProps {
+  navigation: AccountsScreenNavigationProp;
+}
+
+export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
   const { accounts, isLoading, createAccount, updateAccount, deleteAccount, getStatistics } = useData();
   const [modalVisible, setModalVisible] = useState(false);
@@ -21,11 +31,23 @@ export const AccountsScreen: React.FC = () => {
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [actionsModalVisible, setActionsModalVisible] = useState(false);
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
+  const [debtModalVisible, setDebtModalVisible] = useState(false);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [selectedAccountType, setSelectedAccountType] = useState<AccountType>('cash');
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [sectionToAdd, setSectionToAdd] = useState<'cards' | 'savings' | 'debts' | 'credits'>('cards');
 
   const stats = getStatistics();
+
+  // Загружаем долги
+  useEffect(() => {
+    loadDebts();
+  }, []);
+
+  const loadDebts = async () => {
+    const allDebts = await DatabaseService.getDebts();
+    setDebts(allDebts);
+  };
 
   // Группируем счета по типам
   const groupedAccounts = {
@@ -41,6 +63,9 @@ export const AccountsScreen: React.FC = () => {
     if (section === 'cards') {
       // Для карт и счетов показываем селектор типа
       setTypeSelectorVisible(true);
+    } else if (section === 'debts') {
+      // Для долгов открываем специальную модалку
+      setDebtModalVisible(true);
     } else {
       // Для остальных сразу открываем модальное окно
       const typeMap = {
@@ -245,19 +270,31 @@ export const AccountsScreen: React.FC = () => {
 
         <AccountSection 
           title="Долги"
-          count={groupedAccounts.debts.length}
+          count={debts.length}
           onAddPress={() => handleAddAccount('debts')}
         >
-          {Array.isArray(groupedAccounts.debts) && groupedAccounts.debts.length > 0
-            ? groupedAccounts.debts.map(account => (
-                <AccountCard
-                  key={account.id}
-                  account={account}
-                  onPress={() => {}}
-                  onLongPress={() => handleAccountLongPress(account)}
-                />
-              ))
-            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>Нет долгов</Text>}
+          {debts.length === 0 ? (
+            <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>Нет долгов</Text>
+          ) : (
+            <View style={{ paddingHorizontal: 16 }}>
+              <TouchableOpacity 
+                style={[styles.debtCard, { backgroundColor: colors.card }]}
+                onPress={() => navigation.navigate('DebtList', { type: 'owed' })}
+              >
+                <Ionicons name="trending-up-outline" size={32} color={colors.primary} />
+                <Text style={[styles.debtCardTitle, { color: colors.text }]}>Мне должны</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.debtCard, { backgroundColor: colors.card }]}
+                onPress={() => navigation.navigate('DebtList', { type: 'owe' })}
+              >
+                <Ionicons name="trending-down-outline" size={32} color={colors.primary} />
+                <Text style={[styles.debtCardTitle, { color: colors.text }]}>Я должен</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          )}
         </AccountSection>
 
         <AccountSection 
@@ -314,6 +351,16 @@ export const AccountsScreen: React.FC = () => {
         visible={transactionModalVisible}
         onClose={() => setTransactionModalVisible(false)}
       />
+
+      <AddDebtModal
+        visible={debtModalVisible}
+        onClose={() => setDebtModalVisible(false)}
+        onSave={() => {
+          // TODO: Refresh debts data
+          setDebtModalVisible(false);
+          loadDebts();
+        }}
+      />
     </View>
   );
 };
@@ -363,5 +410,23 @@ const styles = StyleSheet.create({
     height: 60,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 20,
+  },
+  debtCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  debtCardTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
   },
 }); 

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Vibration, Platform
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { Account } from '../types';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface AccountCardProps {
   account: Account;
@@ -117,72 +118,85 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         delayLongPress={500}
       >
         {account.type === 'savings' && account.targetAmount ? (
-          <View style={[styles.progressFill, {
-            width: `${getProgress()}%`,
-            backgroundColor: colors.primary,
-          }]} />
-        ) : null}
-        <View style={styles.content}>
-          {account.type === 'savings' && account.targetAmount ? (
-            <View style={styles.row}>
-              <View style={[
-                styles.iconCircle,
+          <>
+            <LinearGradient
+              colors={isDark ? ['#FF9800', '#FFD600'] : ['#3B82F6', '#00E0FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[
+                styles.progressFill,
                 {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.07)',
+                  width: `${getProgress()}%`,
                 },
-              ]}>
-                <Ionicons
-                  name={getIcon()}
-                  size={24}
-                  color={isDark ? '#fff' : '#232323'}
-                />
-              </View>
-              <View style={styles.textBlock}>
-                <Text
-                  style={[
-                    styles.title,
-                    {
+              ]}
+            />
+            <View style={styles.content}>
+              <View style={styles.row}>
+                <View style={[
+                  styles.iconCircle,
+                  {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.07)',
+                  },
+                ]}>
+                  <Ionicons
+                    name={getIcon()}
+                    size={24}
+                    color={isDark ? '#fff' : '#232323'}
+                  />
+                </View>
+                <View style={styles.textBlock}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text
+                      style={[
+                        styles.title,
+                        {
+                          color: isDark ? '#fff' : '#232323',
+                          fontWeight: '700',
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {account.name}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
                       color: isDark ? '#fff' : '#232323',
-                      fontWeight: '700',
-                    },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {account.name}
-                </Text>
+                      fontWeight: '500',
+                      marginTop: 2,
+                    }}
+                  >
+                    ₽{account.balance} / ₽{account.targetAmount}
+                  </Text>
+                </View>
                 <Text
                   style={{
                     color: isDark ? '#fff' : '#232323',
-                    fontWeight: '500',
-                    marginTop: 2,
+                    fontWeight: '700',
+                    fontSize: 18,
+                    marginLeft: 8,
+                    textShadowColor: isDark ? 'rgba(0,0,0,0.15)' : 'transparent',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 2,
                   }}
                 >
-                  ₽{account.balance} / ₽{account.targetAmount}
+                  {Math.floor(getProgress())}%
                 </Text>
               </View>
-              <Text
-                style={{
-                  color: isDark ? '#fff' : '#232323',
-                  fontWeight: '700',
-                  fontSize: 18,
-                  marginLeft: 8,
-                  textShadowColor: isDark ? 'rgba(0,0,0,0.15)' : 'transparent',
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 2,
-                }}
-              >
-                {Math.floor(getProgress())}%
-              </Text>
             </View>
-          ) : (
+          </>
+        ) : (
+          <View style={styles.content}>
             <View style={styles.row}>
               <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}> 
                 <Ionicons name={getIcon()} size={24} color="#fff" />
               </View>
               <View style={styles.textBlock}>
-                <Text style={[styles.title, { color: isDark ? '#fff' : '#232323' }]} numberOfLines={1}>
-                  {account.name}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.title, { color: isDark ? '#fff' : '#232323' }]} numberOfLines={1}>
+                    {account.name}
+                  </Text>
+                </View>
                 {account.type === 'card' && account.cardNumber && (
                   <Text style={[styles.subtitle, { color: colors.textSecondary }]}> 
                     {account.cardNumber}
@@ -193,8 +207,8 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 {formatBalance(account.balance)}
               </Text>
             </View>
-          )}
-        </View>
+          </View>
+        )}
       </TouchableOpacity>
     </Animated.View>
   );

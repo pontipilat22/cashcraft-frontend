@@ -42,4 +42,14 @@ export const AccountTypeLabels: AccountTypeLabels = {
   savings: 'Накопления',
   debt: 'Долг',
   credit: 'Кредит',
-}; 
+};
+
+export interface Debt {
+  id: string;
+  type: 'owe' | 'owed'; // 'owe' — я должен, 'owed' — мне должны
+  name: string;
+  amount: number;
+  isIncludedInTotal?: boolean;
+  createdAt: string;
+  updatedAt: string;
+} 

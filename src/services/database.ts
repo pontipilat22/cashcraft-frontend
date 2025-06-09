@@ -65,6 +65,19 @@ export class DatabaseService {
           );`
         );
 
+        // Создаем таблицу долгов
+        db.execSync(
+          `CREATE TABLE IF NOT EXISTS debts (
+            id TEXT PRIMARY KEY NOT NULL,
+            type TEXT NOT NULL, -- 'owe' (я должен) или 'owed' (мне должны)
+            name TEXT NOT NULL, -- имя человека
+            amount REAL NOT NULL,
+            isIncludedInTotal INTEGER DEFAULT 1,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          );`
+        );
+
         // Проверяем, есть ли счета в БД
         const accounts = db.getAllSync('SELECT COUNT(*) as count FROM accounts');
         const accountCount = (accounts[0] as any).count;
@@ -507,6 +520,47 @@ export class DatabaseService {
       );
     } catch (error) {
       console.error('Error resetting data:', error);
+      throw error;
+    }
+  }
+
+  // Долги
+  static async getDebts(): Promise<any[]> {
+    try {
+      const result = db.getAllSync('SELECT * FROM debts ORDER BY createdAt DESC');
+      return result;
+    } catch (error) {
+      console.error('Error getting debts:', error);
+      return [];
+    }
+  }
+
+  static async createDebt(debt: { type: 'owe' | 'owed'; name: string; amount: number; isIncludedInTotal?: boolean }): Promise<void> {
+    const id = Date.now().toString();
+    const now = new Date().toISOString();
+    try {
+      db.runSync(
+        `INSERT INTO debts (id, type, name, amount, isIncludedInTotal, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?)` ,
+        id,
+        debt.type,
+        debt.name,
+        debt.amount,
+        debt.isIncludedInTotal !== false ? 1 : 0,
+        now,
+        now
+      );
+    } catch (error) {
+      console.error('Error creating debt:', error);
+      throw error;
+    }
+  }
+
+  static async deleteDebt(id: string): Promise<void> {
+    try {
+      db.runSync('DELETE FROM debts WHERE id = ?', id);
+    } catch (error) {
+      console.error('Error deleting debt:', error);
       throw error;
     }
   }

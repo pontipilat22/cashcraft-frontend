@@ -41,23 +41,13 @@ export const AccountSection: React.FC<AccountSectionProps> = ({
       </View>
       {Boolean(isExpanded && React.Children.count(children) > 0) && (
         <View>
-          {Array.isArray(children)
-            ? children.filter(child =>
-                child !== null &&
-                child !== undefined &&
-                !(typeof child === 'string' && child.trim() === '')
-              ).map((child, idx) =>
-                (typeof child === 'string' || typeof child === 'number')
-                  ? <Text key={idx}>{child}</Text>
-                  : React.isValidElement(child)
-                    ? child
-                    : null
-              )
-            : (typeof children === 'string' || typeof children === 'number')
-              ? <Text>{children}</Text>
-              : React.isValidElement(children)
-                ? children
-                : null}
+          {React.Children.toArray(children).map((child, idx) =>
+            (typeof child === 'string' || typeof child === 'number')
+              ? <Text key={idx}>{child}</Text>
+              : React.isValidElement(child)
+                ? child
+                : null
+          )}
         </View>
       )}
     </View>
