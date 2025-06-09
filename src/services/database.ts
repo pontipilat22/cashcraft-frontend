@@ -496,6 +496,9 @@ export class DatabaseService {
       // Удаляем все счета
       db.runSync('DELETE FROM accounts');
       
+      // Удаляем все долги
+      db.runSync('DELETE FROM debts');
+      
       // Удаляем все пользовательские категории (оставляем только базовые)
       db.runSync(`DELETE FROM categories WHERE id NOT IN (
         'salary', 'business', 'investments', 'other_income',

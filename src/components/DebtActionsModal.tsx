@@ -1,124 +1,198 @@
-import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { useData } from '../context/DataContext';
+import { DatabaseService } from '../services/database';
+import { Debt } from '../types';
+import { DebtOperationModal } from './DebtOperationModal';
+import { EditDebtModal } from './EditDebtModal';
 
 interface DebtActionsModalProps {
   visible: boolean;
-  debtName: string;
+  debt: Debt | null;
   onClose: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onPartialPay: () => void;
+  onUpdate: () => void;
 }
 
 export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
   visible,
-  debtName,
+  debt,
   onClose,
-  onEdit,
-  onDelete,
-  onPartialPay,
+  onUpdate,
 }) => {
   const { colors } = useTheme();
+  const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
+  const [debtOperationType, setDebtOperationType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  if (!debt) return null;
+
+  const handlePayOff = () => {
+    onClose();
+    setDebtOperationType(debt.type === 'owed' ? 'return' : 'payback');
+    setShowDebtOperationModal(true);
+  };
+
+  const handleEdit = () => {
+    onClose();
+    setShowEditModal(true);
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Удалить долг',
+      `Вы уверены, что хотите удалить долг "${debt.name}"?`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await DatabaseService.deleteDebt(debt.id);
+              onUpdate();
+              onClose();
+            } catch (error) {
+              console.error('Error deleting debt:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const actions = [
     {
-      icon: 'create-outline' as keyof typeof Ionicons.glyphMap,
-      title: 'Редактировать',
-      color: colors.primary,
-      onPress: onEdit,
+      icon: 'checkmark-circle',
+      label: debt.type === 'owed' ? 'Получить долг' : 'Вернуть долг',
+      onPress: handlePayOff,
+      color: '#4CAF50',
     },
     {
-      icon: 'cash-outline' as keyof typeof Ionicons.glyphMap,
-      title: 'Частичное погашение',
+      icon: 'pencil',
+      label: 'Редактировать',
+      onPress: handleEdit,
       color: colors.primary,
-      onPress: onPartialPay,
     },
     {
-      icon: 'trash-outline' as keyof typeof Ionicons.glyphMap,
-      title: 'Удалить',
-      color: '#f44336',
-      onPress: onDelete,
+      icon: 'trash',
+      label: 'Удалить',
+      onPress: handleDelete,
+      color: '#FF5252',
     },
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <View style={[styles.container, { backgroundColor: colors.card }]}>
-          <Text style={[styles.title, { color: colors.text }]}>{debtName}</Text>
-          {actions.map((action, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.actionButton, index < actions.length - 1 && styles.actionButtonMargin]}
-              onPress={() => {
-                action.onPress();
-                onClose();
-              }}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: action.color + '22' }]}>
-                <Ionicons name={action.icon} size={24} color={action.color} />
-              </View>
-              <Text style={[styles.actionText, { color: colors.text }]}>{action.title}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={[styles.cancelButton, { backgroundColor: colors.background }]} onPress={onClose}>
-            <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Отмена</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    </Modal>
+    <>
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <View style={[styles.content, { backgroundColor: colors.card }]}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.debtName, { color: colors.text }]}>{debt.name}</Text>
+              <Text style={[styles.debtAmount, { color: debt.type === 'owed' ? '#4CAF50' : '#FF5252' }]}>
+                {debt.type === 'owed' ? '+' : '-'}{debt.amount.toLocaleString('ru-RU')} ₽
+              </Text>
+            </View>
+            
+            <View style={styles.actions}>
+              {actions.map((action, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.actionItem}
+                  onPress={action.onPress}
+                >
+                  <View style={[styles.actionIcon, { backgroundColor: action.color + '20' }]}>
+                    <Ionicons name={action.icon as any} size={24} color={action.color} />
+                  </View>
+                  <Text style={[styles.actionLabel, { color: colors.text }]}>
+                    {action.label}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <DebtOperationModal
+        visible={showDebtOperationModal}
+        operationType={debtOperationType}
+        onClose={() => {
+          setShowDebtOperationModal(false);
+          setDebtOperationType(null);
+          onUpdate();
+        }}
+        onOperationComplete={onUpdate}
+      />
+
+      <EditDebtModal
+        visible={showEditModal}
+        debt={debt}
+        mode='edit'
+        onClose={() => {
+          setShowEditModal(false);
+          onUpdate();
+        }}
+        onSave={onUpdate}
+      />
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  container: {
-    width: '80%',
-    borderRadius: 16,
+  content: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  header: {
     padding: 20,
+    borderBottomWidth: 1,
   },
-  title: {
+  debtName: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 4,
   },
-  actionButton: {
+  debtAmount: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  actions: {
+    paddingTop: 12,
+  },
+  actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
-  actionButtonMargin: {
-    marginBottom: 12,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  actionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  actionText: {
+  actionLabel: {
+    flex: 1,
     fontSize: 16,
-    fontWeight: '500',
-  },
-  cancelButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  cancelText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 }); 

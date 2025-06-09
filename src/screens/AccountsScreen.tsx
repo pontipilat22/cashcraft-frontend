@@ -12,7 +12,8 @@ import { AccountActionsModal } from '../components/AccountActionsModal';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AccountType, Account, Debt } from '../types';
 import { AddTransactionModal } from '../components/AddTransactionModal';
-import { AddDebtModal } from '../components/AddDebtModal';
+import { DebtOperationModal } from '../components/DebtOperationModal';
+import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AccountsStackParamList } from '../navigation/AccountsNavigator';
 import { DatabaseService } from '../services/database';
@@ -31,9 +32,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [actionsModalVisible, setActionsModalVisible] = useState(false);
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
-  const [debtModalVisible, setDebtModalVisible] = useState(false);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [debtOperationType, setDebtOperationType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
+  const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
+  const [showDebtTypeSelector, setShowDebtTypeSelector] = useState(false);
   const [selectedAccountType, setSelectedAccountType] = useState<AccountType>('cash');
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [sectionToAdd, setSectionToAdd] = useState<'cards' | 'savings' | 'debts' | 'credits'>('cards');
@@ -72,8 +75,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       // Для карт и счетов показываем селектор типа
       setTypeSelectorVisible(true);
     } else if (section === 'debts') {
-      // Для долгов открываем специальную модалку
-      setDebtModalVisible(true);
+      // Для долгов открываем селектор типов
+      setShowDebtTypeSelector(true);
     } else {
       // Для остальных сразу открываем модальное окно
       const typeMap = {
@@ -221,7 +224,12 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   };
 
   const handleQuickDebt = () => {
-    setDebtModalVisible(true);
+    setShowDebtTypeSelector(true);
+  };
+
+  const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
+    setDebtOperationType(type);
+    setShowDebtOperationModal(true);
   };
 
   if (isLoading) {
@@ -389,11 +397,20 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         initialType={transactionType}
       />
 
-      <AddDebtModal
-        visible={debtModalVisible}
-        onClose={() => setDebtModalVisible(false)}
-        onDebtCreated={() => {
-          setDebtModalVisible(false);
+      <DebtTypeSelector
+        visible={showDebtTypeSelector}
+        onClose={() => setShowDebtTypeSelector(false)}
+        onSelect={handleDebtTypeSelect}
+      />
+
+      <DebtOperationModal
+        visible={showDebtOperationModal}
+        operationType={debtOperationType}
+        onClose={() => {
+          setShowDebtOperationModal(false);
+          setDebtOperationType(null);
+        }}
+        onOperationComplete={() => {
           loadDebts();
         }}
       />

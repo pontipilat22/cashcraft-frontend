@@ -17,7 +17,8 @@ import { TransactionActionsModal } from '../components/TransactionActionsModal';
 import { EditTransactionModal } from '../components/EditTransactionModal';
 import { AddTransactionModal } from '../components/AddTransactionModal';
 import { FABMenu } from '../components/FABMenu';
-import { AddDebtModal } from '../components/AddDebtModal';
+import { DebtOperationModal } from '../components/DebtOperationModal';
+import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { Transaction } from '../types';
 
 export const TransactionsScreen = () => {
@@ -28,8 +29,10 @@ export const TransactionsScreen = () => {
   const [showActionsModal, setShowActionsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showDebtModal, setShowDebtModal] = useState(false);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
+  const [debtOperationType, setDebtOperationType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
+  const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
+  const [showDebtTypeSelector, setShowDebtTypeSelector] = useState(false);
 
   // Фильтрация транзакций по поиску
   const filteredTransactions = useMemo(() => {
@@ -130,7 +133,12 @@ export const TransactionsScreen = () => {
   };
 
   const handleQuickDebt = () => {
-    setShowDebtModal(true);
+    setShowDebtTypeSelector(true);
+  };
+
+  const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
+    setDebtOperationType(type);
+    setShowDebtOperationModal(true);
   };
 
   const renderHeader = () => (
@@ -229,9 +237,19 @@ export const TransactionsScreen = () => {
         initialType={transactionType}
       />
       
-      <AddDebtModal
-        visible={showDebtModal}
-        onClose={() => setShowDebtModal(false)}
+      <DebtTypeSelector
+        visible={showDebtTypeSelector}
+        onClose={() => setShowDebtTypeSelector(false)}
+        onSelect={handleDebtTypeSelect}
+      />
+      
+      <DebtOperationModal
+        visible={showDebtOperationModal}
+        operationType={debtOperationType}
+        onClose={() => {
+          setShowDebtOperationModal(false);
+          setDebtOperationType(null);
+        }}
       />
 
       <TransactionActionsModal

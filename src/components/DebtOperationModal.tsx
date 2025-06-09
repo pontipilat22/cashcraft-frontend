@@ -1,0 +1,593 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTheme } from '../context/ThemeContext';
+import { useData } from '../context/DataContext';
+import { DatabaseService } from '../services/database';
+import { Debt } from '../types';
+
+type OperationType = 'give' | 'return' | 'borrow' | 'payback';
+
+interface DebtOperationModalProps {
+  visible: boolean;
+  operationType: OperationType | null;
+  onClose: () => void;
+  onOperationComplete?: () => void;
+}
+
+export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
+  visible,
+  operationType,
+  onClose,
+  onOperationComplete,
+}) => {
+  const { colors, isDark } = useTheme();
+  const { accounts, createTransaction, refreshData } = useData();
+  
+  const [amount, setAmount] = useState('');
+  const [person, setPerson] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showPersonPicker, setShowPersonPicker] = useState(false);
+  const [existingDebts, setExistingDebts] = useState<Debt[]>([]);
+  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+
+  // Загружаем существующие долги при открытии
+  useEffect(() => {
+    if (visible && (operationType === 'return' || operationType === 'payback')) {
+      loadExistingDebts();
+    }
+  }, [visible, operationType]);
+
+  // Устанавливаем счет по умолчанию
+  useEffect(() => {
+    const availableAccounts = accounts.filter(acc => acc.type !== 'savings');
+    if (visible && availableAccounts.length > 0 && !selectedAccountId) {
+      const defaultAccount = availableAccounts.find(acc => acc.isDefault);
+      setSelectedAccountId(defaultAccount?.id || availableAccounts[0].id);
+    }
+  }, [visible, accounts, selectedAccountId]);
+
+  const loadExistingDebts = async () => {
+    try {
+      const allDebts = await DatabaseService.getDebts();
+      // Фильтруем долги в зависимости от типа операции
+      const filtered = operationType === 'return' 
+        ? allDebts.filter(d => d.type === 'owed') // мне должны
+        : allDebts.filter(d => d.type === 'owe');  // я должен
+      setExistingDebts(filtered);
+    } catch (error) {
+      console.error('Error loading debts:', error);
+    }
+  };
+
+  const getTitle = () => {
+    switch (operationType) {
+      case 'give': return 'Дать в долг';
+      case 'return': return 'Получить долг';
+      case 'borrow': return 'Взять в долг';
+      case 'payback': return 'Вернуть долг';
+      default: return '';
+    }
+  };
+
+  const getPersonLabel = () => {
+    switch (operationType) {
+      case 'give': return 'Кому даю';
+      case 'return': return 'Кто возвращает';
+      case 'borrow': return 'У кого беру';
+      case 'payback': return 'Кому возвращаю';
+      default: return 'Человек';
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedAccountId) {
+      Alert.alert('Ошибка', 'Выберите счет');
+      return;
+    }
+
+    const amountNum = parseFloat(amount);
+    if (!amount || amountNum <= 0) {
+      Alert.alert('Ошибка', 'Введите корректную сумму');
+      return;
+    }
+
+    if (!person.trim() && !selectedDebt) {
+      Alert.alert('Ошибка', 'Введите имя человека');
+      return;
+    }
+
+    try {
+      const personName = selectedDebt ? selectedDebt.name : person.trim();
+      
+      if (operationType === 'give' || operationType === 'borrow') {
+        // Создаем новый долг
+        await DatabaseService.createDebt({
+          type: operationType === 'give' ? 'owed' : 'owe',
+          name: personName,
+          amount: amountNum,
+          isIncludedInTotal: false,
+        });
+
+        // Создаем транзакцию
+        await createTransaction({
+          amount: amountNum,
+          type: operationType === 'give' ? 'expense' : 'income',
+          accountId: selectedAccountId,
+          categoryId: operationType === 'give' ? 'other_expense' : 'other_income',
+          description: description.trim() || `${operationType === 'give' ? 'Дал в долг' : 'Взял в долг'}: ${personName}`,
+          date: selectedDate.toISOString(),
+        });
+      } else {
+        // Погашаем долг
+        if (!selectedDebt) {
+          Alert.alert('Ошибка', 'Выберите долг для погашения');
+          return;
+        }
+
+        if (amountNum > selectedDebt.amount) {
+          Alert.alert('Ошибка', `Сумма погашения больше долга (${selectedDebt.amount.toLocaleString('ru-RU')} ₽)`);
+          return;
+        }
+
+        // Обновляем или удаляем долг
+        const newAmount = selectedDebt.amount - amountNum;
+        if (newAmount <= 0) {
+          await DatabaseService.deleteDebt(selectedDebt.id);
+        } else {
+          await DatabaseService.updateDebt(selectedDebt.id, {
+            amount: newAmount,
+          });
+        }
+
+        // Создаем транзакцию
+        await createTransaction({
+          amount: amountNum,
+          type: operationType === 'return' ? 'income' : 'expense',
+          accountId: selectedAccountId,
+          categoryId: operationType === 'return' ? 'other_income' : 'other_expense',
+          description: description.trim() || `${operationType === 'return' ? 'Получил долг' : 'Вернул долг'}: ${personName}`,
+          date: selectedDate.toISOString(),
+        });
+      }
+
+      // Обновляем данные
+      await refreshData();
+      
+      // Очищаем форму
+      resetForm();
+      onOperationComplete?.();
+      onClose();
+    } catch (error) {
+      console.error('Error processing debt operation:', error);
+      Alert.alert('Ошибка', 'Не удалось выполнить операцию');
+    }
+  };
+
+  const resetForm = () => {
+    setAmount('');
+    setPerson('');
+    setDescription('');
+    setSelectedDate(new Date());
+    setSelectedDebt(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleSelectDebt = (debt: Debt) => {
+    setSelectedDebt(debt);
+    setPerson(debt.name);
+    setAmount(debt.amount.toString());
+    setShowPersonPicker(false);
+  };
+
+  const formatDate = (date: Date) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Сегодня';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Вчера';
+    } else {
+      return date.toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+      });
+    }
+  };
+
+  if (!operationType) return null;
+
+  const isReturnOperation = operationType === 'return' || operationType === 'payback';
+  const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalContainer}
+      >
+        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {getTitle()}
+            </Text>
+            <TouchableOpacity onPress={handleClose}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Сумма */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Сумма
+              </Text>
+              <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={[styles.currencySymbol, { color: colors.primary }]}>
+                  ₽
+                </Text>
+                <TextInput
+                  style={[styles.amountTextInput, { color: colors.text }]}
+                  value={amount}
+                  onChangeText={setAmount}
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                  editable={!selectedDebt}
+                />
+              </View>
+            </View>
+
+            {/* Человек */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {getPersonLabel()}
+              </Text>
+              {isReturnOperation && existingDebts.length > 0 ? (
+                <TouchableOpacity
+                  style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => setShowPersonPicker(true)}
+                >
+                  <Text style={[styles.selectorText, { color: colors.text }]}>
+                    {selectedDebt ? selectedDebt.name : 'Выберите человека'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              ) : (
+                <TextInput
+                  style={[styles.input, { 
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderColor: colors.border,
+                  }]}
+                  value={person}
+                  onChangeText={setPerson}
+                  placeholder="Имя человека"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              )}
+            </View>
+
+            {/* Описание */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Описание (необязательно)
+              </Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderColor: colors.border,
+                }]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="За что"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            {/* Дата */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Дата
+              </Text>
+              <TouchableOpacity
+                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <View style={styles.selectorContent}>
+                  <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
+                  <Text style={[styles.selectorText, { color: colors.text }]}>
+                    {formatDate(selectedDate)}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Счет */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Счет
+              </Text>
+              <TouchableOpacity
+                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => setShowAccountPicker(true)}
+              >
+                <Text style={[styles.selectorText, { color: colors.text }]}>
+                  {selectedAccount?.name || 'Выберите счет'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
+              onPress={handleClose}
+            >
+              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
+              onPress={handleSave}
+              disabled={!amount || parseFloat(amount) === 0 || (!person.trim() && !selectedDebt)}
+            >
+              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, date) => {
+            if (Platform.OS === 'android') {
+              setShowDatePicker(false);
+            }
+            if (date) setSelectedDate(date);
+          }}
+          maximumDate={new Date()}
+        />
+      )}
+
+      {/* Person Picker for return operations */}
+      <Modal
+        visible={showPersonPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPersonPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPersonPicker(false)}
+        >
+          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.pickerTitle, { color: colors.text }]}>
+              Выберите долг для погашения
+            </Text>
+            <ScrollView>
+              {existingDebts.map(debt => (
+                <TouchableOpacity
+                  key={debt.id}
+                  style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                  onPress={() => handleSelectDebt(debt)}
+                >
+                  <View>
+                    <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                      {debt.name}
+                    </Text>
+                    <Text style={[styles.debtDate, { color: colors.textSecondary }]}>
+                      {debt.createdAt ? new Date(debt.createdAt).toLocaleDateString('ru-RU') : ''}
+                    </Text>
+                  </View>
+                  <Text style={[styles.pickerItemBalance, { color: colors.primary }]}>
+                    {debt.amount.toLocaleString('ru-RU')} ₽
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Account Picker */}
+      <Modal
+        visible={showAccountPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAccountPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAccountPicker(false)}
+        >
+          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.pickerTitle, { color: colors.text }]}>
+              Выберите счет
+            </Text>
+            <ScrollView>
+              {accounts.filter(acc => acc.type !== 'savings').map(account => (
+                <TouchableOpacity
+                  key={account.id}
+                  style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                  onPress={() => {
+                    setSelectedAccountId(account.id);
+                    setShowAccountPicker(false);
+                  }}
+                >
+                  <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                    {account.name}
+                  </Text>
+                  <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
+                    {account.balance.toLocaleString('ru-RU')} ₽
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  amountInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  currencySymbol: {
+    fontSize: 24,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  amountTextInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '500',
+  },
+  selector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+  },
+  selectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  selectorText: {
+    fontSize: 16,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    gap: 10,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+  },
+  saveButton: {},
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  pickerContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '60%',
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  pickerItemText: {
+    fontSize: 16,
+  },
+  pickerItemBalance: {
+    fontSize: 14,
+  },
+  debtDate: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+}); 

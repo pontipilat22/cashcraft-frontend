@@ -16,6 +16,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { DatabaseService } from '../services/database';
+import { Debt } from '../types';
 
 interface AddDebtModalProps {
   visible: boolean;
@@ -39,6 +40,41 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showPersonPicker, setShowPersonPicker] = useState(false);
+  const [existingPeople, setExistingPeople] = useState<string[]>([]);
+  const [allDebts, setAllDebts] = useState<Debt[]>([]);
+
+  // Загружаем существующие долги при открытии
+  React.useEffect(() => {
+    if (visible) {
+      loadExistingDebts();
+    }
+  }, [visible]);
+
+  const loadExistingDebts = async () => {
+    try {
+      const debts = await DatabaseService.getDebts();
+      setAllDebts(debts);
+      
+      // Получаем уникальные имена людей
+      const people = Array.from(new Set(debts.map(d => d.name))).sort();
+      setExistingPeople(people);
+    } catch (error) {
+      console.error('Error loading debts:', error);
+    }
+  };
+
+  // Проверяем, есть ли уже долг с этим человеком
+  const checkExistingDebt = () => {
+    if (person.trim()) {
+      const existing = allDebts.find(d => 
+        d.name.toLowerCase() === person.trim().toLowerCase() && 
+        d.type === debtType
+      );
+      return existing;
+    }
+    return null;
+  };
 
   const handleSave = async () => {
     if (!person.trim()) {
@@ -188,17 +224,33 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               <Text style={[styles.label, { color: colors.textSecondary }]}>
                 {debtType === 'owe' ? 'Кому я должен' : 'Кто мне должен'}
               </Text>
-              <TextInput
-                style={[styles.input, { 
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderColor: colors.border,
-                }]}
-                value={person}
-                onChangeText={setPerson}
-                placeholder="Имя человека"
-                placeholderTextColor={colors.textSecondary}
-              />
+              <View style={{ position: 'relative' }}>
+                <TextInput
+                  style={[styles.input, { 
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderColor: colors.border,
+                    paddingRight: existingPeople.length > 0 ? 40 : 12,
+                  }]}
+                  value={person}
+                  onChangeText={setPerson}
+                  placeholder="Имя человека"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                {existingPeople.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.personPickerButton}
+                    onPress={() => setShowPersonPicker(true)}
+                  >
+                    <Ionicons name="people" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {checkExistingDebt() && (
+                <Text style={[styles.existingDebtInfo, { color: colors.primary }]}>
+                  Уже есть долг: {checkExistingDebt()?.amount.toLocaleString('ru-RU')} ₽
+                </Text>
+              )}
             </View>
 
             {/* Описание */}
@@ -372,6 +424,67 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Person Picker */}
+      <Modal
+        visible={showPersonPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPersonPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPersonPicker(false)}
+        >
+          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.pickerTitle, { color: colors.text }]}>
+              Выберите человека
+            </Text>
+            <ScrollView>
+              {existingPeople.map(name => {
+                const debtsWithPerson = allDebts.filter(d => d.name === name);
+                const owedAmount = debtsWithPerson
+                  .filter(d => d.type === 'owed')
+                  .reduce((sum, d) => sum + d.amount, 0);
+                const oweAmount = debtsWithPerson
+                  .filter(d => d.type === 'owe')
+                  .reduce((sum, d) => sum + d.amount, 0);
+                
+                return (
+                  <TouchableOpacity
+                    key={name}
+                    style={[styles.personPickerItem, { backgroundColor: colors.background }]}
+                    onPress={() => {
+                      setPerson(name);
+                      setShowPersonPicker(false);
+                    }}
+                  >
+                    <View style={styles.personInfo}>
+                      <Text style={[styles.personName, { color: colors.text }]}>
+                        {name}
+                      </Text>
+                      <View style={styles.personDebts}>
+                        {owedAmount > 0 && (
+                          <Text style={[styles.personDebtAmount, { color: '#4CAF50' }]}>
+                            Мне должны: {owedAmount.toLocaleString('ru-RU')} ₽
+                          </Text>
+                        )}
+                        {oweAmount > 0 && (
+                          <Text style={[styles.personDebtAmount, { color: '#FF5252' }]}>
+                            Я должен: {oweAmount.toLocaleString('ru-RU')} ₽
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 };
@@ -512,6 +625,37 @@ const styles = StyleSheet.create({
   },
   pickerItemBalance: {
     fontSize: 14,
+  },
+  personPickerButton: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    padding: 4,
+  },
+  existingDebtInfo: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  personPickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  personInfo: {
+    flex: 1,
+  },
+  personName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  personDebts: {
+    marginTop: 4,
+  },
+  personDebtAmount: {
+    fontSize: 12,
   },
   datePickerOverlay: {
     flex: 1,

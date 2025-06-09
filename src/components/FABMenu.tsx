@@ -54,6 +54,12 @@ export const FABMenu: React.FC<FABMenuProps> = ({
     setTimeout(action, 200);
   };
 
+  const handleClose = () => {
+    if (isOpen) {
+      toggleMenu();
+    }
+  };
+
   const rotate = rotateValue.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '45deg'],
@@ -84,7 +90,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
     menuItems.splice(2, 0, {
       label: 'Перевод',
       icon: 'swap-horizontal',
-      color: '#2196F3',
+      color: '#00BCD4',
       onPress: onTransferPress,
     });
   }
@@ -158,7 +164,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
   return (
     <>
       {isOpen && (
-        <TouchableWithoutFeedback onPress={toggleMenu}>
+        <TouchableWithoutFeedback onPress={handleClose}>
           <Animated.View
             style={[
               styles.overlay,

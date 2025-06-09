@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { DatabaseService } from '../services/database';
 import { Debt } from '../types';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DebtActionsModal } from '../components/DebtActionsModal';
-import { EditDebtModal } from '../components/EditDebtModal';
 
 interface DebtListScreenProps {
   route: {
@@ -24,8 +23,6 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
   const [loading, setLoading] = useState(true);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [actionsModalVisible, setActionsModalVisible] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editMode, setEditMode] = useState<'edit' | 'partial'>('edit');
 
   useEffect(() => {
     loadDebts();
@@ -44,36 +41,6 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
     setActionsModalVisible(true);
   };
 
-  const handleEdit = () => {
-    setEditMode('edit');
-    setEditModalVisible(true);
-  };
-
-  const handlePartialPay = () => {
-    setEditMode('partial');
-    setEditModalVisible(true);
-  };
-
-  const handleDelete = () => {
-    if (!selectedDebt) return;
-    
-    Alert.alert(
-      'Удалить долг',
-      `Вы уверены, что хотите удалить долг "${selectedDebt.name}"?`,
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Удалить',
-          style: 'destructive',
-          onPress: async () => {
-            await DatabaseService.deleteDebt(selectedDebt.id);
-            loadDebts();
-          },
-        },
-      ]
-    );
-  };
-
   const renderDebt = ({ item }: { item: Debt }) => (
     <TouchableOpacity 
       style={[styles.debtItem, { backgroundColor: colors.card }]}
@@ -81,7 +48,16 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
       delayLongPress={500}
     >
       <View style={styles.debtInfo}>
-        <Text style={[styles.debtName, { color: colors.text }]}>{item.name}</Text>
+        <View style={styles.debtDetails}>
+          <Text style={[styles.debtName, { color: colors.text }]}>{item.name}</Text>
+          <Text style={[styles.debtDate, { color: colors.textSecondary }]}>
+            {item.createdAt ? new Date(item.createdAt).toLocaleDateString('ru-RU', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            }) : ''}
+          </Text>
+        </View>
         <Text style={[styles.debtAmount, { color: colors.primary }]}>
           {item.amount.toLocaleString('ru-RU')} ₽
         </Text>
@@ -132,22 +108,9 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
 
       <DebtActionsModal
         visible={actionsModalVisible}
-        debtName={selectedDebt?.name || ''}
-        onClose={() => setActionsModalVisible(false)}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onPartialPay={handlePartialPay}
-      />
-
-      <EditDebtModal
-        visible={editModalVisible}
         debt={selectedDebt}
-        mode={editMode}
-        onClose={() => setEditModalVisible(false)}
-        onSave={() => {
-          setEditModalVisible(false);
-          loadDebts();
-        }}
+        onClose={() => setActionsModalVisible(false)}
+        onUpdate={loadDebts}
       />
     </View>
   );
@@ -202,9 +165,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  debtDetails: {
+    flex: 1,
+  },
   debtName: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  debtDate: {
+    fontSize: 12,
+    marginTop: 4,
   },
   debtAmount: {
     fontSize: 18,
