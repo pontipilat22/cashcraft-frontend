@@ -33,6 +33,9 @@ export class DatabaseService {
         try {
           db.execSync('ALTER TABLE accounts ADD COLUMN isIncludedInTotal INTEGER DEFAULT 1');
         } catch (e) {}
+        try {
+          db.execSync('ALTER TABLE accounts ADD COLUMN targetAmount REAL');
+        } catch (e) {}
 
         // Создаем таблицу транзакций
         db.execSync(
@@ -169,31 +172,28 @@ export class DatabaseService {
       const shouldBeDefault = accountsCount === 0 || account.isDefault;
       
       db.runSync(
-        `INSERT INTO accounts (id, name, type, balance, currency, cardNumber, color, icon, isDefault, isIncludedInTotal, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO accounts (id, name, type, balance, cardNumber, icon, isDefault, isIncludedInTotal, createdAt, updatedAt, targetAmount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         id,
         account.name,
         account.type,
         account.balance || 0,
-        account.currency || 'RUB',
         account.cardNumber || null,
-        account.color || null,
         account.icon || null,
         shouldBeDefault ? 1 : 0,
         account.isIncludedInTotal !== false ? 1 : 0,
         now,
-        now
+        now,
+        account.targetAmount !== undefined ? account.targetAmount : null
       );
 
       const newAccount: Account = {
         ...account,
         id,
         balance: account.balance || 0,
-        currency: account.currency || 'RUB',
         isDefault: shouldBeDefault,
         isIncludedInTotal: account.isIncludedInTotal !== false,
-        createdAt: now,
-        updatedAt: now
+        targetAmount: account.targetAmount !== undefined ? account.targetAmount : undefined,
       };
       
       return newAccount;
@@ -297,8 +297,6 @@ export class DatabaseService {
       const newTransaction: Transaction = {
         ...transaction,
         id,
-        createdAt: now,
-        updatedAt: now
       };
       
       return newTransaction;
