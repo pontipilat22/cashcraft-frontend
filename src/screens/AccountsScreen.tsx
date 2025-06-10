@@ -17,7 +17,7 @@ import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AccountsStackParamList } from '../navigation/AccountsNavigator';
-import { DatabaseService } from '../services/database';
+import { LocalDatabaseService } from '../services/localDatabase';
 import { useFocusEffect } from '@react-navigation/native';
 
 type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
@@ -72,14 +72,14 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   }, [accounts]);
 
   const loadDebts = async () => {
-    const allDebts = await DatabaseService.getDebts();
+    const allDebts = await LocalDatabaseService.getDebts();
     setDebts(allDebts);
   };
 
   // Считаем суммы долгов
   const debtTotals = useMemo(() => {
-    const owed = debts.filter(d => d.type === 'owed').reduce((sum, d) => sum + d.amount, 0);
-    const owe = debts.filter(d => d.type === 'owe').reduce((sum, d) => sum + d.amount, 0);
+    const owed = debts.filter(d => d.type === 'owed_to_me').reduce((sum, d) => sum + d.amount, 0);
+    const owe = debts.filter(d => d.type === 'owed_by_me').reduce((sum, d) => sum + d.amount, 0);
     return { owed, owe };
   }, [debts]);
 
@@ -361,7 +361,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
             <View style={{ paddingHorizontal: 16 }}>
               <TouchableOpacity 
                 style={[styles.debtCard, { backgroundColor: colors.card }]}
-                onPress={() => navigation.navigate('DebtList', { type: 'owed' })}
+                onPress={() => navigation.navigate('DebtList')}
               >
                 <Ionicons name="trending-up-outline" size={32} color={colors.primary} />
                 <View style={styles.debtCardContent}>
@@ -374,7 +374,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.debtCard, { backgroundColor: colors.card }]}
-                onPress={() => navigation.navigate('DebtList', { type: 'owe' })}
+                onPress={() => navigation.navigate('DebtList')}
               >
                 <Ionicons name="trending-down-outline" size={32} color={colors.primary} />
                 <View style={styles.debtCardContent}>

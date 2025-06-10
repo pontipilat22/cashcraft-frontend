@@ -16,7 +16,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import DateTimePickerModal from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
-import { DatabaseService } from '../services/database';
+import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt, Account } from '../types';
 
 type OperationType = 'give' | 'return' | 'borrow' | 'payback';
@@ -67,11 +67,11 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
 
   const loadExistingDebts = async () => {
     try {
-      const allDebts = await DatabaseService.getDebts();
+      const allDebts = await LocalDatabaseService.getDebts();
       // Фильтруем долги в зависимости от типа операции
       const filtered = operationType === 'return' 
-        ? allDebts.filter(d => d.type === 'owed') // мне должны
-        : allDebts.filter(d => d.type === 'owe');  // я должен
+              ? allDebts.filter(d => d.type === 'owed_to_me') // мне должны
+      : allDebts.filter(d => d.type === 'owed_by_me');  // я должен
       setExistingDebts(filtered);
     } catch (error) {
       console.error('Error loading debts:', error);
@@ -120,10 +120,11 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
       
       if (operationType === 'give' || operationType === 'borrow') {
         // Создаем новый долг
-        await DatabaseService.createDebt({
-          type: operationType === 'give' ? 'owed' : 'owe',
+        await LocalDatabaseService.createDebt({
+          type: operationType === 'give' ? 'owed_to_me' : 'owed_by_me',
           name: personName,
-          amount: parseFloat(amount)
+          amount: parseFloat(amount),
+          isIncludedInTotal: true
         });
 
         // Создаем транзакцию
@@ -150,9 +151,9 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         // Обновляем или удаляем долг
         const newAmount = selectedDebt.amount - amountNum;
         if (newAmount <= 0) {
-          await DatabaseService.deleteDebt(selectedDebt.id);
+          await LocalDatabaseService.deleteDebt(selectedDebt.id);
         } else {
-          await DatabaseService.updateDebt(selectedDebt.id, {
+          await LocalDatabaseService.updateDebt(selectedDebt.id, {
             amount: newAmount,
           });
         }

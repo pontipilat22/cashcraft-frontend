@@ -92,6 +92,11 @@ export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ on
 
         // Сохраняем текущего пользователя
         await AsyncStorage.setItem('currentUser', email);
+        await AsyncStorage.removeItem('isGuest');
+        
+        // Сохраняем токен для синхронизации (в демо режиме это просто email)
+        await AsyncStorage.setItem(`authToken_${email}`, email);
+        
         onLogin(email);
       } else {
         // Регистрация
@@ -114,8 +119,12 @@ export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ on
 
         await AsyncStorage.setItem('users', JSON.stringify(users));
         await AsyncStorage.setItem('currentUser', email);
+        await AsyncStorage.removeItem('isGuest');
         
-        // Инициализация данных будет происходить автоматически через UserDataService
+        // Сохраняем токен для синхронизации (в демо режиме это просто email)
+        await AsyncStorage.setItem(`authToken_${email}`, email);
+        
+        // Инициализация данных будет происходить автоматически через LocalDatabaseService
         // когда DataProvider получит userId
 
         onLogin(email);
@@ -157,6 +166,10 @@ export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ on
 
       await AsyncStorage.setItem('users', JSON.stringify(users));
       await AsyncStorage.setItem('currentUser', userId);
+      await AsyncStorage.removeItem('isGuest');
+      
+      // Сохраняем токен для синхронизации
+      await AsyncStorage.setItem(`authToken_${userId}`, userId);
       
       onLogin(userId);
     } catch (error: any) {

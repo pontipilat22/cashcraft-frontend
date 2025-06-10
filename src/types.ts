@@ -30,6 +30,8 @@ export interface Transaction {
   date: string;
   note?: string;
   description?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Category {
@@ -55,7 +57,7 @@ export const AccountTypeLabels: AccountTypeLabels = {
 
 export interface Debt {
   id: string;
-  type: 'owe' | 'owed'; // 'owe' — я должен, 'owed' — мне должны
+  type: 'owed_to_me' | 'owed_by_me'; // 'owed_to_me' — мне должны, 'owed_by_me' — я должен
   name: string;
   amount: number;
   isIncludedInTotal?: boolean;

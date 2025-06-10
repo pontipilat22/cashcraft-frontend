@@ -3,7 +3,7 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
-import { DatabaseService } from '../services/database';
+import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt } from '../types';
 import { DebtOperationModal } from './DebtOperationModal';
 import { EditDebtModal } from './EditDebtModal';
@@ -30,7 +30,7 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
 
   const handlePayOff = () => {
     onClose();
-    setDebtOperationType(debt.type === 'owed' ? 'return' : 'payback');
+    setDebtOperationType(debt.type === 'owed_to_me' ? 'return' : 'payback');
     setShowDebtOperationModal(true);
   };
 
@@ -50,7 +50,7 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
-              await DatabaseService.deleteDebt(debt.id);
+              await LocalDatabaseService.deleteDebt(debt.id);
               onUpdate();
               onClose();
             } catch (error) {
@@ -65,7 +65,7 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
   const actions = [
     {
       icon: 'checkmark-circle',
-      label: debt.type === 'owed' ? 'Получить долг' : 'Вернуть долг',
+      label: debt.type === 'owed_to_me' ? 'Получить долг' : 'Вернуть долг',
       onPress: handlePayOff,
       color: '#4CAF50',
     },
@@ -99,8 +99,8 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
           <View style={[styles.content, { backgroundColor: colors.card }]}>
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
               <Text style={[styles.debtName, { color: colors.text }]}>{debt.name}</Text>
-              <Text style={[styles.debtAmount, { color: debt.type === 'owed' ? '#4CAF50' : '#FF5252' }]}>
-                {debt.type === 'owed' ? '+' : '-'}{debt.amount.toLocaleString('ru-RU')} ₽
+              <Text style={[styles.debtAmount, { color: debt.type === 'owed_to_me' ? '#4CAF50' : '#FF5252' }]}>
+                {debt.type === 'owed_to_me' ? '+' : '-'}{debt.amount.toLocaleString('ru-RU')} ₽
               </Text>
             </View>
             

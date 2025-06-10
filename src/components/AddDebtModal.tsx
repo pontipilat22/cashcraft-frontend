@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -10,670 +10,358 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Switch,
 } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
-import { useData } from '../context/DataContext';
-import { DatabaseService } from '../services/database';
 import { Debt } from '../types';
 
 interface AddDebtModalProps {
   visible: boolean;
   onClose: () => void;
-  onDebtCreated?: () => void;
+  onSave: (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  editingDebt?: Debt | null;
 }
 
 export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   visible,
   onClose,
-  onDebtCreated,
+  onSave,
+  editingDebt,
 }) => {
-  const { colors, isDark } = useTheme();
-  const { accounts } = useData();
+  const { colors } = useTheme();
   
-  const [debtType, setDebtType] = useState<'owe' | 'owed'>('owe');
+  const [type, setType] = useState<'owed_to_me' | 'owed_by_me'>('owed_to_me');
+  const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [person, setPerson] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [dueDate, setDueDate] = useState<Date | null>(null);
-  const [showAccountPicker, setShowAccountPicker] = useState(false);
+  const [isIncludedInTotal, setIsIncludedInTotal] = useState(true);
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showPersonPicker, setShowPersonPicker] = useState(false);
-  const [existingPeople, setExistingPeople] = useState<string[]>([]);
-  const [allDebts, setAllDebts] = useState<Debt[]>([]);
 
-  // Загружаем существующие долги при открытии
-  React.useEffect(() => {
-    if (visible) {
-      loadExistingDebts();
+  useEffect(() => {
+    if (editingDebt) {
+      setType(editingDebt.type);
+      setName(editingDebt.name);
+      setAmount(editingDebt.amount.toString());
+      setIsIncludedInTotal(editingDebt.isIncludedInTotal !== false);
+      setDueDate(editingDebt.dueDate ? new Date(editingDebt.dueDate) : undefined);
+    } else {
+      // Сброс формы для нового долга
+      setType('owed_to_me');
+      setName('');
+      setAmount('');
+      setIsIncludedInTotal(true);
+      setDueDate(undefined);
     }
-  }, [visible]);
+  }, [editingDebt, visible]);
 
-  const loadExistingDebts = async () => {
-    try {
-      const debts = await DatabaseService.getDebts();
-      setAllDebts(debts);
-      
-      // Получаем уникальные имена людей
-      const people = Array.from(new Set(debts.map(d => d.name))).sort();
-      setExistingPeople(people);
-    } catch (error) {
-      console.error('Error loading debts:', error);
-    }
-  };
-
-  // Проверяем, есть ли уже долг с этим человеком
-  const checkExistingDebt = () => {
-    if (person.trim()) {
-      const existing = allDebts.find(d => 
-        d.name.toLowerCase() === person.trim().toLowerCase() && 
-        d.type === debtType
-      );
-      return existing;
-    }
-    return null;
-  };
-
-  const handleSave = async () => {
-    if (!person.trim()) {
-      Alert.alert('Ошибка', 'Введите имя человека');
+  const handleSave = () => {
+    if (!name.trim()) {
+      Alert.alert('Ошибка', 'Введите имя должника');
       return;
     }
-    
-    if (!amount || parseFloat(amount) <= 0) {
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
       Alert.alert('Ошибка', 'Введите корректную сумму');
       return;
     }
-    
-    try {
-      await DatabaseService.createDebt({
-        type: debtType,
-        amount: parseFloat(amount),
-        name: person.trim(),
-        isIncludedInTotal: false,
-      });
-      
-      // Очищаем форму
-      setAmount('');
-      setPerson('');
-      setDescription('');
-      setSelectedAccountId(null);
-      setDueDate(null);
-      setDebtType('owe');
-      
-      onDebtCreated?.();
-      onClose();
-    } catch (error) {
-      console.error('Error creating debt:', error);
-      Alert.alert('Ошибка', 'Не удалось создать долг');
-    }
-  };
 
-  const handleClose = () => {
-    setAmount('');
-    setPerson('');
-    setDescription('');
-    setSelectedAccountId(null);
-    setDueDate(null);
-    setDebtType('owe');
-    onClose();
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('ru-RU', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
+    onSave({
+      type,
+      name: name.trim(),
+      amount: numAmount,
+      isIncludedInTotal,
+      dueDate: dueDate?.toISOString(),
     });
   };
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (selectedDate) {
-      setDueDate(selectedDate);
-    }
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('ru-RU');
   };
 
-  const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
     >
       <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalContainer}
       >
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              Новый долг
-            </Text>
-            <TouchableOpacity onPress={handleClose}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {editingDebt ? 'Редактировать долг' : 'Новый долг'}
+            </Text>
+            <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
+              <Text style={[styles.saveButtonText, { color: colors.primary }]}>
+                Сохранить
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Тип долга */}
-            <View style={styles.typeContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Тип долга
               </Text>
-              <View style={[styles.typeSwitch, { backgroundColor: colors.background }]}>
+              <View style={[styles.segmentedControl, { backgroundColor: colors.card }]}>
                 <TouchableOpacity
                   style={[
-                    styles.typeButton,
-                    debtType === 'owe' && { backgroundColor: '#FF5252' },
+                    styles.segment,
+                    type === 'owed_to_me' && {
+                      backgroundColor: colors.primary,
+                    },
                   ]}
-                  onPress={() => setDebtType('owe')}
+                  onPress={() => setType('owed_to_me')}
                 >
-                  <Text style={[
-                    styles.typeButtonText,
-                    { color: debtType === 'owe' ? '#fff' : colors.text }
-                  ]}>
-                    Я должен
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      {
+                        color: type === 'owed_to_me' ? '#fff' : colors.text,
+                      },
+                    ]}
+                  >
+                    Мне должны
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
-                    styles.typeButton,
-                    debtType === 'owed' && { backgroundColor: '#4CAF50' },
+                    styles.segment,
+                    type === 'owed_by_me' && {
+                      backgroundColor: colors.primary,
+                    },
                   ]}
-                  onPress={() => setDebtType('owed')}
+                  onPress={() => setType('owed_by_me')}
                 >
-                  <Text style={[
-                    styles.typeButtonText,
-                    { color: debtType === 'owed' ? '#fff' : colors.text }
-                  ]}>
-                    Мне должны
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      {
+                        color: type === 'owed_by_me' ? '#fff' : colors.text,
+                      },
+                    ]}
+                  >
+                    Я должен
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
+            {/* Имя должника */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {type === 'owed_to_me' ? 'Кто должен' : 'Кому должен'}
+              </Text>
+              <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder={type === 'owed_to_me' ? 'Имя должника' : 'Имя кредитора'}
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+            </View>
+
             {/* Сумма */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Сумма
               </Text>
-              <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                <Text style={[styles.currencySymbol, { color: debtType === 'owed' ? '#4CAF50' : '#FF5252' }]}>
-                  ₽
-                </Text>
+              <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
                 <TextInput
-                  style={[styles.amountTextInput, { color: colors.text }]}
+                  style={[styles.input, { color: colors.text }]}
                   value={amount}
                   onChangeText={setAmount}
                   placeholder="0"
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />
+                <Text style={[styles.currency, { color: colors.textSecondary }]}>₽</Text>
               </View>
-            </View>
-
-            {/* Человек */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {debtType === 'owe' ? 'Кому я должен' : 'Кто мне должен'}
-              </Text>
-              <View style={{ position: 'relative' }}>
-                <TextInput
-                  style={[styles.input, { 
-                    backgroundColor: colors.background,
-                    color: colors.text,
-                    borderColor: colors.border,
-                    paddingRight: existingPeople.length > 0 ? 40 : 12,
-                  }]}
-                  value={person}
-                  onChangeText={setPerson}
-                  placeholder="Имя человека"
-                  placeholderTextColor={colors.textSecondary}
-                />
-                {existingPeople.length > 0 && (
-                  <TouchableOpacity
-                    style={styles.personPickerButton}
-                    onPress={() => setShowPersonPicker(true)}
-                  >
-                    <Ionicons name="people" size={20} color={colors.primary} />
-                  </TouchableOpacity>
-                )}
-              </View>
-              {checkExistingDebt() && (
-                <Text style={[styles.existingDebtInfo, { color: colors.primary }]}>
-                  Уже есть долг: {checkExistingDebt()?.amount.toLocaleString('ru-RU')} ₽
-                </Text>
-              )}
-            </View>
-
-            {/* Описание */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                За что (необязательно)
-              </Text>
-              <TextInput
-                style={[styles.input, { 
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderColor: colors.border,
-                }]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Например: За обед"
-                placeholderTextColor={colors.textSecondary}
-              />
             </View>
 
             {/* Дата возврата */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Дата возврата (необязательно)
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Дата возврата
               </Text>
               <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                style={[styles.dateButton, { backgroundColor: colors.card }]}
                 onPress={() => setShowDatePicker(true)}
               >
-                <View style={styles.selectorContent}>
-                  <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
-                  <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {dueDate ? formatDate(dueDate) : 'Не указана'}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Связанный счет */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Связанный счет (необязательно)
-              </Text>
-              <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => setShowAccountPicker(true)}
-              >
-                <Text style={[styles.selectorText, { color: colors.text }]}>
-                  {selectedAccount?.name || 'Не выбран'}
+                <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
+                <Text
+                  style={[
+                    styles.dateText,
+                    { color: dueDate ? colors.text : colors.textSecondary },
+                  ]}
+                >
+                  {dueDate ? formatDate(dueDate) : 'Выберите дату'}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                {dueDate && (
+                  <TouchableOpacity
+                    onPress={() => setDueDate(undefined)}
+                    style={styles.clearButton}
+                  >
+                    <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
               </TouchableOpacity>
             </View>
-          </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
-              onPress={handleClose}
-            >
-              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.button, 
-                styles.saveButton, 
-                { backgroundColor: debtType === 'owed' ? '#4CAF50' : '#FF5252' }
-              ]}
-              onPress={handleSave}
-              disabled={!amount || parseFloat(amount) === 0 || !person.trim()}
-            >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-
-      {/* Date Picker */}
-      {showDatePicker && Platform.OS === 'android' && (
-        <DateTimePicker
-          value={dueDate || new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
-      )}
-      {showDatePicker && Platform.OS === 'ios' && (
-        <Modal
-          visible={showDatePicker}
-          transparent={true}
-          animationType="slide"
-        >
-          <TouchableOpacity
-            style={styles.datePickerOverlay}
-            activeOpacity={1}
-            onPress={() => setShowDatePicker(false)}
-          >
-            <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
-              <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => {
-                  setDueDate(null);
-                  setShowDatePicker(false);
-                }}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Сбросить</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Готово</Text>
-                </TouchableOpacity>
+            {/* Включить в общий баланс */}
+            <View style={[styles.switchRow, { backgroundColor: colors.card }]}>
+              <View style={styles.switchLeft}>
+                <Text style={[styles.switchTitle, { color: colors.text }]}>
+                  Учитывать в общем балансе
+                </Text>
+                <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>
+                  Долг будет отображаться в общей статистике
+                </Text>
               </View>
-              <DateTimePicker
-                value={dueDate || new Date()}
-                mode="date"
-                display="spinner"
-                onChange={handleDateChange}
-                minimumDate={new Date()}
-                themeVariant={isDark ? 'dark' : 'light'}
+              <Switch
+                value={isIncludedInTotal}
+                onValueChange={setIsIncludedInTotal}
+                trackColor={{ false: '#767577', true: colors.primary }}
               />
             </View>
-          </TouchableOpacity>
-        </Modal>
-      )}
+          </ScrollView>
+        </View>
 
-      {/* Account Picker */}
-      <Modal
-        visible={showAccountPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowAccountPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.pickerOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAccountPicker(false)}
-        >
-          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              Выберите счет
-            </Text>
-            <ScrollView>
-              <TouchableOpacity
-                style={[styles.pickerItem, { backgroundColor: colors.background }]}
-                onPress={() => {
-                  setSelectedAccountId(null);
-                  setShowAccountPicker(false);
-                }}
-              >
-                <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                  Не выбран
-                </Text>
-              </TouchableOpacity>
-              {accounts.filter(acc => acc.type !== 'savings').map(account => (
-                <TouchableOpacity
-                  key={account.id}
-                  style={[styles.pickerItem, { backgroundColor: colors.background }]}
-                  onPress={() => {
-                    setSelectedAccountId(account.id);
-                    setShowAccountPicker(false);
-                  }}
-                >
-                  <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                    {account.name}
-                  </Text>
-                  <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
-                    {account.balance.toLocaleString('ru-RU')} ₽
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Person Picker */}
-      <Modal
-        visible={showPersonPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPersonPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.pickerOverlay}
-          activeOpacity={1}
-          onPress={() => setShowPersonPicker(false)}
-        >
-          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              Выберите человека
-            </Text>
-            <ScrollView>
-              {existingPeople.map(name => {
-                const debtsWithPerson = allDebts.filter(d => d.name === name);
-                const owedAmount = debtsWithPerson
-                  .filter(d => d.type === 'owed')
-                  .reduce((sum, d) => sum + d.amount, 0);
-                const oweAmount = debtsWithPerson
-                  .filter(d => d.type === 'owe')
-                  .reduce((sum, d) => sum + d.amount, 0);
-                
-                return (
-                  <TouchableOpacity
-                    key={name}
-                    style={[styles.personPickerItem, { backgroundColor: colors.background }]}
-                    onPress={() => {
-                      setPerson(name);
-                      setShowPersonPicker(false);
-                    }}
-                  >
-                    <View style={styles.personInfo}>
-                      <Text style={[styles.personName, { color: colors.text }]}>
-                        {name}
-                      </Text>
-                      <View style={styles.personDebts}>
-                        {owedAmount > 0 && (
-                          <Text style={[styles.personDebtAmount, { color: '#4CAF50' }]}>
-                            Мне должны: {owedAmount.toLocaleString('ru-RU')} ₽
-                          </Text>
-                        )}
-                        {oweAmount > 0 && (
-                          <Text style={[styles.personDebtAmount, { color: '#FF5252' }]}>
-                            Я должен: {oweAmount.toLocaleString('ru-RU')} ₽
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        {showDatePicker && (
+          <DateTimePicker
+            value={dueDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) {
+                setDueDate(selectedDate);
+              }
+            }}
+            minimumDate={new Date()}
+          />
+        )}
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  container: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  closeButton: {
+    width: 70,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
   },
-  typeContainer: {
-    marginBottom: 20,
+  saveButton: {
+    width: 70,
+    alignItems: 'flex-end',
   },
-  label: {
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  content: {
+    flex: 1,
+  },
+  section: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
     fontSize: 14,
+    fontWeight: '600',
     marginBottom: 8,
   },
-  typeSwitch: {
+  segmentedControl: {
     flexDirection: 'row',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 4,
   },
-  typeButton: {
+  segment: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: 6,
+    borderRadius: 8,
   },
-  typeButtonText: {
+  segmentText: {
     fontSize: 16,
     fontWeight: '500',
   },
   inputContainer: {
-    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    flex: 1,
     fontSize: 16,
-  },
-  amountInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  currencySymbol: {
-    fontSize: 24,
-    fontWeight: '500',
-    marginRight: 8,
-  },
-  amountTextInput: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: '500',
-  },
-  selector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-  },
-  selectorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  selectorText: {
-    fontSize: 16,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    gap: 10,
-  },
-  button: {
-    flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
   },
-  cancelButton: {
-    borderWidth: 1,
-  },
-  saveButton: {},
-  buttonText: {
+  currency: {
     fontSize: 16,
-    fontWeight: '500',
+    marginLeft: 8,
   },
-  pickerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  pickerContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '60%',
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  pickerItem: {
+  dateButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    borderRadius: 12,
     padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
   },
-  pickerItemText: {
+  dateText: {
+    flex: 1,
     fontSize: 16,
+    marginLeft: 12,
   },
-  pickerItemBalance: {
-    fontSize: 14,
-  },
-  personPickerButton: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
+  clearButton: {
     padding: 4,
   },
-  existingDebtInfo: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  personPickerItem: {
+  switchRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  personInfo: {
-    flex: 1,
-  },
-  personName: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  personDebts: {
-    marginTop: 4,
-  },
-  personDebtAmount: {
-    fontSize: 12,
-  },
-  datePickerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  datePickerContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  datePickerHeader: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
+    margin: 16,
     padding: 16,
-    borderBottomWidth: 1,
+    borderRadius: 12,
   },
-  datePickerButton: {
+  switchLeft: {
+    flex: 1,
+    marginRight: 16,
+  },
+  switchTitle: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  switchSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
   },
 }); 

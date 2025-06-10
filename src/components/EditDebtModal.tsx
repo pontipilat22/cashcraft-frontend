@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
-import { DatabaseService } from '../services/database';
+import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt } from '../types';
 
 interface EditDebtModalProps {
@@ -59,7 +59,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
     setLoading(true);
 
     try {
-      await DatabaseService.updateDebt(debt.id, {
+      await LocalDatabaseService.updateDebt(debt.id, {
         ...debt,
         name,
         amount: Number(amount),
@@ -108,12 +108,12 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
             <View style={styles.typeInfo}>
               <View style={[styles.typeInfoCard, { backgroundColor: colors.background }]}>
                 <Ionicons 
-                  name={debt.type === 'owed' ? 'arrow-up-circle' : 'arrow-down-circle'} 
+                  name={debt.type === 'owed_to_me' ? 'arrow-up-circle' : 'arrow-down-circle'} 
                   size={24} 
-                  color={debt.type === 'owed' ? '#4CAF50' : '#FF5252'} 
+                                      color={debt.type === 'owed_to_me' ? '#4CAF50' : '#FF5252'} 
                 />
                 <Text style={[styles.typeInfoText, { color: colors.text }]}>
-                  {debt.type === 'owed' ? 'Мне должны' : 'Я должен'}
+                                      {debt.type === 'owed_to_me' ? 'Мне должны' : 'Я должен'}
                 </Text>
               </View>
             </View>
@@ -141,7 +141,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
             {/* Человек */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {debt.type === 'owed' ? 'Кто должен' : 'Кому должен'}
+                {debt.type === 'owed_to_me' ? 'Кто должен' : 'Кому должен'}
               </Text>
               <TextInput
                 style={[styles.input, { 

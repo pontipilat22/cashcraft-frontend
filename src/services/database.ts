@@ -1,14 +1,35 @@
 import * as SQLite from 'expo-sqlite';
-import { Account, Transaction, Category } from '../types';
+import { Account, Transaction, Category, Debt } from '../types';
 
-const db = SQLite.openDatabaseSync('cashcraft.db');
+let db: SQLite.SQLiteDatabase | null = null;
+let currentUserId: string | null = null;
 
 export class DatabaseService {
+  static setUserId(userId: string | null) {
+    currentUserId = userId;
+    if (userId) {
+      // Открываем базу данных для конкретного пользователя
+      db = SQLite.openDatabaseSync(`cashcraft_${userId.replace(/[^a-zA-Z0-9]/g, '_')}.db`);
+    }
+  }
+
+  private static getDb(): SQLite.SQLiteDatabase {
+    if (!db) {
+      throw new Error('Database not initialized. Call setUserId first.');
+    }
+    return db;
+  }
+
   static async initDatabase() {
+    if (!db || !currentUserId) {
+      console.warn('Database not initialized. Call setUserId first.');
+      return;
+    }
     return new Promise<void>((resolve) => {
       try {
+        const database = this.getDb();
         // Создаем таблицу счетов
-        db.execSync(
+        database.execSync(
           `CREATE TABLE IF NOT EXISTS accounts (
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
@@ -34,17 +55,17 @@ export class DatabaseService {
         
         // Добавляем новые колонки в существующую таблицу
         try {
-          db.execSync('ALTER TABLE accounts ADD COLUMN isDefault INTEGER DEFAULT 0');
+          database.execSync('ALTER TABLE accounts ADD COLUMN isDefault INTEGER DEFAULT 0');
         } catch (e) {}
         try {
-          db.execSync('ALTER TABLE accounts ADD COLUMN isIncludedInTotal INTEGER DEFAULT 1');
+          database.execSync('ALTER TABLE accounts ADD COLUMN isIncludedInTotal INTEGER DEFAULT 1');
         } catch (e) {}
         try {
-          db.execSync('ALTER TABLE accounts ADD COLUMN targetAmount REAL');
+          database.execSync('ALTER TABLE accounts ADD COLUMN targetAmount REAL');
         } catch (e) {}
 
         // Создаем таблицу транзакций
-        db.execSync(
+        database.execSync(
           `CREATE TABLE IF NOT EXISTS transactions (
             id TEXT PRIMARY KEY NOT NULL,
             amount REAL NOT NULL,
@@ -61,7 +82,7 @@ export class DatabaseService {
         );
 
         // Создаем таблицу категорий
-        db.execSync(
+        database.execSync(
           `CREATE TABLE IF NOT EXISTS categories (
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
@@ -72,7 +93,7 @@ export class DatabaseService {
         );
 
         // Создаем таблицу долгов
-        db.execSync(`
+        database.execSync(`
           CREATE TABLE IF NOT EXISTS debts (
             id TEXT PRIMARY KEY,
             type TEXT NOT NULL,
@@ -87,12 +108,12 @@ export class DatabaseService {
         
         // Проверяем, есть ли колонка dueDate в таблице debts (для миграции)
         try {
-          const tableInfo = db.getAllSync("PRAGMA table_info(debts)");
+          const tableInfo = database.getAllSync("PRAGMA table_info(debts)");
           const hasDueDateColumn = tableInfo.some((col: any) => col.name === 'dueDate');
           
           if (!hasDueDateColumn) {
             // Добавляем колонку dueDate в существующую таблицу
-            db.execSync('ALTER TABLE debts ADD COLUMN dueDate TEXT');
+            database.execSync('ALTER TABLE debts ADD COLUMN dueDate TEXT');
             console.log('Added dueDate column to debts table');
           }
         } catch (error) {
@@ -101,39 +122,39 @@ export class DatabaseService {
 
         // Проверяем и добавляем колонки для кредитов
         try {
-          const accountsTableInfo = db.getAllSync("PRAGMA table_info(accounts)");
+          const accountsTableInfo = database.getAllSync("PRAGMA table_info(accounts)");
           const columns = accountsTableInfo.map((col: any) => col.name);
           
           if (!columns.includes('creditStartDate')) {
-            db.execSync('ALTER TABLE accounts ADD COLUMN creditStartDate TEXT');
+            database.execSync('ALTER TABLE accounts ADD COLUMN creditStartDate TEXT');
           }
           if (!columns.includes('creditTerm')) {
-            db.execSync('ALTER TABLE accounts ADD COLUMN creditTerm INTEGER');
+            database.execSync('ALTER TABLE accounts ADD COLUMN creditTerm INTEGER');
           }
           if (!columns.includes('creditRate')) {
-            db.execSync('ALTER TABLE accounts ADD COLUMN creditRate REAL');
+            database.execSync('ALTER TABLE accounts ADD COLUMN creditRate REAL');
           }
           if (!columns.includes('creditPaymentType')) {
-            db.execSync('ALTER TABLE accounts ADD COLUMN creditPaymentType TEXT');
+            database.execSync('ALTER TABLE accounts ADD COLUMN creditPaymentType TEXT');
           }
           if (!columns.includes('creditInitialAmount')) {
-            db.execSync('ALTER TABLE accounts ADD COLUMN creditInitialAmount REAL');
+            database.execSync('ALTER TABLE accounts ADD COLUMN creditInitialAmount REAL');
           }
           if (!columns.includes('targetAmount')) {
-            db.execSync('ALTER TABLE accounts ADD COLUMN targetAmount REAL');
+            database.execSync('ALTER TABLE accounts ADD COLUMN targetAmount REAL');
           }
         } catch (error) {
           console.error('Error adding credit columns:', error);
         }
 
         // Проверяем, есть ли счета в БД
-        const accounts = db.getAllSync('SELECT COUNT(*) as count FROM accounts');
+        const accounts = database.getAllSync('SELECT COUNT(*) as count FROM accounts');
         const accountCount = (accounts[0] as any).count;
         
         // Если счетов нет, создаем счет "Наличные" по умолчанию
         if (accountCount === 0) {
           const now = new Date().toISOString();
-          db.runSync(
+          database.runSync(
             `INSERT INTO accounts (id, name, type, balance, currency, isDefault, isIncludedInTotal, createdAt, updatedAt)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             '1',
@@ -148,7 +169,7 @@ export class DatabaseService {
           );
           
           // Создаем пример транзакции "Зарплата"
-          db.runSync(
+          database.runSync(
             `INSERT INTO transactions (id, amount, type, accountId, categoryId, description, date, createdAt, updatedAt)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             '1',
@@ -164,7 +185,7 @@ export class DatabaseService {
         }
 
         // Проверяем, есть ли категории в БД
-        const categories = db.getAllSync('SELECT COUNT(*) as count FROM categories');
+        const categories = database.getAllSync('SELECT COUNT(*) as count FROM categories');
         const categoryCount = (categories[0] as any).count;
         
         // Если категорий нет, создаем базовые категории
@@ -187,7 +208,7 @@ export class DatabaseService {
           ];
           
           baseCategories.forEach(category => {
-            db.runSync(
+            database.runSync(
               `INSERT INTO categories (id, name, type, icon, color)
                VALUES (?, ?, ?, ?, ?)`,
               category.id,
@@ -210,7 +231,8 @@ export class DatabaseService {
   // Счета
   static async getAccounts(): Promise<Account[]> {
     try {
-      const result = db.getAllSync('SELECT * FROM accounts ORDER BY createdAt DESC');
+      const database = this.getDb();
+      const result = database.getAllSync('SELECT * FROM accounts ORDER BY createdAt DESC');
       return result as Account[];
     } catch (error) {
       console.error('Error getting accounts:', error);
@@ -221,18 +243,19 @@ export class DatabaseService {
   static async createAccount(account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>): Promise<Account> {
     const id = Date.now().toString();
     const now = new Date().toISOString();
+    const database = this.getDb();
     
     try {
       // Если это первый счет или isDefault = true, убираем флаг default у других счетов
       if (account.isDefault) {
-        db.runSync('UPDATE accounts SET isDefault = 0');
+        database.runSync('UPDATE accounts SET isDefault = 0');
       }
       
       // Проверяем есть ли уже счета
-      const accountsCount = (db.getAllSync('SELECT COUNT(*) as count FROM accounts')[0] as any).count;
+      const accountsCount = (database.getAllSync('SELECT COUNT(*) as count FROM accounts')[0] as any).count;
       const shouldBeDefault = accountsCount === 0 || account.isDefault;
       
-      db.runSync(
+      database.runSync(
         `INSERT INTO accounts (id, name, type, balance, cardNumber, icon, isDefault, isIncludedInTotal, createdAt, updatedAt, targetAmount, creditStartDate, creditTerm, creditRate, creditPaymentType, creditInitialAmount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         id,
@@ -283,10 +306,11 @@ export class DatabaseService {
     const now = new Date().toISOString();
     const fields: string[] = [];
     const values: any[] = [];
+    const database = this.getDb();
     
     // Если устанавливаем этот счет как default, убираем флаг у других
     if (updates.isDefault === true) {
-      db.runSync('UPDATE accounts SET isDefault = 0');
+      database.runSync('UPDATE accounts SET isDefault = 0');
     }
     
     Object.entries(updates).forEach(([key, value]) => {
@@ -304,7 +328,7 @@ export class DatabaseService {
     values.push(now, id);
     
     try {
-      db.runSync(
+      database.runSync(
         `UPDATE accounts SET ${fields.join(', ')}, updatedAt = ? WHERE id = ?`,
         ...values
       );
@@ -315,8 +339,9 @@ export class DatabaseService {
   }
 
   static async deleteAccount(id: string): Promise<void> {
+    const database = this.getDb();
     try {
-      db.runSync('DELETE FROM accounts WHERE id = ?', id);
+      database.runSync('DELETE FROM accounts WHERE id = ?', id);
     } catch (error) {
       console.error('Error deleting account:', error);
       throw error;
@@ -325,14 +350,15 @@ export class DatabaseService {
 
   // Транзакции
   static async getTransactions(accountId?: string): Promise<Transaction[]> {
+    const database = this.getDb();
     try {
       const query = accountId
         ? 'SELECT * FROM transactions WHERE accountId = ? ORDER BY date DESC, createdAt DESC'
         : 'SELECT * FROM transactions ORDER BY date DESC, createdAt DESC';
       
       const result = accountId 
-        ? db.getAllSync(query, accountId)
-        : db.getAllSync(query);
+        ? database.getAllSync(query, accountId)
+        : database.getAllSync(query);
       
       return result as Transaction[];
     } catch (error) {
@@ -344,10 +370,11 @@ export class DatabaseService {
   static async createTransaction(transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>): Promise<Transaction> {
     const id = Date.now().toString();
     const now = new Date().toISOString();
+    const database = this.getDb();
     
     try {
       // Создаем транзакцию
-      db.runSync(
+      database.runSync(
         `INSERT INTO transactions (id, amount, type, accountId, categoryId, description, date, createdAt, updatedAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         id,
@@ -363,7 +390,7 @@ export class DatabaseService {
 
       // Обновляем баланс счета
       const balanceChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
-      db.runSync(
+      database.runSync(
         'UPDATE accounts SET balance = balance + ?, updatedAt = ? WHERE id = ?',
         balanceChange,
         now,
@@ -386,6 +413,7 @@ export class DatabaseService {
     const now = new Date().toISOString();
     const fields: string[] = [];
     const values: any[] = [];
+    const database = this.getDb();
     
     // Подготавливаем поля для обновления
     Object.entries(updates).forEach(([key, value]) => {
@@ -401,7 +429,7 @@ export class DatabaseService {
     
     try {
       // Обновляем транзакцию
-      db.runSync(
+      database.runSync(
         `UPDATE transactions SET ${fields.join(', ')}, updatedAt = ? WHERE id = ?`,
         ...values
       );
@@ -410,7 +438,7 @@ export class DatabaseService {
       if (updates.amount !== undefined || updates.type !== undefined || updates.accountId !== undefined) {
         // Отменяем старую транзакцию
         const oldBalanceChange = oldTransaction.type === 'income' ? -oldTransaction.amount : oldTransaction.amount;
-        db.runSync(
+        database.runSync(
           'UPDATE accounts SET balance = balance + ?, updatedAt = ? WHERE id = ?',
           oldBalanceChange,
           now,
@@ -423,7 +451,7 @@ export class DatabaseService {
         const newAccountId = updates.accountId ?? oldTransaction.accountId;
         const newBalanceChange = newType === 'income' ? newAmount : -newAmount;
         
-        db.runSync(
+        database.runSync(
           'UPDATE accounts SET balance = balance + ?, updatedAt = ? WHERE id = ?',
           newBalanceChange,
           now,
@@ -438,14 +466,15 @@ export class DatabaseService {
 
   static async deleteTransaction(transaction: Transaction): Promise<void> {
     const now = new Date().toISOString();
+    const database = this.getDb();
     
     try {
       // Удаляем транзакцию
-      db.runSync('DELETE FROM transactions WHERE id = ?', transaction.id);
+      database.runSync('DELETE FROM transactions WHERE id = ?', transaction.id);
       
       // Отменяем изменение баланса
       const balanceChange = transaction.type === 'income' ? -transaction.amount : transaction.amount;
-      db.runSync(
+      database.runSync(
         'UPDATE accounts SET balance = balance + ?, updatedAt = ? WHERE id = ?',
         balanceChange,
         now,
@@ -465,8 +494,9 @@ export class DatabaseService {
 
   // Добавляем методы для работы с категориями
   static async getCategories(): Promise<Category[]> {
+    const database = this.getDb();
     try {
-      const result = db.getAllSync('SELECT * FROM categories ORDER BY name');
+      const result = database.getAllSync('SELECT * FROM categories ORDER BY name');
       return result as Category[];
     } catch (error) {
       console.error('Error getting categories:', error);
@@ -476,9 +506,10 @@ export class DatabaseService {
   
   static async createCategory(category: Omit<Category, 'id'>): Promise<Category> {
     const id = Date.now().toString();
+    const database = this.getDb();
     
     try {
-      db.runSync(
+      database.runSync(
         `INSERT INTO categories (id, name, type, icon, color)
          VALUES (?, ?, ?, ?, ?)`,
         id,
@@ -488,12 +519,7 @@ export class DatabaseService {
         category.color
       );
       
-      const newCategory: Category = {
-        ...category,
-        id
-      };
-      
-      return newCategory;
+      return { ...category, id };
     } catch (error) {
       console.error('Error creating category:', error);
       throw error;
@@ -503,6 +529,7 @@ export class DatabaseService {
   static async updateCategory(id: string, updates: Partial<Category>): Promise<void> {
     const fields: string[] = [];
     const values: any[] = [];
+    const database = this.getDb();
     
     Object.entries(updates).forEach(([key, value]) => {
       if (key !== 'id') {
@@ -516,7 +543,7 @@ export class DatabaseService {
     values.push(id);
     
     try {
-      db.runSync(
+      database.runSync(
         `UPDATE categories SET ${fields.join(', ')} WHERE id = ?`,
         ...values
       );
@@ -527,23 +554,24 @@ export class DatabaseService {
   }
   
   static async deleteCategory(id: string): Promise<void> {
+    const database = this.getDb();
     try {
       // Получаем информацию о категории для определения типа
-      const category = db.getFirstSync('SELECT type FROM categories WHERE id = ?', id) as Category;
+      const category = database.getFirstSync('SELECT type FROM categories WHERE id = ?', id) as Category;
       if (!category) return;
       
       // Определяем ID категории "Другое" в зависимости от типа
       const otherId = category.type === 'income' ? 'other_income' : 'other_expense';
       
       // Обновляем все транзакции с этой категорией на "Другое"
-      db.runSync(
+      database.runSync(
         'UPDATE transactions SET categoryId = ? WHERE categoryId = ?',
         otherId,
         id
       );
       
       // Удаляем категорию
-      db.runSync('DELETE FROM categories WHERE id = ?', id);
+      database.runSync('DELETE FROM categories WHERE id = ?', id);
     } catch (error) {
       console.error('Error deleting category:', error);
       throw error;
@@ -552,18 +580,19 @@ export class DatabaseService {
   
   // Сброс всех данных
   static async resetAllData(): Promise<void> {
+    const database = this.getDb();
     try {
       // Удаляем все транзакции
-      db.runSync('DELETE FROM transactions');
+      database.runSync('DELETE FROM transactions');
       
       // Удаляем все счета
-      db.runSync('DELETE FROM accounts');
+      database.runSync('DELETE FROM accounts');
       
       // Удаляем все долги
-      db.runSync('DELETE FROM debts');
+      database.runSync('DELETE FROM debts');
       
       // Удаляем все пользовательские категории (оставляем только базовые)
-      db.runSync(`DELETE FROM categories WHERE id NOT IN (
+      database.runSync(`DELETE FROM categories WHERE id NOT IN (
         'salary', 'business', 'investments', 'other_income',
         'food', 'transport', 'housing', 'entertainment', 
         'health', 'shopping', 'other_expense'
@@ -571,7 +600,7 @@ export class DatabaseService {
       
       // Создаем счет "Наличные" по умолчанию
       const now = new Date().toISOString();
-      db.runSync(
+      database.runSync(
         `INSERT INTO accounts (id, name, type, balance, currency, isDefault, isIncludedInTotal, createdAt, updatedAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         '1',
@@ -592,28 +621,34 @@ export class DatabaseService {
 
   // Долги
   static async getDebts(): Promise<any[]> {
+    const database = this.getDb();
     try {
-      const result = db.getAllSync('SELECT * FROM debts ORDER BY createdAt DESC');
-      return result;
+      const result = database.getAllSync('SELECT * FROM debts ORDER BY createdAt DESC');
+      return result.map((debt: any) => ({
+        ...debt,
+        isIncludedInTotal: debt.isIncludedInTotal === 1
+      }));
     } catch (error) {
       console.error('Error getting debts:', error);
       return [];
     }
   }
 
-  static async createDebt(debt: { type: 'owe' | 'owed'; name: string; amount: number; isIncludedInTotal?: boolean }): Promise<void> {
+  static async createDebt(debt: { type: 'owe' | 'owed'; name: string; amount: number; isIncludedInTotal?: boolean; dueDate?: string }): Promise<void> {
     const id = Date.now().toString();
     const now = new Date().toISOString();
+    const database = this.getDb();
+    
     try {
-      db.runSync(
+      database.runSync(
         `INSERT INTO debts (id, type, name, amount, isIncludedInTotal, dueDate, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         id,
         debt.type,
         debt.name,
         debt.amount,
         debt.isIncludedInTotal !== false ? 1 : 0,
-        null,
+        debt.dueDate || null,
         now,
         now
       );
@@ -623,11 +658,12 @@ export class DatabaseService {
     }
   }
 
-  static async updateDebt(id: string, updates: { name?: string; amount?: number }): Promise<void> {
+  static async updateDebt(id: string, updates: { name?: string; amount?: number; dueDate?: string; isIncludedInTotal?: boolean }): Promise<void> {
     const now = new Date().toISOString();
-    const fields = [];
-    const values = [];
-
+    const fields: string[] = [];
+    const values: any[] = [];
+    const database = this.getDb();
+    
     if (updates.name !== undefined) {
       fields.push('name = ?');
       values.push(updates.name);
@@ -636,14 +672,22 @@ export class DatabaseService {
       fields.push('amount = ?');
       values.push(updates.amount);
     }
-
-    fields.push('updatedAt = ?');
-    values.push(now);
-    values.push(id);
-
+    if (updates.dueDate !== undefined) {
+      fields.push('dueDate = ?');
+      values.push(updates.dueDate);
+    }
+    if (updates.isIncludedInTotal !== undefined) {
+      fields.push('isIncludedInTotal = ?');
+      values.push(updates.isIncludedInTotal ? 1 : 0);
+    }
+    
+    if (fields.length === 0) return;
+    
+    values.push(now, id);
+    
     try {
-      db.runSync(
-        `UPDATE debts SET ${fields.join(', ')} WHERE id = ?`,
+      database.runSync(
+        `UPDATE debts SET ${fields.join(', ')}, updatedAt = ? WHERE id = ?`,
         ...values
       );
     } catch (error) {
@@ -653,8 +697,9 @@ export class DatabaseService {
   }
 
   static async deleteDebt(id: string): Promise<void> {
+    const database = this.getDb();
     try {
-      db.runSync('DELETE FROM debts WHERE id = ?', id);
+      database.runSync('DELETE FROM debts WHERE id = ?', id);
     } catch (error) {
       console.error('Error deleting debt:', error);
       throw error;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { DatabaseService } from '../services/database';
+import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt } from '../types';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DebtActionsModal } from '../components/DebtActionsModal';
@@ -10,7 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 interface DebtListScreenProps {
   route: {
     params: {
-      type: 'owe' | 'owed';
+      type: 'owed_to_me' | 'owed_by_me';
     };
   };
   navigation: any;
@@ -33,8 +33,8 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
 
   const loadDebts = async () => {
     setLoading(true);
-    const allDebts = await DatabaseService.getDebts();
-    setDebts(allDebts.filter(d => d.type === type));
+    const allDebts = await LocalDatabaseService.getDebts();
+    setDebts(allDebts.filter((d: Debt) => d.type === type));
     setLoading(false);
   };
 
@@ -84,13 +84,13 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>
-          {type === 'owed' ? 'Мне должны' : 'Я должен'}
+          {type === 'owed_to_me' ? 'Мне должны' : 'Я должен'}
         </Text>
         <View style={{ width: 24 }} />
       </View>
       
       <Text style={[styles.description, { color: colors.textSecondary }]}>
-        {type === 'owed' 
+        {type === 'owed_to_me' 
           ? 'Список людей, которые должны вам деньги' 
           : 'Список людей, которым вы должны деньги'}
       </Text>
@@ -98,7 +98,7 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
       {debts.length === 0 ? (
         <View style={[styles.center, { flex: 1 }]}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            {type === 'owed' ? 'Никто вам не должен' : 'Вы никому не должны'}
+            {type === 'owed_to_me' ? 'Никто вам не должен' : 'Вы никому не должны'}
           </Text>
         </View>
       ) : (

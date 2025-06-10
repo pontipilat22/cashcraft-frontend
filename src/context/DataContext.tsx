@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Account, Transaction, Category, Debt } from '../types';
-import { UserDataService } from '../services/userDataService';
-import { SyncService } from '../services/sync';
+import { LocalDatabaseService } from '../services/localDatabase';
+import { CloudSyncService } from '../services/cloudSync';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface DataContextType {
   accounts: Account[];
@@ -9,6 +10,8 @@ interface DataContextType {
   categories: Category[];
   totalBalance: number;
   isLoading: boolean;
+  lastSyncTime: string | null;
+  isSyncing: boolean;
   
   // Методы для работы со счетами
   createAccount: (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -31,6 +34,9 @@ interface DataContextType {
   // Сброс всех данных
   resetAllData: () => Promise<void>;
   
+  // Синхронизация
+  syncData: () => Promise<void>;
+  
   // Статистика
   getStatistics: () => {
     income: number;
@@ -46,24 +52,55 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalBalance, setTotalBalance] = useState(0);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncInterval, setSyncInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Инициализация БД и загрузка данных
   useEffect(() => {
     if (userId) {
       initializeApp();
       
-      // Запускаем автоматическую синхронизацию
-      SyncService.startAutoSync();
+      // Запускаем автоматическую синхронизацию для зарегистрированных пользователей
+      startAutoSync();
+    } else {
+      // Очищаем данные при выходе
+      setAccounts([]);
+      setTransactions([]);
+      setCategories([]);
+      setTotalBalance(0);
+      stopAutoSync();
     }
+    
+    return () => {
+      stopAutoSync();
+    };
   }, [userId]);
 
   const initializeApp = async () => {
     try {
       // Устанавливаем userId для базы данных
       if (userId) {
-        UserDataService.setUserId(userId);
-        await UserDataService.initializeUserData();
+        LocalDatabaseService.setUserId(userId);
+        await LocalDatabaseService.initDatabase();
         await refreshData();
+        
+        // Проверяем есть ли данные в облаке
+        const isGuest = await AsyncStorage.getItem('isGuest');
+        if (isGuest !== 'true') {
+          const token = await AsyncStorage.getItem(`authToken_${userId}`);
+          if (token) {
+            // Пытаемся загрузить данные из облака при первом входе
+            const hasCloudData = await CloudSyncService.downloadData(userId, token);
+            if (hasCloudData) {
+              await refreshData();
+            }
+          }
+        }
+        
+        // Получаем время последней синхронизации
+        const syncTime = await LocalDatabaseService.getLastSyncTime();
+        setLastSyncTime(syncTime);
       }
     } catch (error) {
       console.error('Error initializing data:', error);
@@ -72,11 +109,54 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
+  const startAutoSync = async () => {
+    const isGuest = await AsyncStorage.getItem('isGuest');
+    if (isGuest === 'true' || !userId) return;
+    
+    // Синхронизация каждые 5 минут
+    const interval = setInterval(() => {
+      syncData();
+    }, 5 * 60 * 1000);
+    
+    setSyncInterval(interval);
+  };
+
+  const stopAutoSync = () => {
+    if (syncInterval) {
+      clearInterval(syncInterval);
+      setSyncInterval(null);
+    }
+  };
+
+  const syncData = async () => {
+    if (!userId || isSyncing) return;
+    
+    const isGuest = await AsyncStorage.getItem('isGuest');
+    if (isGuest === 'true') return;
+    
+    setIsSyncing(true);
+    
+    try {
+      const token = await AsyncStorage.getItem(`authToken_${userId}`);
+      if (token) {
+        const success = await CloudSyncService.syncData(userId, token);
+        if (success) {
+          const syncTime = await LocalDatabaseService.getLastSyncTime();
+          setLastSyncTime(syncTime);
+        }
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const refreshData = async () => {
     const [accounts, transactions, categories] = await Promise.all([
-      UserDataService.getAccounts(),
-      UserDataService.getTransactions(),
-      UserDataService.getCategories()
+      LocalDatabaseService.getAccounts(),
+      LocalDatabaseService.getTransactions(),
+      LocalDatabaseService.getCategories()
     ]);
     
     setAccounts(accounts);
@@ -85,8 +165,8 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     
     // Считаем общий баланс только по счетам
     const accountsTotal = accounts
-      .filter(acc => acc.isIncludedInTotal !== false)
-      .reduce((sum, account) => sum + account.balance, 0);
+      .filter((acc: Account) => acc.isIncludedInTotal !== false)
+      .reduce((sum: number, account: Account) => sum + account.balance, 0);
     
     setTotalBalance(accountsTotal);
   };
@@ -94,7 +174,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Методы для работы со счетами
   const createAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const newAccount = await UserDataService.createAccount(account);
+      const newAccount = await LocalDatabaseService.createAccount(account);
       setAccounts(prev => [newAccount, ...prev]);
       
       // Обновляем общий баланс
@@ -112,7 +192,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       const oldAccount = accounts.find(acc => acc.id === id);
       if (!oldAccount) return;
       
-      await UserDataService.updateAccount(id, updates);
+      await LocalDatabaseService.updateAccount(id, updates);
       setAccounts(prev => prev.map(acc => 
         acc.id === id ? { ...acc, ...updates } : acc
       ));
@@ -145,7 +225,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       const accountToDelete = accounts.find(acc => acc.id === id);
       if (!accountToDelete) return;
       
-      await UserDataService.deleteAccount(id);
+      await LocalDatabaseService.deleteAccount(id);
       setAccounts(prev => prev.filter(acc => acc.id !== id));
       setTransactions(prev => prev.filter(trans => trans.accountId !== id));
       
@@ -162,7 +242,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Методы для работы с транзакциями
   const createTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const newTransaction = await UserDataService.createTransaction(transaction);
+      const newTransaction = await LocalDatabaseService.createTransaction(transaction);
       setTransactions(prev => [newTransaction, ...prev]);
       
       // Обновляем баланс счета
@@ -191,7 +271,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       const oldTransaction = transactions.find(t => t.id === id);
       if (!oldTransaction) return;
       
-      await UserDataService.updateTransaction(id, oldTransaction, updates);
+      await LocalDatabaseService.updateTransaction(id, oldTransaction, updates);
       
       // Обновляем транзакцию в состоянии
       setTransactions(prev => prev.map(trans => 
@@ -213,7 +293,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       const transaction = transactions.find(t => t.id === id);
       if (!transaction) return;
       
-      await UserDataService.deleteTransaction(transaction);
+      await LocalDatabaseService.deleteTransaction(transaction);
       
       // Удаляем транзакцию из состояния
       setTransactions(prev => prev.filter(trans => trans.id !== id));
@@ -242,7 +322,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Методы для работы с категориями
   const createCategory = async (category: Omit<Category, 'id'>) => {
     try {
-      const newCategory = await UserDataService.createCategory(category);
+      const newCategory = await LocalDatabaseService.createCategory(category);
       setCategories(prev => [...prev, newCategory]);
     } catch (error) {
       console.error('Error creating category:', error);
@@ -252,7 +332,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
 
   const updateCategory = async (id: string, updates: Partial<Category>) => {
     try {
-      await UserDataService.updateCategory(id, updates);
+      await LocalDatabaseService.updateCategory(id, updates);
       setCategories(prev => prev.map(cat => 
         cat.id === id ? { ...cat, ...updates } : cat
       ));
@@ -269,7 +349,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         throw new Error('Нельзя удалить базовую категорию');
       }
       
-      await UserDataService.deleteCategory(id);
+      await LocalDatabaseService.deleteCategory(id);
       setCategories(prev => prev.filter(cat => cat.id !== id));
       
       // Обновляем транзакции в состоянии
@@ -286,7 +366,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
-    // Получение статистики
+  // Получение статистики
   const getStatistics = () => {
     const income = transactions
       .filter(t => t.type === 'income')
@@ -302,7 +382,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Сброс всех данных
   const resetAllData = async () => {
     try {
-      await UserDataService.resetAllData();
+      await LocalDatabaseService.resetAllData();
       await refreshData();
     } catch (error) {
       console.error('Error resetting data:', error);
@@ -318,6 +398,8 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         categories,
         totalBalance,
         isLoading,
+        lastSyncTime,
+        isSyncing,
         createAccount,
         updateAccount,
         deleteAccount,
@@ -329,6 +411,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         deleteCategory,
         refreshData,
         resetAllData,
+        syncData,
         getStatistics,
       }}
     >

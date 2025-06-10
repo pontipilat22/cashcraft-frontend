@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, Modal, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Modal, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const MoreScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
-  const { resetAllData } = useData();
+  const { resetAllData, syncData, isSyncing, lastSyncTime } = useData();
   const auth = useAuth();
   const onLogout = auth?.onLogout;
   const { isPremium, checkSubscription } = useSubscription();
@@ -159,6 +159,37 @@ export const MoreScreen: React.FC = () => {
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
+      )}
+
+      {/* Синхронизация */}
+      {!userInfo.isGuest && (
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <TouchableOpacity 
+            style={styles.settingRow} 
+            activeOpacity={0.7}
+            onPress={() => syncData()}
+            disabled={isSyncing}
+          >
+            <View style={styles.settingLeft}>
+              {isSyncing ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="cloud-outline" size={24} color={colors.text} />
+              )}
+              <View style={{ marginLeft: 12 }}>
+                <Text style={[styles.settingText, { color: colors.text }]}>
+                  {isSyncing ? 'Синхронизация...' : 'Синхронизировать'}
+                </Text>
+                {lastSyncTime && (
+                  <Text style={[styles.syncTimeText, { color: colors.textSecondary }]}>
+                    Последняя: {new Date(lastSyncTime).toLocaleString('ru')}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       )}
 
       <View style={[styles.section, { backgroundColor: colors.card }]}>
@@ -405,6 +436,10 @@ const styles = StyleSheet.create({
   premiumSubtitle: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
+  },
+  syncTimeText: {
+    fontSize: 12,
     marginTop: 2,
   },
 }); 
