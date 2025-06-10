@@ -15,11 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { clearAllStorage, debugAsyncStorage } from '../utils/clearStorage';
 
-export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => {
+export const AuthScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
+  const { login, register, loginAsGuest } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -79,59 +81,15 @@ export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ on
 
     try {
       if (isLogin) {
-        // Вход
-        const storedUsers = await AsyncStorage.getItem('users');
-        const users = storedUsers ? JSON.parse(storedUsers) : {};
-        
-        const user = users[email];
-        if (!user || user.password !== password) {
-          Alert.alert('Ошибка', 'Неверный email или пароль');
-          setIsLoading(false);
-          return;
-        }
-
-        // Сохраняем текущего пользователя
-        await AsyncStorage.setItem('currentUser', email);
-        await AsyncStorage.removeItem('isGuest');
-        
-        // Сохраняем токен для синхронизации (в демо режиме это просто email)
-        await AsyncStorage.setItem(`authToken_${email}`, email);
-        
-        onLogin(email);
+        // Вход через Firebase
+        await login(email, password);
       } else {
-        // Регистрация
-        const storedUsers = await AsyncStorage.getItem('users');
-        const users = storedUsers ? JSON.parse(storedUsers) : {};
-        
-        if (users[email]) {
-          Alert.alert('Ошибка', 'Пользователь с таким email уже существует');
-          setIsLoading(false);
-          return;
-        }
-
-        // Создаем нового пользователя
-        users[email] = {
-          name,
-          email,
-          password,
-          createdAt: new Date().toISOString(),
-        };
-
-        await AsyncStorage.setItem('users', JSON.stringify(users));
-        await AsyncStorage.setItem('currentUser', email);
-        await AsyncStorage.removeItem('isGuest');
-        
-        // Сохраняем токен для синхронизации (в демо режиме это просто email)
-        await AsyncStorage.setItem(`authToken_${email}`, email);
-        
-        // Инициализация данных будет происходить автоматически через LocalDatabaseService
-        // когда DataProvider получит userId
-
-        onLogin(email);
+        // Регистрация через Firebase
+        await register(email, password, name);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Auth error:', error);
-      Alert.alert('Ошибка', 'Произошла ошибка при авторизации');
+      Alert.alert('Ошибка', error.message || 'Произошла ошибка при авторизации');
     } finally {
       setIsLoading(false);
     }
@@ -139,39 +97,27 @@ export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ on
 
   const handleAppleSignIn = async () => {
     try {
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-
-      // Сохраняем данные пользователя
-      const userId = credential.user;
-      const userEmail = credential.email || `${userId}@apple.com`;
-      const userName = credential.fullName ? 
-        `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim() || 'Apple User' 
-        : 'Apple User';
-
-      // Сохраняем или обновляем пользователя
-      const storedUsers = await AsyncStorage.getItem('users');
-      const users = storedUsers ? JSON.parse(storedUsers) : {};
-      
-      users[userId] = {
-        name: userName,
-        email: userEmail,
-        appleUserId: userId,
-        createdAt: new Date().toISOString(),
-      };
-
-      await AsyncStorage.setItem('users', JSON.stringify(users));
-      await AsyncStorage.setItem('currentUser', userId);
-      await AsyncStorage.removeItem('isGuest');
-      
-      // Сохраняем токен для синхронизации
-      await AsyncStorage.setItem(`authToken_${userId}`, userId);
-      
-      onLogin(userId);
+      Alert.alert(
+        'В разработке', 
+        'Apple Sign In с Firebase пока не настроен. Используйте email/пароль или гостевой вход.'
+      );
+      // TODO: Интегрировать Apple Sign In с Firebase
+      // 1. Импортировать OAuthProvider из firebase/auth
+      // 2. Создать провайдер: const provider = new OAuthProvider('apple.com');
+      // 3. Использовать credential от Apple:
+      // const credential = await AppleAuthentication.signInAsync({
+      //   requestedScopes: [
+      //     AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      //     AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+      //   ],
+      // });
+      // 4. Конвертировать в Firebase credential:
+      // const oAuthCredential = provider.credential({
+      //   idToken: credential.identityToken,
+      //   rawNonce: credential.authorizationCode, // или использовать nonce
+      // });
+      // 5. Войти через Firebase:
+      // await signInWithCredential(auth, oAuthCredential);
     } catch (error: any) {
       if (error.code !== 'ERR_CANCELED') {
         Alert.alert('Ошибка', 'Не удалось войти через Apple ID');
@@ -181,14 +127,22 @@ export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ on
 
   const handleSkipAuth = async () => {
     try {
-      // Создаем гостевого пользователя
-      const guestId = `guest_${Date.now()}`;
-      await AsyncStorage.setItem('currentUser', guestId);
-      await AsyncStorage.setItem('isGuest', 'true');
-      onLogin(guestId);
+      setIsLoading(true);
+      await loginAsGuest();
     } catch (error) {
       console.error('Skip auth error:', error);
+      Alert.alert('Ошибка', 'Не удалось войти как гость');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    Alert.alert(
+      'Восстановление пароля',
+      'Функция восстановления пароля будет доступна в ближайшее время'
+    );
+    // TODO: Реализовать восстановление пароля через Firebase
   };
 
   return (
@@ -344,7 +298,7 @@ export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ on
             </TouchableOpacity>
 
             {isLogin && (
-              <TouchableOpacity style={styles.forgotPassword}>
+              <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
                 <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
                   Забыли пароль?
                 </Text>
@@ -394,6 +348,33 @@ export const AuthScreen: React.FC<{ onLogin: (userId: string) => void }> = ({ on
           >
             <Text style={[styles.skipButtonText, { color: colors.textSecondary }]}>
               Пропустить
+            </Text>
+          </TouchableOpacity>
+
+          {/* Временная кнопка отладки */}
+          <TouchableOpacity 
+            style={[styles.skipButton, { backgroundColor: 'rgba(255,0,0,0.1)' }]}
+            onPress={async () => {
+              await debugAsyncStorage();
+              Alert.alert(
+                'Очистить хранилище?',
+                'Это удалит все сохраненные данные',
+                [
+                  { text: 'Отмена', style: 'cancel' },
+                  { 
+                    text: 'Очистить', 
+                    style: 'destructive',
+                    onPress: async () => {
+                      await clearAllStorage();
+                      Alert.alert('Готово', 'Хранилище очищено. Перезапустите приложение.');
+                    }
+                  }
+                ]
+              );
+            }}
+          >
+            <Text style={[styles.skipButtonText, { color: 'red' }]}>
+              🔧 Отладка: Очистить хранилище
             </Text>
           </TouchableOpacity>
         </ScrollView>

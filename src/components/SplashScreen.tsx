@@ -8,6 +8,7 @@ import {
   Text,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { DebugInfo } from './DebugInfo';
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,7 +18,10 @@ export const SplashScreen: React.FC = () => {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
 
+  console.log('SplashScreen: Component rendered');
+
   useEffect(() => {
+    console.log('SplashScreen: Starting animations');
     // Анимация появления
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -69,6 +73,7 @@ export const SplashScreen: React.FC = () => {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
+        <DebugInfo />
         <Animated.View
           style={[
             styles.logoContainer,

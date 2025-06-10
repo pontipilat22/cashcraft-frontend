@@ -12,38 +12,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const MoreScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
   const { resetAllData, syncData, isSyncing, lastSyncTime } = useData();
-  const auth = useAuth();
-  const onLogout = auth?.onLogout;
+  const { user, logout } = useAuth();
   const { isPremium, checkSubscription } = useSubscription();
   const [showCategories, setShowCategories] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
-  const [userInfo, setUserInfo] = useState<{ name?: string; email?: string; isGuest?: boolean }>({});
 
-  useEffect(() => {
-    loadUserInfo();
-  }, []);
-
-  const loadUserInfo = async () => {
-    try {
-      const userId = await AsyncStorage.getItem('currentUser');
-      const isGuest = await AsyncStorage.getItem('isGuest');
-      
-      if (isGuest === 'true') {
-        setUserInfo({ name: 'Гость', isGuest: true });
-      } else if (userId) {
-        const users = await AsyncStorage.getItem('users');
-        if (users) {
-          const usersData = JSON.parse(users);
-          const user = usersData[userId];
-          if (user) {
-            setUserInfo({ name: user.name, email: user.email, isGuest: false });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error loading user info:', error);
-    }
-  };
+  // Пользовательская информация теперь берется из AuthContext
 
   const handleResetData = () => {
     Alert.alert(
@@ -85,15 +59,15 @@ export const MoreScreen: React.FC = () => {
           </View>
           <View style={styles.userDetails}>
             <Text style={[styles.userName, { color: colors.text }]}>
-              {userInfo.name || 'Загрузка...'}
+              {user?.displayName || 'Загрузка...'}
             </Text>
-            {userInfo.email && (
+            {user?.email && (
               <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
-                {userInfo.email}
+                {user.email}
               </Text>
             )}
-            {userInfo.isGuest && onLogout && (
-              <TouchableOpacity onPress={onLogout}>
+            {user?.isGuest && (
+              <TouchableOpacity onPress={logout}>
                 <Text style={[styles.createAccountLink, { color: colors.primary }]}>
                   Создать аккаунт →
                 </Text>
@@ -108,7 +82,7 @@ export const MoreScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.premiumBanner, { backgroundColor: colors.primary }]}
           onPress={() => {
-            if (userInfo.isGuest && onLogout) {
+            if (user?.isGuest) {
               Alert.alert(
                 'Требуется вход',
                 'Для оформления подписки необходимо войти в аккаунт',
@@ -119,7 +93,7 @@ export const MoreScreen: React.FC = () => {
                   },
                   {
                     text: 'Войти',
-                    onPress: onLogout,
+                    onPress: logout,
                   },
                 ]
               );
@@ -133,10 +107,10 @@ export const MoreScreen: React.FC = () => {
             <Ionicons name="diamond" size={24} color="#fff" />
             <View style={styles.premiumTextContainer}>
               <Text style={styles.premiumTitle}>
-                {userInfo.isGuest ? 'Войдите для Premium' : 'Попробуйте Premium'}
+                {user?.isGuest ? 'Войдите для Premium' : 'Попробуйте Premium'}
               </Text>
               <Text style={styles.premiumSubtitle}>
-                {userInfo.isGuest ? 'Создайте аккаунт для подписки' : 'Разблокируйте все возможности'}
+                {user?.isGuest ? 'Создайте аккаунт для подписки' : 'Разблокируйте все возможности'}
               </Text>
             </View>
           </View>
@@ -162,7 +136,7 @@ export const MoreScreen: React.FC = () => {
       )}
 
       {/* Синхронизация */}
-      {!userInfo.isGuest && (
+      {!user?.isGuest && (
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <TouchableOpacity 
             style={styles.settingRow} 
@@ -266,12 +240,12 @@ export const MoreScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {onLogout && !userInfo.isGuest && (
+      {!user?.isGuest && (
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <TouchableOpacity 
             style={styles.settingRow} 
             activeOpacity={0.7}
-            onPress={onLogout}
+            onPress={logout}
           >
             <View style={styles.settingLeft}>
               <Ionicons name="log-out-outline" size={24} color={colors.text} />
