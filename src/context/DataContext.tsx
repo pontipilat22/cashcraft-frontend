@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Account, Transaction, Category, Debt } from '../types';
-import { DatabaseService } from '../services/database';
+import { UserDataService } from '../services/userDataService';
 import { SyncService } from '../services/sync';
 
 interface DataContextType {
@@ -40,7 +40,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const DataProvider: React.FC<{ children: ReactNode; userId?: string | null }> = ({ children, userId }) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -49,16 +49,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Инициализация БД и загрузка данных
   useEffect(() => {
-    initializeApp();
-    
-    // Запускаем автоматическую синхронизацию
-    SyncService.startAutoSync();
-  }, []);
+    if (userId) {
+      initializeApp();
+      
+      // Запускаем автоматическую синхронизацию
+      SyncService.startAutoSync();
+    }
+  }, [userId]);
 
   const initializeApp = async () => {
     try {
-      await DatabaseService.initDatabase();
-      await refreshData();
+      // Устанавливаем userId для базы данных
+      if (userId) {
+        UserDataService.setUserId(userId);
+        await UserDataService.initializeUserData();
+        await refreshData();
+      }
     } catch (error) {
       console.error('Error initializing data:', error);
     } finally {
@@ -68,9 +74,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshData = async () => {
     const [accounts, transactions, categories] = await Promise.all([
-      DatabaseService.getAccounts(),
-      DatabaseService.getTransactions(),
-      DatabaseService.getCategories()
+      UserDataService.getAccounts(),
+      UserDataService.getTransactions(),
+      UserDataService.getCategories()
     ]);
     
     setAccounts(accounts);
@@ -88,7 +94,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Методы для работы со счетами
   const createAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const newAccount = await DatabaseService.createAccount(account);
+      const newAccount = await UserDataService.createAccount(account);
       setAccounts(prev => [newAccount, ...prev]);
       
       // Обновляем общий баланс
@@ -106,7 +112,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const oldAccount = accounts.find(acc => acc.id === id);
       if (!oldAccount) return;
       
-      await DatabaseService.updateAccount(id, updates);
+      await UserDataService.updateAccount(id, updates);
       setAccounts(prev => prev.map(acc => 
         acc.id === id ? { ...acc, ...updates } : acc
       ));
@@ -139,7 +145,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const accountToDelete = accounts.find(acc => acc.id === id);
       if (!accountToDelete) return;
       
-      await DatabaseService.deleteAccount(id);
+      await UserDataService.deleteAccount(id);
       setAccounts(prev => prev.filter(acc => acc.id !== id));
       setTransactions(prev => prev.filter(trans => trans.accountId !== id));
       
@@ -156,7 +162,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Методы для работы с транзакциями
   const createTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const newTransaction = await DatabaseService.createTransaction(transaction);
+      const newTransaction = await UserDataService.createTransaction(transaction);
       setTransactions(prev => [newTransaction, ...prev]);
       
       // Обновляем баланс счета
@@ -185,7 +191,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const oldTransaction = transactions.find(t => t.id === id);
       if (!oldTransaction) return;
       
-      await DatabaseService.updateTransaction(id, oldTransaction, updates);
+      await UserDataService.updateTransaction(id, oldTransaction, updates);
       
       // Обновляем транзакцию в состоянии
       setTransactions(prev => prev.map(trans => 
@@ -207,7 +213,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const transaction = transactions.find(t => t.id === id);
       if (!transaction) return;
       
-      await DatabaseService.deleteTransaction(transaction);
+      await UserDataService.deleteTransaction(transaction);
       
       // Удаляем транзакцию из состояния
       setTransactions(prev => prev.filter(trans => trans.id !== id));
@@ -236,7 +242,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Методы для работы с категориями
   const createCategory = async (category: Omit<Category, 'id'>) => {
     try {
-      const newCategory = await DatabaseService.createCategory(category);
+      const newCategory = await UserDataService.createCategory(category);
       setCategories(prev => [...prev, newCategory]);
     } catch (error) {
       console.error('Error creating category:', error);
@@ -246,7 +252,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateCategory = async (id: string, updates: Partial<Category>) => {
     try {
-      await DatabaseService.updateCategory(id, updates);
+      await UserDataService.updateCategory(id, updates);
       setCategories(prev => prev.map(cat => 
         cat.id === id ? { ...cat, ...updates } : cat
       ));
@@ -263,7 +269,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error('Нельзя удалить базовую категорию');
       }
       
-      await DatabaseService.deleteCategory(id);
+      await UserDataService.deleteCategory(id);
       setCategories(prev => prev.filter(cat => cat.id !== id));
       
       // Обновляем транзакции в состоянии
@@ -296,7 +302,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Сброс всех данных
   const resetAllData = async () => {
     try {
-      await DatabaseService.resetAllData();
+      await UserDataService.resetAllData();
       await refreshData();
     } catch (error) {
       console.error('Error resetting data:', error);

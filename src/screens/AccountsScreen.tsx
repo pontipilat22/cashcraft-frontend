@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
 import { FABMenu } from '../components/FABMenu';
@@ -28,6 +29,7 @@ interface AccountsScreenProps {
 export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
   const { accounts, isLoading, createAccount, updateAccount, deleteAccount, getStatistics } = useData();
+  const { isPremium } = useSubscription();
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -90,6 +92,28 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   };
 
   const handleAddAccount = (section: 'cards' | 'savings' | 'debts' | 'credits') => {
+    // Проверка лимита для бесплатных пользователей
+    if (!isPremium && accounts.length >= 3) {
+      Alert.alert(
+        'Лимит счетов',
+        'В бесплатной версии можно создать не более 3 счетов. Оформите подписку для неограниченного количества.',
+        [
+          {
+            text: 'Отмена',
+            style: 'cancel',
+          },
+          {
+            text: 'Оформить Premium',
+            onPress: () => {
+              // Открываем экран подписки через MoreScreen
+              navigation.navigate('More' as any);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     setSectionToAdd(section);
     
     if (section === 'cards') {

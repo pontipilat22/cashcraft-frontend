@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "cashcraft3",
+    "name": "CashCraft",
     "slug": "cashcraft3",
     "version": "1.0.0",
+    "description": "Управляйте финансами легко",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -10,17 +11,32 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#4287f5"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.cashcraft.app",
+      "buildNumber": "1",
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#4287f5"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.cashcraft.app",
+      "versionCode": 1,
+      "edgeToEdgeEnabled": true,
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#4287f5"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

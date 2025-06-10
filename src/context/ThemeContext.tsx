@@ -16,6 +16,8 @@ interface ThemeContextType {
     income: string;
     expense: string;
     statsBg: string;
+    warning: string;
+    danger: string;
   };
 }
 
@@ -32,6 +34,8 @@ const lightTheme = {
   income: '#4CAF50',
   expense: '#f44336',
   statsBg: '#4287f5',
+  warning: '#ff9800',
+  danger: '#f44336',
 };
 
 const darkTheme = {
@@ -47,6 +51,8 @@ const darkTheme = {
   income: '#4CAF50',
   expense: '#f44336',
   statsBg: 'rgba(255, 104, 0, 0.9)',
+  warning: '#ff9800',
+  danger: '#f44336',
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
