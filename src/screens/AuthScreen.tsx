@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +19,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { clearAllStorage, debugAsyncStorage } from '../utils/clearStorage';
+import { ForgotPasswordModal } from '../components/ForgotPasswordModal';
 
 export const AuthScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
@@ -30,6 +32,7 @@ export const AuthScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isAppleAuthAvailable, setIsAppleAuthAvailable] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   useEffect(() => {
     checkAppleAuthAvailability();
@@ -138,11 +141,7 @@ export const AuthScreen: React.FC = () => {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      'Восстановление пароля',
-      'Функция восстановления пароля будет доступна в ближайшее время'
-    );
-    // TODO: Реализовать восстановление пароля через Firebase
+    setShowForgotPassword(true);
   };
 
   return (
@@ -157,8 +156,12 @@ export const AuthScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Ionicons name="cash-outline" size={80} color={colors.primary} />
-            <Text style={[styles.title, { color: colors.text }]}>CashCraft</Text>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={[styles.logo, { tintColor: colors.primary }]}
+              resizeMode="contain"
+            />
+            <Text style={[styles.title, { color: colors.text }]}>CASHCRAFT</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Управляйте финансами легко
             </Text>
@@ -379,6 +382,11 @@ export const AuthScreen: React.FC = () => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ForgotPasswordModal
+        visible={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -398,6 +406,10 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 40,
+  },
+  logo: {
+    width: 80,
+    height: 80,
   },
   title: {
     fontSize: 32,
