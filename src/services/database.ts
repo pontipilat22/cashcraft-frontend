@@ -20,6 +20,12 @@ export class DatabaseService {
             icon TEXT,
             isDefault INTEGER DEFAULT 0,
             isIncludedInTotal INTEGER DEFAULT 1,
+            targetAmount REAL,
+            creditStartDate TEXT,
+            creditTerm INTEGER,
+            creditRate REAL,
+            creditPaymentType TEXT,
+            creditInitialAmount REAL,
             createdAt TEXT NOT NULL,
             updatedAt TEXT NOT NULL,
             syncedAt TEXT
@@ -91,6 +97,33 @@ export class DatabaseService {
           }
         } catch (error) {
           console.error('Error checking/adding dueDate column:', error);
+        }
+
+        // Проверяем и добавляем колонки для кредитов
+        try {
+          const accountsTableInfo = db.getAllSync("PRAGMA table_info(accounts)");
+          const columns = accountsTableInfo.map((col: any) => col.name);
+          
+          if (!columns.includes('creditStartDate')) {
+            db.execSync('ALTER TABLE accounts ADD COLUMN creditStartDate TEXT');
+          }
+          if (!columns.includes('creditTerm')) {
+            db.execSync('ALTER TABLE accounts ADD COLUMN creditTerm INTEGER');
+          }
+          if (!columns.includes('creditRate')) {
+            db.execSync('ALTER TABLE accounts ADD COLUMN creditRate REAL');
+          }
+          if (!columns.includes('creditPaymentType')) {
+            db.execSync('ALTER TABLE accounts ADD COLUMN creditPaymentType TEXT');
+          }
+          if (!columns.includes('creditInitialAmount')) {
+            db.execSync('ALTER TABLE accounts ADD COLUMN creditInitialAmount REAL');
+          }
+          if (!columns.includes('targetAmount')) {
+            db.execSync('ALTER TABLE accounts ADD COLUMN targetAmount REAL');
+          }
+        } catch (error) {
+          console.error('Error adding credit columns:', error);
         }
 
         // Проверяем, есть ли счета в БД
@@ -200,8 +233,8 @@ export class DatabaseService {
       const shouldBeDefault = accountsCount === 0 || account.isDefault;
       
       db.runSync(
-        `INSERT INTO accounts (id, name, type, balance, cardNumber, icon, isDefault, isIncludedInTotal, createdAt, updatedAt, targetAmount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO accounts (id, name, type, balance, cardNumber, icon, isDefault, isIncludedInTotal, createdAt, updatedAt, targetAmount, creditStartDate, creditTerm, creditRate, creditPaymentType, creditInitialAmount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         id,
         account.name,
         account.type,
@@ -212,16 +245,31 @@ export class DatabaseService {
         account.isIncludedInTotal !== false ? 1 : 0,
         now,
         now,
-        account.targetAmount !== undefined ? account.targetAmount : null
+        account.targetAmount !== undefined ? account.targetAmount : null,
+        account.creditStartDate || null,
+        account.creditTerm || null,
+        account.creditRate || null,
+        account.creditPaymentType || null,
+        account.creditInitialAmount || null
       );
 
       const newAccount: Account = {
-        ...account,
         id,
+        name: account.name,
+        type: account.type,
         balance: account.balance || 0,
+        cardNumber: account.cardNumber || undefined,
+        icon: account.icon || undefined,
         isDefault: shouldBeDefault,
         isIncludedInTotal: account.isIncludedInTotal !== false,
-        targetAmount: account.targetAmount !== undefined ? account.targetAmount : undefined,
+        targetAmount: account.targetAmount || undefined,
+        creditStartDate: account.creditStartDate || undefined,
+        creditTerm: account.creditTerm || undefined,
+        creditRate: account.creditRate !== undefined ? account.creditRate : undefined,
+        creditPaymentType: account.creditPaymentType || undefined,
+        creditInitialAmount: account.creditInitialAmount || undefined,
+        createdAt: now,
+        updatedAt: now,
       };
       
       return newAccount;

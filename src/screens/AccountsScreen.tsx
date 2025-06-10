@@ -123,8 +123,15 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     isIncludedInTotal?: boolean;
     icon?: string;
     targetAmount?: number;
+    creditStartDate?: string;
+    creditTerm?: number;
+    creditRate?: number;
+    creditPaymentType?: 'annuity' | 'differentiated';
+    creditInitialAmount?: number;
+    [key: string]: any; // Для остальных полей
   }) => {
     try {
+
       // Если новый счет должен быть по умолчанию, снимаем флаг с предыдущего
       if (data.isDefault) {
         const currentDefault = accounts.find(acc => acc.isDefault);
@@ -276,7 +283,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
               <Text style={styles.statLabel}>Расходы</Text>
               <Text style={styles.statAmount}>{stats.expense.toLocaleString('ru-RU')} ₽</Text>
             </View>
-            <View style={styles.statDivider}></View>
+            <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Ionicons name="arrow-up" size={24} color="#fff" />
               <Text style={styles.statLabel}>Доходы</Text>

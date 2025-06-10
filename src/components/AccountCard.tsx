@@ -94,6 +94,58 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     return Math.min((account.balance / account.targetAmount) * 100, 100);
   };
 
+  const calculateMonthlyPayment = () => {
+    if (account.type !== 'credit' || !account.creditRate || !account.creditTerm || !account.creditInitialAmount) {
+      return 0;
+    }
+
+    const principal = account.creditInitialAmount;
+    const monthlyRate = account.creditRate / 100 / 12;
+    const months = account.creditTerm;
+
+    if (account.creditPaymentType === 'annuity') {
+      // Аннуитетный платеж
+      if (monthlyRate === 0) {
+        return principal / months;
+      }
+      const payment = principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+      return Math.round(payment);
+    } else {
+      // Дифференцированный платеж (возвращаем первый платеж)
+      const principalPayment = principal / months;
+      const interestPayment = principal * monthlyRate;
+      return Math.round(principalPayment + interestPayment);
+    }
+  };
+
+  const calculateTotalPayment = () => {
+    if (account.type !== 'credit' || !account.creditRate || !account.creditTerm || !account.creditInitialAmount) {
+      return 0;
+    }
+
+    const principal = account.creditInitialAmount;
+    const monthlyRate = account.creditRate / 100 / 12;
+    const months = account.creditTerm;
+
+    if (account.creditPaymentType === 'annuity') {
+      if (monthlyRate === 0) {
+        return principal;
+      }
+      const monthlyPayment = calculateMonthlyPayment();
+      return monthlyPayment * months;
+    } else {
+      // Дифференцированный платеж
+      let totalPayment = 0;
+      for (let i = 0; i < months; i++) {
+        const remainingPrincipal = principal - (principal / months) * i;
+        const interestPayment = remainingPrincipal * monthlyRate;
+        const principalPayment = principal / months;
+        totalPayment += principalPayment + interestPayment;
+      }
+      return Math.round(totalPayment);
+    }
+  };
+
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
@@ -202,10 +254,33 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     {account.cardNumber}
                   </Text>
                 )}
+                {account.type === 'credit' && account.creditTerm && account.creditRate !== undefined && account.creditPaymentType && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12 }]}>
+                      {account.creditTerm} мес • {account.creditRate}% • {account.creditPaymentType === 'annuity' ? 'Аннуитет' : 'Дифференц.'}
+                    </Text>
+                    <Text style={[styles.creditPayment, { color: colors.primary }]}>
+                      {formatBalance(calculateMonthlyPayment())}/мес
+                    </Text>
+                  </View>
+                )}
               </View>
-              <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}> 
-                {formatBalance(account.balance)}
-              </Text>
+              <View style={{ alignItems: 'flex-end' }}>
+                {account.type === 'credit' ? (
+                  <>
+                    <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12, marginBottom: 2 }]}>
+                      Осталось выплатить:
+                    </Text>
+                    <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}> 
+                      {formatBalance(Math.abs(account.balance))}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}> 
+                    {formatBalance(account.balance)}
+                  </Text>
+                )}
+              </View>
             </View>
           </View>
         )}
@@ -264,7 +339,7 @@ const styles = StyleSheet.create({
   },
   balance: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   targetAmount: {
     fontSize: 13,
@@ -298,5 +373,56 @@ const styles = StyleSheet.create({
   textBlock: {
     flex: 1,
     justifyContent: 'center',
+  },
+  cardContent: {
+    padding: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  accountName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  cardNumber: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  creditInfo: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  defaultBadge: {
+    padding: 4,
+    borderRadius: 4,
+  },
+  defaultText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  creditTotal: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  progressText: {
+    fontSize: 12,
+    marginLeft: 8,
+  },
+  creditPayment: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 2,
   },
 }); 

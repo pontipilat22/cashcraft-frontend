@@ -15,6 +15,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { AccountType, AccountTypeLabels } from '../types';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface AddAccountModalProps {
   visible: boolean;
@@ -31,6 +32,11 @@ interface AddAccountModalProps {
     interestRate?: number;
     openDate?: string;
     interestDay?: number;
+    creditStartDate?: string;
+    creditTerm?: number;
+    creditRate?: number;
+    creditPaymentType?: 'annuity' | 'differentiated';
+    creditInitialAmount?: number;
   }) => void;
 }
 
@@ -67,7 +73,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -80,22 +86,47 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const [openDate, setOpenDate] = useState('');
   const [interestDay, setInterestDay] = useState('');
 
+  // Поля для кредитов
+  const [creditStartDate, setCreditStartDate] = useState(new Date());
+  const [showCreditDatePicker, setShowCreditDatePicker] = useState(false);
+  const [creditTerm, setCreditTerm] = useState('');
+  const [creditRate, setCreditRate] = useState('');
+  const [creditPaymentType, setCreditPaymentType] = useState<'annuity' | 'differentiated'>('annuity');
+
   const handleSave = () => {
     if (!name.trim()) return;
-
-    onSave({
+    
+    const accountData: any = {
       name: name.trim(),
       balance: parseFloat(balance) || 0,
-      cardNumber: cardNumber.trim() || undefined,
+      cardNumber: cardNumber.trim() ? cardNumber.trim() : undefined,
       isDefault: accountType !== 'savings' ? isDefault : false,
       isIncludedInTotal,
-      icon: accountType === 'savings' ? selectedIcon : undefined,
-      targetAmount: accountType === 'savings' ? parseFloat(targetAmount) || 0 : undefined,
-      interestRate: accountType === 'bank' ? parseFloat(interestRate) || undefined : undefined,
-      openDate: accountType === 'bank' ? openDate || undefined : undefined,
-      interestDay: accountType === 'bank' ? parseInt(interestDay) || undefined : undefined,
-    });
+    };
 
+    if (accountType === 'savings') {
+      accountData.icon = selectedIcon;
+      if (targetAmount) {
+        accountData.targetAmount = parseFloat(targetAmount);
+      }
+    }
+
+    if (accountType === 'bank') {
+      if (interestRate) accountData.interestRate = parseFloat(interestRate);
+      if (openDate) accountData.openDate = openDate;
+      if (interestDay) accountData.interestDay = parseInt(interestDay);
+    }
+
+    if (accountType === 'credit') {
+      accountData.creditStartDate = creditStartDate.toISOString();
+      accountData.creditTerm = parseInt(creditTerm) || 0;
+      accountData.creditRate = parseFloat(creditRate) || 0;
+      accountData.creditPaymentType = creditPaymentType;
+      accountData.creditInitialAmount = parseFloat(balance) || 0;
+    }
+
+    onSave(accountData);
+    
     // Очищаем форму
     setName('');
     setBalance('');
@@ -107,6 +138,10 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     setInterestRate('');
     setOpenDate('');
     setInterestDay('');
+    setCreditStartDate(new Date());
+    setCreditTerm('');
+    setCreditRate('');
+    setCreditPaymentType('annuity');
   };
 
   const getIcon = () => {
@@ -295,6 +330,117 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 </View>
               </>
             )}
+
+            {/* Поля для кредитов */}
+            {accountType === 'credit' && (
+              <>
+                {/* Дата получения кредита */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Дата получения</Text>
+                  <TouchableOpacity
+                    style={[styles.dateButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                    onPress={() => setShowCreditDatePicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                    <Text style={[styles.dateText, { color: colors.text }]}>
+                      {creditStartDate.toLocaleDateString('ru-RU')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Сумма кредита */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Сумма кредита</Text>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.background,
+                      color: colors.text,
+                      borderColor: colors.border,
+                    }]}
+                    value={balance}
+                    onChangeText={setBalance}
+                    placeholder="0"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                {/* Срок кредита */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Срок (месяцев)</Text>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.background,
+                      color: colors.text,
+                      borderColor: colors.border,
+                    }]}
+                    value={creditTerm}
+                    onChangeText={setCreditTerm}
+                    placeholder="12"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                {/* Процентная ставка */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Процентная ставка (%)</Text>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.background,
+                      color: colors.text,
+                      borderColor: colors.border,
+                    }]}
+                    value={creditRate}
+                    onChangeText={setCreditRate}
+                    placeholder="15.5"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                {/* Тип платежей */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Тип платежей</Text>
+                  <View style={styles.paymentTypeContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.paymentTypeButton,
+                        { 
+                          backgroundColor: creditPaymentType === 'annuity' ? colors.primary : colors.background,
+                          borderColor: colors.border,
+                        }
+                      ]}
+                      onPress={() => setCreditPaymentType('annuity')}
+                    >
+                      <Text style={[
+                        styles.paymentTypeText,
+                        { color: creditPaymentType === 'annuity' ? '#fff' : colors.text }
+                      ]}>
+                        Аннуитетные
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.paymentTypeButton,
+                        { 
+                          backgroundColor: creditPaymentType === 'differentiated' ? colors.primary : colors.background,
+                          borderColor: colors.border,
+                        }
+                      ]}
+                      onPress={() => setCreditPaymentType('differentiated')}
+                    >
+                      <Text style={[
+                        styles.paymentTypeText,
+                        { color: creditPaymentType === 'differentiated' ? '#fff' : colors.text }
+                      ]}>
+                        Дифференцированные
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            )}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -352,6 +498,46 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
           />
         </View>
       </Modal>
+
+      {/* Date Picker для кредитов */}
+      {showCreditDatePicker && (
+        <Modal
+          visible={showCreditDatePicker}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowCreditDatePicker(false)}
+        >
+          <View style={styles.datePickerModal}>
+            <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => setShowCreditDatePicker(false)}>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Отмена</Text>
+                </TouchableOpacity>
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>Дата получения кредита</Text>
+                <TouchableOpacity onPress={() => setShowCreditDatePicker(false)}>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Готово</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={creditStartDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => {
+                  if (date) {
+                    setCreditStartDate(date);
+                  }
+                  if (Platform.OS === 'android') {
+                    setShowCreditDatePicker(false);
+                  }
+                }}
+                maximumDate={new Date()}
+                themeVariant={isDark ? 'dark' : 'light'}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
     </Modal>
   );
 };
@@ -469,5 +655,58 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     margin: 8,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+  },
+  dateText: {
+    marginLeft: 8,
+    fontSize: 16,
+  },
+  paymentTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  paymentTypeButton: {
+    flex: 1,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  paymentTypeText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  datePickerModal: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  datePickerContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  datePickerButton: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
   },
 }); 

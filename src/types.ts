@@ -5,11 +5,20 @@ export interface Account {
   name: string;
   type: AccountType;
   balance: number;
+  currency?: string;
   cardNumber?: string;
+  icon?: string;
   isDefault?: boolean;
   isIncludedInTotal?: boolean;
-  icon?: string;
   targetAmount?: number;
+  // Поля для кредитов
+  creditStartDate?: string; // Дата получения кредита
+  creditTerm?: number; // Срок кредита в месяцах
+  creditRate?: number; // Процентная ставка
+  creditPaymentType?: 'annuity' | 'differentiated'; // Тип платежей
+  creditInitialAmount?: number; // Начальная сумма кредита
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Transaction {
