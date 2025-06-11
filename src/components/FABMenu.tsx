@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface FABMenuProps {
   onIncomePress: () => void;
@@ -26,6 +27,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
   onTransferPress,
 }) => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const [isOpen, setIsOpen] = useState(false);
   const animationValue = useRef(new Animated.Value(0)).current;
   const rotateValue = useRef(new Animated.Value(0)).current;
@@ -93,19 +95,19 @@ export const FABMenu: React.FC<FABMenuProps> = ({
 
   const menuItems = [
     {
-      label: 'Расход',
+      label: t('transactions.expense'),
       icon: 'remove-circle',
       color: '#FF5252',
       onPress: onExpensePress,
     },
     {
-      label: 'Доход',
+      label: t('transactions.income'),
       icon: 'add-circle',
       color: '#4CAF50',
       onPress: onIncomePress,
     },
     {
-      label: 'Долг',
+      label: t('transactions.debt'),
       icon: 'people',
       color: '#FF9800',
       onPress: onDebtPress,
@@ -114,7 +116,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
 
   if (onTransferPress) {
     menuItems.splice(2, 0, {
-      label: 'Перевод',
+      label: t('transactions.transfer'),
       icon: 'swap-horizontal',
       color: '#00BCD4',
       onPress: onTransferPress,

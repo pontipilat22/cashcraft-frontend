@@ -6,13 +6,14 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { useAuth } from '../context/AuthContext';
 
 interface ForgotPasswordModalProps {
@@ -20,14 +21,12 @@ interface ForgotPasswordModalProps {
   onClose: () => void;
 }
 
-export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
-  visible,
-  onClose,
-}) => {
+export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ visible, onClose }) => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const { resetPassword } = useAuth();
   const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,41 +34,47 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
   };
 
   const handleResetPassword = async () => {
-    if (!email) {
-      Alert.alert('Ошибка', 'Введите email');
+    if (!email.trim()) {
+      Alert.alert(t('common.error'), t('auth.emailRequired'));
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Ошибка', 'Введите корректный email');
+      Alert.alert(t('common.error'), t('auth.invalidEmail'));
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
 
     try {
       await resetPassword(email);
       Alert.alert(
-        'Успешно',
-        'Инструкции по восстановлению пароля отправлены на ваш email',
-        [{ text: 'OK', onPress: handleClose }]
+        t('common.success'),
+        t('auth.resetPasswordSuccess'),
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setEmail('');
+              onClose();
+            },
+          },
+        ]
       );
     } catch (error: any) {
-      console.error('Reset password error:', error);
+      console.error('Password reset error:', error);
       
-      let errorMessage = 'Произошла ошибка при восстановлении пароля';
+      let errorMessage = t('common.error');
       
       if (error.code === 'auth/user-not-found') {
-        errorMessage = 'Пользователь с таким email не найден';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Неверный формат email';
+        errorMessage = t('auth.userNotFound');
       } else if (error.code === 'auth/network-request-failed') {
-        errorMessage = 'Ошибка сети. Проверьте подключение к интернету';
+        errorMessage = t('auth.networkError');
       }
       
-      Alert.alert('Ошибка', errorMessage);
+      Alert.alert(t('common.error'), errorMessage);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -82,7 +87,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
@@ -94,11 +99,11 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
           activeOpacity={1}
           onPress={handleClose}
         />
-
+        
         <View style={[styles.content, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Восстановление пароля
+              {t('auth.resetPassword')}
             </Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -106,11 +111,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
           </View>
 
           <Text style={[styles.description, { color: colors.textSecondary }]}>
-            Введите email, который вы использовали при регистрации. 
-            Мы отправим вам инструкции по восстановлению пароля.
+            {t('auth.resetPasswordDescription')}
           </Text>
 
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { borderColor: colors.border }]}>
             <Ionicons
               name="mail-outline"
               size={20}
@@ -119,29 +123,27 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
             />
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="Email"
+              placeholder={t('auth.email')}
               placeholderTextColor={colors.textSecondary}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              autoFocus
+              autoCorrect={false}
             />
           </View>
 
           <TouchableOpacity
-            style={[
-              styles.button,
-              { backgroundColor: colors.primary },
-              isLoading && styles.buttonDisabled,
-            ]}
+            style={[styles.button, { backgroundColor: colors.primary }]}
             onPress={handleResetPassword}
-            disabled={isLoading}
+            disabled={loading}
           >
-            {isLoading ? (
+            {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Отправить инструкции</Text>
+              <Text style={styles.buttonText}>
+                {t('auth.sendInstructions')}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -153,49 +155,44 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   content: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   closeButton: {
-    padding: 4,
+    padding: 8,
   },
   description: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
     marginBottom: 24,
+    lineHeight: 22,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
     marginBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingBottom: 8,
+    height: 50,
   },
   inputIcon: {
     marginRight: 12,
@@ -203,15 +200,12 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    paddingVertical: 8,
   },
   button: {
-    borderRadius: 8,
-    padding: 16,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',

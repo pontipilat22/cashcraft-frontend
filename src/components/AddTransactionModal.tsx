@@ -16,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -30,6 +31,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const { accounts, categories, createTransaction } = useData();
+  const { t } = useLocalization();
   
   const [isIncome, setIsIncome] = useState(false);
   const [amount, setAmount] = useState('');
@@ -80,12 +82,12 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   
   const handleSave = async () => {
     if (!selectedAccountId) {
-      Alert.alert('Ошибка', 'Пожалуйста, выберите счет');
+      Alert.alert(t('common.error'), t('transactions.selectAccount'));
       return;
     }
     
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Ошибка', 'Введите корректную сумму');
+      Alert.alert(t('common.error'), t('transactions.enterAmount'));
       return;
     }
     
@@ -97,7 +99,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         type: isIncome ? 'income' : 'expense',
         accountId: selectedAccountId,
         categoryId: selectedCategoryId,
-        description: description.trim() || selectedCategory?.name || (isIncome ? 'Доход' : 'Расход'),
+        description: description.trim() || selectedCategory?.name || (isIncome ? t('transactions.income') : t('transactions.expense')),
         date: selectedDate.toISOString(),
       });
       
@@ -128,9 +130,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     yesterday.setDate(yesterday.getDate() - 1);
     
     if (date.toDateString() === today.toDateString()) {
-      return 'Сегодня';
+      return t('transactions.today');
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Вчера';
+      return t('transactions.yesterday');
     } else {
       return date.toLocaleDateString('ru-RU', {
         day: 'numeric',
@@ -166,7 +168,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Новая транзакция
+              {t('transactions.addTransaction')}
             </Text>
             <TouchableOpacity onPress={handleClose}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -177,7 +179,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Переключатель типа транзакции */}
             <View style={styles.typeContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Тип операции
+                {t('common.type')}
               </Text>
               <View style={[styles.typeSwitch, { backgroundColor: colors.background }]}>
                 <TouchableOpacity
@@ -191,7 +193,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     styles.typeButtonText,
                     { color: !isIncome ? '#fff' : colors.text }
                   ]}>
-                    Расход
+                    {t('transactions.expense')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -205,7 +207,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     styles.typeButtonText,
                     { color: isIncome ? '#fff' : colors.text }
                   ]}>
-                    Доход
+                    {t('transactions.income')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -214,7 +216,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Сумма */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Сумма
+                {t('transactions.amount')}
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: isIncome ? '#4CAF50' : colors.primary }]}>
@@ -234,7 +236,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Дата */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Дата
+                {t('transactions.date')}
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
@@ -253,7 +255,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Категория */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Категория
+                {t('transactions.category')}
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
@@ -266,7 +268,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     </View>
                   )}
                   <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {selectedCategory?.name || 'Выберите категорию'}
+                    {selectedCategory?.name || t('transactions.selectCategory')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
@@ -276,14 +278,14 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Счет */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Счет
+                {t('transactions.account')}
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => setShowAccountPicker(true)}
               >
                 <Text style={[styles.selectorText, { color: colors.text }]}>
-                  {selectedAccount?.name || 'Выберите счет'}
+                  {selectedAccount?.name || t('transactions.selectAccount')}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -292,7 +294,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Описание */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Описание (необязательно)
+                {t('transactions.description')} ({t('common.optional')})
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -302,7 +304,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 }]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder={isIncome ? "Например: Зарплата" : "Например: Продукты"}
+                placeholder={t('transactions.enterDescription')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -313,7 +315,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
               onPress={handleClose}
             >
-              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+              <Text style={[styles.buttonText, { color: colors.text }]}>
+                {t('common.cancel')}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -324,7 +328,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               onPress={handleSave}
               disabled={!amount || parseFloat(amount) === 0}
             >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+              <Text style={[styles.buttonText, { color: '#fff' }]}>
+                {t('common.save')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -354,10 +360,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
               <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Отмена</Text>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Готово</Text>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -387,7 +393,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         >
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
             <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              Выберите категорию
+              {t('transactions.selectCategory')}
             </Text>
             <ScrollView>
               {filteredCategories.map(category => (
@@ -425,7 +431,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         >
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
             <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              Выберите счет
+              {t('transactions.selectAccount')}
             </Text>
             <ScrollView>
               {accounts.filter(acc => acc.type !== 'savings').map(account => (

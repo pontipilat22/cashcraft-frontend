@@ -16,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { AccountType, AccountTypeLabels } from '../types';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface AddAccountModalProps {
   visible: boolean;
@@ -74,6 +75,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   onSave,
 }) => {
   const { colors, isDark } = useTheme();
+  const { t } = useLocalization();
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -180,7 +182,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Добавить счет
+              {t('accounts.addAccount')}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -200,14 +202,14 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 onPress={() => setShowIconPicker(true)}
               >
                 <Text style={[styles.iconSelectorText, { color: colors.text }]}>
-                  Выбрать иконку
+                  {t('accounts.selectIcon')}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             )}
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Название</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.accountName')}</Text>
               <TextInput
                 style={[styles.input, { 
                   backgroundColor: colors.background,
@@ -216,13 +218,13 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 }]}
                 value={name}
                 onChangeText={setName}
-                placeholder={`Название ${AccountTypeLabels[accountType].toLowerCase()}`}
+                placeholder={t('accounts.accountName')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Баланс</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.initialBalance')}</Text>
               <TextInput
                 style={[styles.input, { 
                   backgroundColor: colors.background,
@@ -239,7 +241,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
             {accountType === 'savings' && (
               <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Цель накопления</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.targetAmount')}</Text>
                 <TextInput
                   style={[styles.input, { 
                     backgroundColor: colors.background,
@@ -257,7 +259,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
             {accountType === 'card' && (
               <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Номер карты</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.cardNumber')}</Text>
                 <TextInput
                   style={[styles.input, { 
                     backgroundColor: colors.background,
@@ -276,7 +278,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
             {accountType !== 'savings' && (
               <View style={styles.switchContainer}>
-                <Text style={[styles.switchLabel, { color: colors.text }]}>Счет по умолчанию</Text>
+                <Text style={[styles.switchLabel, { color: colors.text }]}>{t('accounts.defaultAccount')}</Text>
                 <Switch
                   value={isDefault}
                   onValueChange={setIsDefault}
@@ -286,7 +288,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
             )}
 
             <View style={styles.switchContainer}>
-              <Text style={[styles.switchLabel, { color: colors.text }]}>Учитывать в общем балансе</Text>
+              <Text style={[styles.switchLabel, { color: colors.text }]}>{t('accounts.includeInBalance')}</Text>
               <Switch
                 value={isIncludedInTotal}
                 onValueChange={setIsIncludedInTotal}
@@ -297,33 +299,33 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
             {accountType === 'bank' && (
               <>
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Процентная ставка в год (%)</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.interestRate')}</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                     value={interestRate}
                     onChangeText={setInterestRate}
-                    placeholder="Например: 7.5"
+                    placeholder="7.5"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="numeric"
                   />
                 </View>
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Дата открытия счета</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.openDate')}</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                     value={openDate}
                     onChangeText={setOpenDate}
-                    placeholder="ДД.ММ.ГГГГ"
+                    placeholder="DD.MM.YYYY"
                     placeholderTextColor={colors.textSecondary}
                   />
                 </View>
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Число начисления процентов</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.interestDay')}</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                     value={interestDay}
                     onChangeText={setInterestDay}
-                    placeholder="Например: 15"
+                    placeholder="15"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="numeric"
                   />
@@ -336,7 +338,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
               <>
                 {/* Дата получения кредита */}
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Дата получения</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditDate')}</Text>
                   <TouchableOpacity
                     style={[styles.dateButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                     onPress={() => setShowCreditDatePicker(true)}
@@ -350,7 +352,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
                 {/* Сумма кредита */}
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Сумма кредита</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditAmount')}</Text>
                   <TextInput
                     style={[styles.input, { 
                       backgroundColor: colors.background,
@@ -367,7 +369,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
                 {/* Срок кредита */}
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Срок (месяцев)</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditTerm')}</Text>
                   <TextInput
                     style={[styles.input, { 
                       backgroundColor: colors.background,
@@ -384,7 +386,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
                 {/* Процентная ставка */}
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Процентная ставка (%)</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditRate')}</Text>
                   <TextInput
                     style={[styles.input, { 
                       backgroundColor: colors.background,
@@ -401,7 +403,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
                 {/* Тип платежей */}
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Тип платежей</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.paymentType')}</Text>
                   <View style={styles.paymentTypeContainer}>
                     <TouchableOpacity
                       style={[
@@ -417,7 +419,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                         styles.paymentTypeText,
                         { color: creditPaymentType === 'annuity' ? '#fff' : colors.text }
                       ]}>
-                        Аннуитетные
+                        {t('accounts.annuity')}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -434,7 +436,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                         styles.paymentTypeText,
                         { color: creditPaymentType === 'differentiated' ? '#fff' : colors.text }
                       ]}>
-                        Дифференцированные
+                        {t('accounts.differentiated')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -448,13 +450,13 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
               style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
               onPress={onClose}
             >
-              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+              <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
               onPress={handleSave}
             >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+              <Text style={[styles.buttonText, { color: '#fff' }]}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -469,7 +471,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
         <View style={[styles.iconPickerContainer, { backgroundColor: colors.card }]}>
           <View style={styles.iconPickerHeader}>
             <Text style={[styles.iconPickerTitle, { color: colors.text }]}>
-              Выберите иконку
+              {t('accounts.selectIcon')}
             </Text>
             <TouchableOpacity onPress={() => setShowIconPicker(false)}>
               <Ionicons name="close" size={24} color={colors.text} />

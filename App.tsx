@@ -8,6 +8,8 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { DataProvider } from './src/context/DataContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { SubscriptionProvider } from './src/context/SubscriptionContext';
+import { LocalizationProvider } from './src/context/LocalizationContext';
+import { CurrencyProvider } from './src/context/CurrencyContext';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { SplashScreen } from './src/components/SplashScreen';
 
@@ -91,9 +93,13 @@ export default function App() {
   
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <LocalizationProvider>
+        <CurrencyProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </CurrencyProvider>
+      </LocalizationProvider>
     </ThemeProvider>
   );
 }

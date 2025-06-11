@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface AccountTypeSelectorProps {
   visible: boolean;
@@ -21,6 +22,7 @@ export const AccountTypeSelector: React.FC<AccountTypeSelectorProps> = ({
   onSelect,
 }) => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
 
   const options: Array<{
     type: 'cash' | 'card' | 'bank';
@@ -31,20 +33,20 @@ export const AccountTypeSelector: React.FC<AccountTypeSelectorProps> = ({
     {
       type: 'cash',
       icon: 'cash-outline',
-      title: 'Наличные',
-      description: 'Для учета наличных денег',
+      title: t('accounts.types.cash'),
+      description: t('accounts.cashDescription'),
     },
     {
       type: 'card',
       icon: 'card-outline',
-      title: 'Банковская карта',
-      description: 'Банковская или кредитная карта',
+      title: t('accounts.types.card'),
+      description: t('accounts.cardDescription'),
     },
     {
       type: 'bank',
       icon: 'business-outline',
-      title: 'Банковский счет',
-      description: 'Для учета расчетных счетов и депозитов',
+      title: t('accounts.types.bank'),
+      description: t('accounts.bankDescription'),
     },
   ];
 
@@ -66,7 +68,7 @@ export const AccountTypeSelector: React.FC<AccountTypeSelectorProps> = ({
           onPress={(e) => e.stopPropagation()}
         >
           <Text style={[styles.title, { color: colors.text }]}>
-            Выберите тип счета
+            {t('accounts.selectAccountType')}
           </Text>
           
           {options.map((option) => (

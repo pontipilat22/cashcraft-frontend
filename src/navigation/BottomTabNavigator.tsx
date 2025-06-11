@@ -4,10 +4,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useLocalization } from '../context/LocalizationContext';
+import { useCurrency } from '../context/CurrencyContext';
 
 import { AccountsNavigator } from './AccountsNavigator';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
-import { MoreScreen } from '../screens/MoreScreen';
+import { MoreNavigator } from './MoreNavigator';
 
 export type BottomTabParamList = {
   Accounts: undefined;
@@ -21,14 +23,16 @@ const Tab = createBottomTabNavigator<BottomTabParamList>();
 export const BalanceHeader: React.FC = () => {
   const { colors } = useTheme();
   const { totalBalance } = useData();
+  const { t } = useLocalization();
+  const { formatAmount } = useCurrency();
 
   return (
     <View style={styles.balanceHeader}>
       <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
-        Общий баланс
+        {t('accounts.totalBalance')}
       </Text>
       <Text style={[styles.balanceAmount, { color: colors.text }]}>
-        {`₽${totalBalance.toLocaleString('ru-RU')}`}
+        {formatAmount(totalBalance)}
       </Text>
     </View>
   );
@@ -36,6 +40,7 @@ export const BalanceHeader: React.FC = () => {
 
 export const BottomTabNavigator: React.FC = () => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
 
   return (
     <Tab.Navigator
@@ -75,24 +80,30 @@ export const BottomTabNavigator: React.FC = () => {
         name="Accounts" 
         component={AccountsNavigator}
         options={{ 
-          title: 'Счета',
-          headerTitle: () => <BalanceHeader />
+          title: t('navigation.accounts'),
+          headerTitle: () => <BalanceHeader />,
+          headerTitleAlign: 'left',
         }}
       />
       <Tab.Screen 
         name="Transactions" 
         component={TransactionsScreen}
         options={{ 
-          title: 'Транзакции',
-          headerTitle: () => <BalanceHeader />
+          title: t('navigation.transactions'),
+          headerTitle: () => <BalanceHeader />,
+          headerTitleAlign: 'left',
         }}
       />
       <Tab.Screen 
         name="More" 
-        component={MoreScreen}
+        component={MoreNavigator}
         options={{ 
-          title: 'Еще',
-          headerTitle: () => <BalanceHeader />
+          title: t('navigation.more'),
+          headerTitle: t('navigation.more'),
+          headerTitleStyle: {
+            fontSize: 20,
+            fontWeight: '600',
+          },
         }}
       />
     </Tab.Navigator>
@@ -101,13 +112,14 @@ export const BottomTabNavigator: React.FC = () => {
 
 const styles = StyleSheet.create({
   balanceHeader: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
   },
   balanceLabel: {
     fontSize: 12,
   },
   balanceAmount: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '600',
   },
 }); 

@@ -20,10 +20,14 @@ import { FABMenu } from '../components/FABMenu';
 import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { Transaction } from '../types';
+import { useLocalization } from '../context/LocalizationContext';
+import { getCurrentLanguage } from '../services/i18n';
 
 export const TransactionsScreen = () => {
   const { colors } = useTheme();
   const { transactions, accounts, categories, totalBalance, isLoading, deleteTransaction } = useData();
+  const { t } = useLocalization();
+  const currentLanguage = getCurrentLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showActionsModal, setShowActionsModal] = useState(false);
@@ -64,11 +68,11 @@ export const TransactionsScreen = () => {
       
       let dateKey: string;
       if (date.toDateString() === today.toDateString()) {
-        dateKey = 'Сегодня';
+        dateKey = t('transactions.today');
       } else if (date.toDateString() === yesterday.toDateString()) {
-        dateKey = 'Вчера';
+        dateKey = t('transactions.yesterday');
       } else {
-        dateKey = date.toLocaleDateString('ru-RU', {
+        dateKey = date.toLocaleDateString(currentLanguage === 'ru' ? 'ru-RU' : 'en-US', {
           day: 'numeric',
           month: 'long',
           year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
@@ -100,15 +104,15 @@ export const TransactionsScreen = () => {
     if (!selectedTransaction) return;
     
     Alert.alert(
-      'Удалить транзакцию?',
-      'Это действие нельзя отменить',
+      t('transactions.deleteTransaction'),
+      t('transactions.deleteTransactionConfirm'),
       [
         {
-          text: 'Отмена',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Удалить',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -147,7 +151,7 @@ export const TransactionsScreen = () => {
         <Ionicons name="search" size={20} color={colors.textSecondary} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Поиск транзакций..."
+          placeholder={t('transactions.searchPlaceholder')}
           placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -171,7 +175,7 @@ export const TransactionsScreen = () => {
           const total = section.data.reduce((sum: number, t: Transaction) => {
             return sum + (t.type === 'income' ? t.amount : -t.amount);
           }, 0);
-          return `${total > 0 ? '+' : ''}₽${Math.abs(total).toLocaleString('ru-RU')}`;
+          return `${total > 0 ? '+' : ''}₽${Math.abs(total).toLocaleString(currentLanguage === 'ru' ? 'ru-RU' : 'en-US')}`;
         })()}
       </Text>
     </View>
@@ -211,12 +215,12 @@ export const TransactionsScreen = () => {
           <View style={styles.emptyContainer}>
             <Ionicons name="receipt-outline" size={64} color={colors.textSecondary} />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {searchQuery ? 'Транзакции не найдены' : 'Нет транзакций'}
+              {searchQuery ? t('transactions.notFound') : t('transactions.noTransactions')}
             </Text>
             <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
               {searchQuery 
-                ? 'Попробуйте изменить поисковый запрос' 
-                : 'Добавьте первую транзакцию'
+                ? t('transactions.changeSearchQuery') 
+                : t('transactions.addFirstTransaction')
               }
             </Text>
           </View>

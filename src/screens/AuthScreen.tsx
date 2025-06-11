@@ -5,148 +5,162 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
-  Alert,
+  Keyboard,
   ActivityIndicator,
+  Alert,
+  Animated,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import { clearAllStorage, debugAsyncStorage } from '../utils/clearStorage';
+import { useLocalization } from '../context/LocalizationContext';
 import { ForgotPasswordModal } from '../components/ForgotPasswordModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const AuthScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const { login, register, loginAsGuest } = useAuth();
+  const { t } = useLocalization();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [isAppleAuthAvailable, setIsAppleAuthAvailable] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    name?: string;
+  }>({});
+  const [forgotPasswordVisible, setForgotPasswordVisible] = useState(false);
+
+  // Animations
+  const fadeAnim = useState(new Animated.Value(0))[0];
+  const slideAnim = useState(new Animated.Value(30))[0];
 
   useEffect(() => {
-    checkAppleAuthAvailability();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
-  const checkAppleAuthAvailability = async () => {
-    try {
-      const isAvailable = await AppleAuthentication.isAvailableAsync();
-      setIsAppleAuthAvailable(isAvailable);
-    } catch (error) {
-      console.log('Apple Auth check error:', error);
-    }
-  };
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidHideListener.remove();
+      keyboardDidShowListener.remove();
+    };
+  }, []);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
   };
 
-  const handleAuth = async () => {
-    // Валидация
-    if (!email || !password) {
-      Alert.alert('Ошибка', 'Заполните все поля');
-      return;
+  const validate = () => {
+    const newErrors: typeof errors = {};
+    
+    if (!email.trim()) {
+      newErrors.email = t('auth.emailRequired');
+    } else if (!validateEmail(email)) {
+      newErrors.email = t('auth.invalidEmail');
     }
-
-    if (!validateEmail(email)) {
-      Alert.alert('Ошибка', 'Введите корректный email');
-      return;
+    
+    if (!password) {
+      newErrors.password = t('auth.passwordRequired');
+    } else if (password.length < 6) {
+      newErrors.password = t('auth.passwordTooShort');
     }
-
-    if (password.length < 6) {
-      Alert.alert('Ошибка', 'Пароль должен быть не менее 6 символов');
-      return;
-    }
-
+    
     if (!isLogin) {
-      if (!name) {
-        Alert.alert('Ошибка', 'Введите имя');
-        return;
+      if (!name.trim()) {
+        newErrors.name = t('auth.nameRequired');
       }
+      
       if (password !== confirmPassword) {
-        Alert.alert('Ошибка', 'Пароли не совпадают');
-        return;
+        newErrors.confirmPassword = t('auth.passwordsDoNotMatch');
       }
     }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-    setIsLoading(true);
+  const handleAuth = async () => {
+    if (!validate()) return;
 
+    setLoading(true);
     try {
       if (isLogin) {
-        // Вход через Firebase
         await login(email, password);
       } else {
-        // Регистрация через Firebase
         await register(email, password, name);
       }
     } catch (error: any) {
-      console.error('Auth error:', error);
-      Alert.alert('Ошибка', error.message || 'Произошла ошибка при авторизации');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAppleSignIn = async () => {
-    try {
       Alert.alert(
-        'В разработке', 
-        'Apple Sign In с Firebase пока не настроен. Используйте email/пароль или гостевой вход.'
+        t('common.error'),
+        error.message || (isLogin ? t('auth.loginError') : t('auth.registerError'))
       );
-      // TODO: Интегрировать Apple Sign In с Firebase
-      // 1. Импортировать OAuthProvider из firebase/auth
-      // 2. Создать провайдер: const provider = new OAuthProvider('apple.com');
-      // 3. Использовать credential от Apple:
-      // const credential = await AppleAuthentication.signInAsync({
-      //   requestedScopes: [
-      //     AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      //     AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-      //   ],
-      // });
-      // 4. Конвертировать в Firebase credential:
-      // const oAuthCredential = provider.credential({
-      //   idToken: credential.identityToken,
-      //   rawNonce: credential.authorizationCode, // или использовать nonce
-      // });
-      // 5. Войти через Firebase:
-      // await signInWithCredential(auth, oAuthCredential);
-    } catch (error: any) {
-      if (error.code !== 'ERR_CANCELED') {
-        Alert.alert('Ошибка', 'Не удалось войти через Apple ID');
-      }
-    }
-  };
-
-  const handleSkipAuth = async () => {
-    try {
-      setIsLoading(true);
-      await loginAsGuest();
-    } catch (error) {
-      console.error('Skip auth error:', error);
-      Alert.alert('Ошибка', 'Не удалось войти как гость');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleForgotPassword = () => {
-    setShowForgotPassword(true);
+  const handleGuestLogin = async () => {
+    setLoading(true);
+    try {
+      await loginAsGuest();
+    } catch (error: any) {
+      Alert.alert(t('common.error'), error.message || t('auth.guestLoginError'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchMode = () => {
+    setIsLogin(!isLogin);
+    setErrors({});
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setName('');
+  };
+
+  const clearAllData = async () => {
+    try {
+      await AsyncStorage.clear();
+      Alert.alert(t('common.success'), 'All data cleared. Please restart the app.');
+    } catch (error) {
+      Alert.alert(t('common.error'), 'Failed to clear data');
+    }
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -155,119 +169,110 @@ export const AuthScreen: React.FC = () => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Image
-              source={require('../../assets/icon.png')}
-              style={[styles.logo, { tintColor: colors.primary }]}
-              resizeMode="contain"
-            />
-            <Text style={[styles.title, { color: colors.text }]}>CASHCRAFT</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Управляйте финансами легко
-            </Text>
-          </View>
-
-          <View style={[styles.form, { backgroundColor: colors.card }]}>
-            <View style={styles.tabs}>
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  isLogin && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
-                ]}
-                onPress={() => setIsLogin(true)}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: isLogin ? colors.primary : colors.textSecondary },
-                  ]}
-                >
-                  Вход
+          <Animated.View
+            style={[
+              styles.formContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            {!keyboardVisible && (
+              <View style={styles.header}>
+                <Image
+                  source={require('../../assets/icon.png')}
+                  style={[styles.logo, { tintColor: colors.primary }]}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.title, { color: colors.text }]}>CASHCRAFT</Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                  {t('auth.tagline')}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  !isLogin && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
-                ]}
-                onPress={() => setIsLogin(false)}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: !isLogin ? colors.primary : colors.textSecondary },
-                  ]}
-                >
-                  Регистрация
-                </Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            )}
 
-            {!isLogin && (
+            <View style={[styles.form, { backgroundColor: colors.card }]}>
+              <View style={styles.tabs}>
+                <TouchableOpacity
+                  style={[
+                    styles.tab,
+                    isLogin && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+                  ]}
+                  onPress={() => setIsLogin(true)}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { color: isLogin ? colors.primary : colors.textSecondary },
+                    ]}
+                  >
+                    {t('auth.login')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.tab,
+                    !isLogin && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+                  ]}
+                  onPress={() => setIsLogin(false)}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { color: !isLogin ? colors.primary : colors.textSecondary },
+                    ]}
+                  >
+                    {t('auth.register')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {!isLogin && (
+                <View style={styles.inputContainer}>
+                  <Ionicons
+                    name="person-outline"
+                    size={20}
+                    color={colors.textSecondary}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { color: colors.text, borderColor: errors.name ? '#FF3B30' : colors.border },
+                    ]}
+                    placeholder={t('auth.name')}
+                    placeholderTextColor={colors.textSecondary}
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                  />
+                </View>
+              )}
+              {errors.name && <Text style={[styles.errorText, { color: '#FF3B30' }]}>{errors.name}</Text>}
+
               <View style={styles.inputContainer}>
                 <Ionicons
-                  name="person-outline"
+                  name="mail-outline"
                   size={20}
                   color={colors.textSecondary}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Имя"
+                  style={[
+                    styles.input,
+                    { color: colors.text, borderColor: errors.email ? '#FF3B30' : colors.border },
+                  ]}
+                  placeholder={t('auth.email')}
                   placeholderTextColor={colors.textSecondary}
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
                 />
               </View>
-            )}
+              {errors.email && <Text style={[styles.errorText, { color: '#FF3B30' }]}>{errors.email}</Text>}
 
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color={colors.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="Email"
-                placeholderTextColor={colors.textSecondary}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={colors.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="Пароль"
-                placeholderTextColor={colors.textSecondary}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {!isLogin && (
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="lock-closed-outline"
@@ -276,116 +281,130 @@ export const AuthScreen: React.FC = () => {
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Подтвердите пароль"
+                  style={[
+                    styles.input,
+                    { color: colors.text, borderColor: errors.password ? '#FF3B30' : colors.border },
+                  ]}
+                  placeholder={t('auth.password')}
                   placeholderTextColor={colors.textSecondary}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
+                  value={password}
+                  onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: colors.primary }]}
-              onPress={handleAuth}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  {isLogin ? 'Войти' : 'Зарегистрироваться'}
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            {isLogin && (
-              <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
-                <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
-                  Забыли пароль?
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {isAppleAuthAvailable && (
-              <>
-                <View style={styles.dividerContainer}>
-                  <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                  <Text style={[styles.dividerText, { color: colors.textSecondary }]}>или</Text>
-                  <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                </View>
-
                 <TouchableOpacity
-                  style={[styles.appleButton, { backgroundColor: isDark ? '#fff' : '#000' }]}
-                  onPress={handleAppleSignIn}
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIcon}
                 >
-                  <Ionicons 
-                    name="logo-apple" 
-                    size={20} 
-                    color={isDark ? '#000' : '#fff'} 
-                    style={styles.appleIcon}
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={colors.textSecondary}
                   />
-                  <Text style={[styles.appleButtonText, { color: isDark ? '#000' : '#fff' }]}>
-                    Войти через Apple
+                </TouchableOpacity>
+              </View>
+              {errors.password && <Text style={[styles.errorText, { color: '#FF3B30' }]}>{errors.password}</Text>}
+
+              {!isLogin && (
+                <>
+                  <View style={styles.inputContainer}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={20}
+                      color={colors.textSecondary}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { color: colors.text, borderColor: errors.confirmPassword ? '#FF3B30' : colors.border },
+                      ]}
+                      placeholder={t('auth.confirmPassword')}
+                      placeholderTextColor={colors.textSecondary}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry={!showConfirmPassword}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      style={styles.eyeIcon}
+                    >
+                      <Ionicons
+                        name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  {errors.confirmPassword && (
+                    <Text style={[styles.errorText, { color: '#FF3B30' }]}>{errors.confirmPassword}</Text>
+                  )}
+                </>
+              )}
+
+              {isLogin && (
+                <TouchableOpacity
+                  onPress={() => setForgotPasswordVisible(true)}
+                  style={styles.forgotPasswordButton}
+                >
+                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                    {t('auth.forgotPassword')}
                   </Text>
                 </TouchableOpacity>
-              </>
-            )}
-          </View>
+              )}
 
-          <View style={styles.footer}>
-            <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-              {isLogin ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}
-            </Text>
-            <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
-              <Text style={[styles.footerLink, { color: colors.primary }]}>
-                {isLogin ? 'Зарегистрироваться' : 'Войти'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: colors.primary }]}
+                onPress={handleAuth}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>
+                    {isLogin ? t('auth.loginButton') : t('auth.registerButton')}
+                  </Text>
+                )}
+              </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.skipButton}
-            onPress={handleSkipAuth}
-          >
-            <Text style={[styles.skipButtonText, { color: colors.textSecondary }]}>
-              Пропустить
-            </Text>
-          </TouchableOpacity>
+              <View style={styles.orContainer}>
+                <View style={[styles.orLine, { backgroundColor: colors.border }]} />
+                <Text style={[styles.orText, { color: colors.textSecondary }]}>{t('auth.orLoginWith')}</Text>
+                <View style={[styles.orLine, { backgroundColor: colors.border }]} />
+              </View>
 
-          {/* Временная кнопка отладки */}
-          <TouchableOpacity 
-            style={[styles.skipButton, { backgroundColor: 'rgba(255,0,0,0.1)' }]}
-            onPress={async () => {
-              await debugAsyncStorage();
-              Alert.alert(
-                'Очистить хранилище?',
-                'Это удалит все сохраненные данные',
-                [
-                  { text: 'Отмена', style: 'cancel' },
-                  { 
-                    text: 'Очистить', 
-                    style: 'destructive',
-                    onPress: async () => {
-                      await clearAllStorage();
-                      Alert.alert('Готово', 'Хранилище очищено. Перезапустите приложение.');
-                    }
-                  }
-                ]
-              );
-            }}
-          >
-            <Text style={[styles.skipButtonText, { color: 'red' }]}>
-              🔧 Отладка: Очистить хранилище
-            </Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.guestButton, { borderColor: colors.border }]}
+                onPress={handleGuestLogin}
+                disabled={loading}
+              >
+                <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.guestButtonText, { color: colors.textSecondary }]}>
+                  {t('auth.skipAuth')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={switchMode} style={styles.switchButton}>
+                <Text style={[styles.switchText, { color: colors.textSecondary }]}>
+                  {isLogin ? t('auth.noAccount') : t('auth.haveAccount')}{' '}
+                  <Text style={{ color: colors.primary }}>
+                    {isLogin ? t('auth.register') : t('auth.login')}
+                  </Text>
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={clearAllData} style={styles.debugButton}>
+                <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                  Debug: Clear Storage
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <ForgotPasswordModal
-        visible={showForgotPassword}
-        onClose={() => setShowForgotPassword(false)}
+        visible={forgotPasswordVisible}
+        onClose={() => setForgotPasswordVisible(false)}
       />
     </SafeAreaView>
   );
@@ -403,6 +422,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  formContainer: {
+    width: '100%',
+  },
   header: {
     alignItems: 'center',
     marginBottom: 40,
@@ -410,24 +432,20 @@ const styles = StyleSheet.create({
   logo: {
     width: 80,
     height: 80,
+    marginBottom: 16,
   },
   title: {
     fontSize: 32,
-    fontWeight: '700',
-    marginTop: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    marginTop: 8,
   },
   form: {
     borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    padding: 20,
+    marginBottom: 20,
   },
   tabs: {
     flexDirection: 'row',
@@ -445,10 +463,11 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingBottom: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    height: 50,
   },
   inputIcon: {
     marginRight: 12,
@@ -456,75 +475,74 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    paddingVertical: 8,
   },
   eyeIcon: {
     padding: 8,
+    marginLeft: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    marginBottom: 12,
+    marginLeft: 16,
   },
   button: {
-    borderRadius: 8,
-    padding: 16,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 16,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
-  forgotPassword: {
+  forgotPasswordButton: {
     alignItems: 'center',
     marginTop: 16,
   },
   forgotPasswordText: {
     fontSize: 14,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 32,
-  },
-  footerText: {
-    fontSize: 14,
-  },
-  footerLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  dividerContainer: {
+  orContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 20,
   },
-  dividerLine: {
+  orLine: {
     flex: 1,
     height: 1,
   },
-  dividerText: {
+  orText: {
     marginHorizontal: 10,
     fontSize: 14,
   },
-  appleButton: {
+  guestButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    padding: 16,
+    height: 50,
+    borderRadius: 12,
+    borderWidth: 1,
     marginBottom: 16,
   },
-  appleIcon: {
-    marginRight: 8,
-  },
-  appleButtonText: {
+  guestButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
-  skipButton: {
+  switchButton: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  switchText: {
+    fontSize: 14,
+  },
+  debugButton: {
     padding: 16,
     alignItems: 'center',
   },
-  skipButtonText: {
+  debugText: {
     fontSize: 16,
     fontWeight: '600',
   },

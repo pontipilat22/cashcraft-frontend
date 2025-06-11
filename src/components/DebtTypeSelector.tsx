@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface DebtTypeSelectorProps {
   visible: boolean;
@@ -22,6 +23,7 @@ export const DebtTypeSelector: React.FC<DebtTypeSelectorProps> = ({
   onSelect,
 }) => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const [selectedSection, setSelectedSection] = useState<'give' | 'borrow'>('give');
 
   const handleSelect = (operation: 'give' | 'return') => {
@@ -46,7 +48,7 @@ export const DebtTypeSelector: React.FC<DebtTypeSelectorProps> = ({
             <View style={[styles.content, { backgroundColor: colors.card }]}>
               <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.text }]}>
-                  Выберите операцию
+                  {t('debts.selectOperation')}
                 </Text>
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons name="close" size={24} color={colors.text} />
@@ -67,7 +69,7 @@ export const DebtTypeSelector: React.FC<DebtTypeSelectorProps> = ({
                       { color: selectedSection === 'give' ? '#fff' : colors.text },
                     ]}
                   >
-                    Я даю
+                    {t('debts.iGive')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -83,7 +85,7 @@ export const DebtTypeSelector: React.FC<DebtTypeSelectorProps> = ({
                       { color: selectedSection === 'borrow' ? '#fff' : colors.text },
                     ]}
                   >
-                    Мне дают
+                    {t('debts.theyGive')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -100,10 +102,10 @@ export const DebtTypeSelector: React.FC<DebtTypeSelectorProps> = ({
                       </View>
                       <View style={styles.optionText}>
                         <Text style={[styles.optionTitle, { color: colors.text }]}>
-                          Дать в долг
+                          {t('debts.lendMoney')}
                         </Text>
                         <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>
-                          Дать деньги в долг кому-то
+                          {t('debts.lendMoneyDescription')}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
@@ -118,10 +120,10 @@ export const DebtTypeSelector: React.FC<DebtTypeSelectorProps> = ({
                       </View>
                       <View style={styles.optionText}>
                         <Text style={[styles.optionTitle, { color: colors.text }]}>
-                          Получить долг
+                          {t('debts.collectDebt')}
                         </Text>
                         <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>
-                          Получить возврат долга
+                          {t('debts.collectDebtDescription')}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
@@ -138,10 +140,10 @@ export const DebtTypeSelector: React.FC<DebtTypeSelectorProps> = ({
                       </View>
                       <View style={styles.optionText}>
                         <Text style={[styles.optionTitle, { color: colors.text }]}>
-                          Взять в долг
+                          {t('debts.borrowMoney')}
                         </Text>
                         <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>
-                          Взять деньги в долг у кого-то
+                          {t('debts.borrowMoneyDescription')}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
@@ -156,10 +158,10 @@ export const DebtTypeSelector: React.FC<DebtTypeSelectorProps> = ({
                       </View>
                       <View style={styles.optionText}>
                         <Text style={[styles.optionTitle, { color: colors.text }]}>
-                          Вернуть долг
+                          {t('debts.paybackDebt')}
                         </Text>
                         <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>
-                          Вернуть долг кому-то
+                          {t('debts.paybackDebtDescription')}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />

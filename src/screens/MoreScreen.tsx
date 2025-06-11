@@ -8,6 +8,10 @@ import { useSubscription } from '../context/SubscriptionContext';
 import { CategoriesScreen } from './CategoriesScreen';
 import { SubscriptionScreen } from './SubscriptionScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalization } from '../context/LocalizationContext';
+import { getCurrentLanguage } from '../services/i18n';
 
 export const MoreScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -16,27 +20,35 @@ export const MoreScreen: React.FC = () => {
   const { isPremium, checkSubscription } = useSubscription();
   const [showCategories, setShowCategories] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const navigation = useNavigation<any>();
+  const { t } = useLocalization();
+  const currentLanguage = getCurrentLanguage();
 
   // Пользовательская информация теперь берется из AuthContext
 
+  useEffect(() => {
+    // Проверяем статус подписки при загрузке
+    checkSubscription();
+  }, []);
+
   const handleResetData = () => {
     Alert.alert(
-      'Сбросить все данные?',
-      'Это действие удалит все счета, транзакции и пользовательские категории. Действие нельзя отменить!',
+      t('common.resetAllDataTitle'),
+      t('common.resetAllDataMessage'),
       [
         {
-          text: 'Отмена',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Сбросить',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: async () => {
             try {
               await resetAllData();
-              Alert.alert('Успешно', 'Все данные были сброшены');
+              Alert.alert(t('common.success'), t('common.dataResetSuccess'));
             } catch (error) {
-              Alert.alert('Ошибка', 'Не удалось сбросить данные');
+              Alert.alert(t('common.error'), t('common.dataResetError'));
             }
           },
         },
@@ -45,220 +57,200 @@ export const MoreScreen: React.FC = () => {
     );
   };
 
+  const menuItems = [
+    {
+      id: 'settings',
+      title: t('settings.title'),
+      icon: 'settings-outline',
+      onPress: () => navigation.navigate('Settings'),
+    },
+    {
+      id: 'categories',
+      title: t('common.categories'),
+      icon: 'grid-outline',
+      onPress: () => setShowCategories(true),
+    },
+    {
+      id: 'statistics',
+      title: t('common.statistics'),
+      icon: 'stats-chart-outline',
+      onPress: () => {},
+    },
+    {
+      id: 'export',
+      title: t('common.export'),
+      icon: 'download-outline',
+      onPress: () => {},
+    },
+    {
+      id: 'help',
+      title: t('common.help'),
+      icon: 'help-circle-outline',
+      onPress: () => {},
+    },
+  ];
+
+  const renderMenuItem = (item: typeof menuItems[0]) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.menuItem, { borderBottomColor: colors.border }]}
+      onPress={item.onPress}
+    >
+      <View style={styles.menuItemLeft}>
+        <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+          <Ionicons name={item.icon as any} size={24} color={colors.primary} />
+        </View>
+        <Text style={[styles.menuItemTitle, { color: colors.text }]}>
+          {item.title}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+    </TouchableOpacity>
+  );
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Информация о пользователе */}
-        <View style={[styles.userSection, { backgroundColor: colors.card }]}>
-        <View style={styles.userInfo}>
-          <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
-            <Ionicons name="person" size={40} color="#fff" />
-          </View>
-          <View style={styles.userDetails}>
-            <Text style={[styles.userName, { color: colors.text }]}>
-              {user?.displayName || 'Загрузка...'}
-            </Text>
-            {user?.email && (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {user && !user.isGuest && (
+          <View style={[styles.userCard, { backgroundColor: colors.card }]}>
+            <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
+              <Text style={styles.userAvatarText}>
+                {(user.displayName || user.email || 'U')[0].toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.userInfo}>
+              {user.displayName && (
+                <Text style={[styles.userName, { color: colors.text }]}>
+                  {user.displayName}
+                </Text>
+              )}
               <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
                 {user.email}
               </Text>
-            )}
-            {user?.isGuest && (
-              <TouchableOpacity onPress={logout}>
-                <Text style={[styles.createAccountLink, { color: colors.primary }]}>
-                  Создать аккаунт →
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
-
-      {/* Кнопка подписки */}
-      {!isPremium && (
-        <TouchableOpacity
-          style={[styles.premiumBanner, { backgroundColor: colors.primary }]}
-          onPress={() => {
-            if (user?.isGuest) {
-              Alert.alert(
-                'Требуется вход',
-                'Для оформления подписки необходимо войти в аккаунт',
-                [
-                  {
-                    text: 'Отмена',
-                    style: 'cancel',
-                  },
-                  {
-                    text: 'Войти',
-                    onPress: logout,
-                  },
-                ]
-              );
-            } else {
-              setShowSubscription(true);
-            }
-          }}
-          activeOpacity={0.8}
-        >
-          <View style={styles.premiumContent}>
-            <Ionicons name="diamond" size={24} color="#fff" />
-            <View style={styles.premiumTextContainer}>
-              <Text style={styles.premiumTitle}>
-                {user?.isGuest ? 'Войдите для Premium' : 'Попробуйте Premium'}
-              </Text>
-              <Text style={styles.premiumSubtitle}>
-                {user?.isGuest ? 'Создайте аккаунт для подписки' : 'Разблокируйте все возможности'}
-              </Text>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
-        </TouchableOpacity>
-      )}
+        )}
 
-      {isPremium && (
-        <TouchableOpacity
-          style={[styles.premiumBanner, styles.activePremiumBanner, { backgroundColor: colors.card, borderColor: colors.primary }]}
-          onPress={() => setShowSubscription(true)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.premiumContent}>
-            <Ionicons name="diamond" size={24} color={colors.primary} />
-            <View style={styles.premiumTextContainer}>
-              <Text style={[styles.premiumTitle, { color: colors.text }]}>Premium активен</Text>
-              <Text style={[styles.premiumSubtitle, { color: colors.textSecondary }]}>Управление подпиской</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      )}
-
-      {/* Синхронизация */}
-      {!user?.isGuest && (
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <TouchableOpacity 
-            style={styles.settingRow} 
-            activeOpacity={0.7}
-            onPress={() => syncData()}
-            disabled={isSyncing}
+        {/* Кнопка подписки */}
+        {!isPremium && (
+          <TouchableOpacity
+            style={[styles.premiumBanner, { backgroundColor: colors.primary }]}
+            onPress={() => {
+              if (user?.isGuest) {
+                Alert.alert(
+                  t('premium.loginRequired'),
+                  t('premium.loginRequiredMessage'),
+                  [
+                    {
+                      text: t('common.cancel'),
+                      style: 'cancel',
+                    },
+                    {
+                      text: t('premium.login'),
+                      onPress: logout,
+                    },
+                  ]
+                );
+              } else {
+                setShowSubscription(true);
+              }
+            }}
+            activeOpacity={0.8}
           >
-            <View style={styles.settingLeft}>
-              {isSyncing ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Ionicons name="cloud-outline" size={24} color={colors.text} />
-              )}
-              <View style={{ marginLeft: 12 }}>
-                <Text style={[styles.settingText, { color: colors.text }]}>
-                  {isSyncing ? 'Синхронизация...' : 'Синхронизировать'}
+            <View style={styles.premiumContent}>
+              <Ionicons name="diamond" size={24} color="#fff" />
+              <View style={styles.premiumTextContainer}>
+                <Text style={styles.premiumTitle}>
+                  {user?.isGuest ? t('premium.loginForPremium') : t('premium.tryPremium')}
                 </Text>
-                {lastSyncTime && (
-                  <Text style={[styles.syncTimeText, { color: colors.textSecondary }]}>
-                    Последняя: {new Date(lastSyncTime).toLocaleString('ru')}
-                  </Text>
-                )}
+                <Text style={styles.premiumSubtitle}>
+                  {user?.isGuest ? t('premium.createAccountForSubscription') : t('premium.unlockFeatures')}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
+
+        {isPremium && (
+          <TouchableOpacity
+            style={[styles.premiumBanner, styles.activePremiumBanner, { backgroundColor: colors.card, borderColor: colors.primary }]}
+            onPress={() => setShowSubscription(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.premiumContent}>
+              <Ionicons name="diamond" size={24} color={colors.primary} />
+              <View style={styles.premiumTextContainer}>
+                <Text style={[styles.premiumTitle, { color: colors.text }]}>
+                  {t('premium.premiumActive')}
+                </Text>
+                <Text style={[styles.premiumSubtitle, { color: colors.textSecondary }]}>
+                  {t('premium.manageSubscription')}
+                </Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
+        )}
+
+        <View style={[styles.menuSection, { backgroundColor: colors.card }]}>
+          {menuItems.map(renderMenuItem)}
         </View>
-      )}
 
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
-          <View style={styles.settingLeft}>
-            <Ionicons name="moon-outline" size={24} color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>Темная тема</Text>
+        {/* Синхронизация */}
+        {!user?.isGuest && (
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
+            <TouchableOpacity 
+              style={styles.menuItem} 
+              activeOpacity={0.7}
+              onPress={() => syncData()}
+              disabled={isSyncing}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+                  {isSyncing ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="cloud-outline" size={24} color={colors.primary} />
+                  )}
+                </View>
+                <View style={{ marginLeft: 16, flex: 1 }}>
+                  <Text style={[styles.menuItemTitle, { color: colors.text }]}>
+                    {isSyncing ? t('common.synchronizing') : t('common.synchronize')}
+                  </Text>
+                  {lastSyncTime && (
+                    <Text style={[styles.syncTimeText, { color: colors.textSecondary }]}>
+                      {t('common.lastSync')}: {new Date(lastSyncTime).toLocaleString(currentLanguage === 'ru' ? 'ru' : 'en')}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
-          <Switch
-            value={isDark}
-            onValueChange={toggleTheme}
-            trackColor={{ false: '#767577', true: colors.primary }}
-          />
-        </TouchableOpacity>
-      </View>
+        )}
 
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <TouchableOpacity 
-          style={styles.settingRow} 
-          activeOpacity={0.7}
-          onPress={() => setShowCategories(true)}
-        >
-          <View style={styles.settingLeft}>
-            <Ionicons name="grid-outline" size={24} color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>Категории</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-
-        <View style={[styles.divider, { backgroundColor: colors.border }]}></View>
-
-        <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
-          <View style={styles.settingLeft}>
-            <Ionicons name="settings-outline" size={24} color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>Настройки</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-
-        <View style={[styles.divider, { backgroundColor: colors.border }]}></View>
-
-        <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
-          <View style={styles.settingLeft}>
-            <Ionicons name="help-circle-outline" size={24} color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>Помощь</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-
-        <View style={[styles.divider, { backgroundColor: colors.border }]}></View>
-
-        <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
-          <View style={styles.settingLeft}>
-            <Ionicons name="information-circle-outline" size={24} color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>О приложении</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={[styles.section, styles.dangerSection, { backgroundColor: colors.card }]}>
-        <TouchableOpacity 
-          style={styles.settingRow} 
-          activeOpacity={0.7}
-          onPress={handleResetData}
-        >
-          <View style={styles.settingLeft}>
-            <Ionicons name="trash-outline" size={24} color="#f44336" />
-            <Text style={[styles.settingText, { color: '#f44336' }]}>
-              Сбросить все данные
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
-
-      {!user?.isGuest && (
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        {/* Опасная зона */}
+        <View style={[styles.section, { backgroundColor: colors.card, marginTop: 20 }]}>
           <TouchableOpacity 
-            style={styles.settingRow} 
+            style={styles.menuItem} 
             activeOpacity={0.7}
-            onPress={logout}
+            onPress={handleResetData}
           >
-            <View style={styles.settingLeft}>
-              <Ionicons name="log-out-outline" size={24} color={colors.text} />
-              <Text style={[styles.settingText, { color: colors.text }]}>
-                Выйти из аккаунта
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.iconContainer, { backgroundColor: '#ff444420' }]}>
+                <Ionicons name="trash-outline" size={24} color="#ff4444" />
+              </View>
+              <Text style={[styles.menuItemTitle, { color: '#ff4444', marginLeft: 16 }]}>
+                {t('common.resetAllData')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
-      )}
       </ScrollView>
 
+      {/* Модальные окна */}
       <Modal
         visible={showCategories}
         animationType="slide"
@@ -272,7 +264,9 @@ export const MoreScreen: React.FC = () => {
             >
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Категории</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('common.categories')}
+            </Text>
             <View style={{ width: 40 }}></View>
           </View>
           <CategoriesScreen />
@@ -290,7 +284,7 @@ export const MoreScreen: React.FC = () => {
           checkSubscription();
         }} />
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -298,92 +292,50 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  section: {
-    marginTop: 20,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    paddingVertical: 8,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  settingText: {
-    fontSize: 16,
-    marginLeft: 12,
-  },
-  divider: {
-    height: 1,
-    marginLeft: 52,
-    marginRight: 16,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  closeButton: {
-    width: 40,
-    alignItems: 'center',
-  },
-  dangerSection: {
-    marginTop: 40,
-  },
-  userSection: {
-    marginTop: 20,
-    marginHorizontal: 16,
-    borderRadius: 12,
+  header: {
     padding: 20,
+    paddingBottom: 10,
   },
-  userInfo: {
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  userCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
   },
   userAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
-  userDetails: {
+  userAvatarText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  userInfo: {
+    marginLeft: 16,
     flex: 1,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    marginBottom: 8,
-  },
-  createAccountLink: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   premiumBanner: {
-    marginTop: 16,
     marginHorizontal: 16,
+    marginBottom: 16,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -412,8 +364,60 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
   },
+  menuSection: {
+    marginHorizontal: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  section: {
+    marginHorizontal: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuItemTitle: {
+    fontSize: 16,
+  },
   syncTimeText: {
     fontSize: 12,
     marginTop: 2,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  closeButton: {
+    width: 40,
+    alignItems: 'center',
   },
 }); 

@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useSubscription } from '../context/SubscriptionContext';
+import { useAuth } from '../context/AuthContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
 import { FABMenu } from '../components/FABMenu';
@@ -30,6 +32,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const { colors, isDark } = useTheme();
   const { accounts, isLoading, createAccount, updateAccount, deleteAccount, getStatistics } = useData();
   const { isPremium } = useSubscription();
+  const { user } = useAuth();
+  const { t } = useLocalization();
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -93,25 +97,72 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
 
   const handleAddAccount = (section: 'cards' | 'savings' | 'debts' | 'credits') => {
     // Проверка лимита для бесплатных пользователей
-    if (!isPremium && accounts.length >= 3) {
-      Alert.alert(
-        'Лимит счетов',
-        'В бесплатной версии можно создать не более 3 счетов. Оформите подписку для неограниченного количества.',
-        [
-          {
-            text: 'Отмена',
-            style: 'cancel',
-          },
-          {
-            text: 'Оформить Premium',
-            onPress: () => {
-              // Открываем экран подписки через MoreScreen
-              navigation.navigate('More' as any);
-            },
-          },
-        ]
-      );
-      return;
+    if (!isPremium) {
+      let limitReached = false;
+      let accountLimit = 0;
+      let currentCount = 0;
+      
+      // Определяем лимиты и считаем текущее количество для каждого типа
+      switch (section) {
+        case 'cards':
+          accountLimit = 2; // Лимит 2 для карт и счетов
+          currentCount = groupedAccounts.cards.length;
+          limitReached = currentCount >= accountLimit;
+          break;
+        case 'savings':
+          accountLimit = 1; // Лимит 1 для накоплений
+          currentCount = groupedAccounts.savings.length;
+          limitReached = currentCount >= accountLimit;
+          break;
+        case 'debts':
+        case 'credits':
+          // Долги и кредиты без ограничений
+          limitReached = false;
+          break;
+      }
+      
+      if (limitReached) {
+        const isGuest = user?.isGuest;
+        
+        if (isGuest) {
+          Alert.alert(
+            t('accounts.authRequired'),
+            t('accounts.guestLimitMessage'),
+            [
+              {
+                text: t('common.cancel'),
+                style: 'cancel',
+              },
+              {
+                text: t('accounts.signIn'),
+                onPress: () => {
+                  // Выходим из гостевого режима
+                  navigation.navigate('More' as any);
+                },
+              },
+            ]
+          );
+        } else {
+          Alert.alert(
+            t('accounts.limitReached'),
+            t('accounts.freeLimitMessage'),
+            [
+              {
+                text: t('common.cancel'),
+                style: 'cancel',
+              },
+              {
+                text: t('accounts.getPremium'),
+                onPress: () => {
+                  // Открываем экран подписки через MoreScreen
+                  navigation.navigate('More' as any);
+                },
+              },
+            ]
+          );
+        }
+        return;
+      }
     }
 
     setSectionToAdd(section);
@@ -207,15 +258,15 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     if (!selectedAccount) return;
     
     Alert.alert(
-      'Удалить счет',
-      `Вы уверены, что хотите удалить "${selectedAccount.name}"?`,
+      t('accounts.deleteAccount'),
+      `${t('accounts.deleteAccountConfirm')} "${selectedAccount.name}"?`,
       [
         {
-          text: 'Отмена',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Удалить',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -300,24 +351,24 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       />
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={[styles.statsCard, { backgroundColor: colors.statsBg }]}>
-          <Text style={styles.statsTitle}>Статистика за период</Text>
+          <Text style={styles.statsTitle}>{t('accounts.statsForPeriod')}</Text>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Ionicons name="arrow-down" size={24} color="#fff" />
-              <Text style={styles.statLabel}>Расходы</Text>
+              <Text style={styles.statLabel}>{t('accounts.expenses')}</Text>
               <Text style={styles.statAmount}>{stats.expense.toLocaleString('ru-RU')} ₽</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Ionicons name="arrow-up" size={24} color="#fff" />
-              <Text style={styles.statLabel}>Доходы</Text>
+              <Text style={styles.statLabel}>{t('accounts.income')}</Text>
               <Text style={styles.statAmount}>{stats.income.toLocaleString('ru-RU')} ₽</Text>
             </View>
           </View>
         </View>
 
         <AccountSection 
-          title="Карты и счета"
+          title={t('accounts.cardsAndAccounts')}
           count={groupedAccounts.cards.length}
           onAddPress={() => handleAddAccount('cards')}
         >
@@ -330,11 +381,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   onLongPress={() => handleAccountLongPress(account)}
                 />
               ))
-            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>Нет счетов</Text>}
+            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noAccounts')}</Text>}
         </AccountSection>
 
         <AccountSection 
-          title="Накопления"
+          title={t('accounts.savingsAccounts')}
           count={groupedAccounts.savings.length}
           onAddPress={() => handleAddAccount('savings')}
         >
@@ -347,16 +398,16 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   onLongPress={() => handleAccountLongPress(account)}
                 />
               ))
-            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>Нет накоплений</Text>}
+            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noSavings')}</Text>}
         </AccountSection>
 
         <AccountSection 
-          title="Долги"
+          title={t('accounts.debts')}
           count={debts.length}
           onAddPress={() => handleAddAccount('debts')}
         >
           {debts.length === 0 ? (
-            <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>Нет долгов</Text>
+            <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noDebts')}</Text>
           ) : (
             <View style={{ paddingHorizontal: 16 }}>
               <TouchableOpacity 
@@ -365,7 +416,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
               >
                 <Ionicons name="trending-up-outline" size={32} color={colors.primary} />
                 <View style={styles.debtCardContent}>
-                  <Text style={[styles.debtCardTitle, { color: colors.text }]}>Мне должны</Text>
+                  <Text style={[styles.debtCardTitle, { color: colors.text }]}>{t('accounts.owedToMe')}</Text>
                   <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
                     {debtTotals.owed.toLocaleString('ru-RU')} ₽
                   </Text>
@@ -378,7 +429,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
               >
                 <Ionicons name="trending-down-outline" size={32} color={colors.primary} />
                 <View style={styles.debtCardContent}>
-                  <Text style={[styles.debtCardTitle, { color: colors.text }]}>Я должен</Text>
+                  <Text style={[styles.debtCardTitle, { color: colors.text }]}>{t('accounts.owedByMe')}</Text>
                   <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
                     {debtTotals.owe.toLocaleString('ru-RU')} ₽
                   </Text>
@@ -390,7 +441,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         </AccountSection>
 
         <AccountSection 
-          title="Кредиты"
+          title={t('accounts.credits')}
           count={groupedAccounts.credits.length}
           onAddPress={() => handleAddAccount('credits')}
         >
@@ -403,7 +454,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   onLongPress={() => handleAccountLongPress(account)}
                 />
               ))
-            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>Нет кредитов</Text>}
+            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noCredits')}</Text>}
         </AccountSection>
 
         <View style={{ height: 100 }}></View>
