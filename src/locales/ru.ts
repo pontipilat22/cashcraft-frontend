@@ -80,6 +80,7 @@ export default {
     initialBalance: 'Начальный баланс',
     currency: 'Валюта',
     selectCurrency: 'Выберите валюту',
+    exchangeRate: 'Курс обмена',
     accountType: 'Тип счёта',
     types: {
       cash: 'Наличные',

@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { AccountType, AccountTypeLabels } from '../types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalization } from '../context/LocalizationContext';
+import { useCurrency } from '../context/CurrencyContext';
 
 interface AddAccountModalProps {
   visible: boolean;
@@ -25,6 +26,8 @@ interface AddAccountModalProps {
   onSave: (data: { 
     name: string; 
     balance: number; 
+    currency?: string;
+    exchangeRate?: number;
     cardNumber?: string;
     isDefault?: boolean;
     isIncludedInTotal?: boolean;
@@ -76,8 +79,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
+  const { defaultCurrency, currencies } = useCurrency();
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState(defaultCurrency);
+  const [exchangeRate, setExchangeRate] = useState('1');
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [cardNumber, setCardNumber] = useState('');
   const [isDefault, setIsDefault] = useState(false);
   const [isIncludedInTotal, setIsIncludedInTotal] = useState(true);
@@ -101,6 +108,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     const accountData: any = {
       name: name.trim(),
       balance: parseFloat(balance) || 0,
+      currency: selectedCurrency,
+      exchangeRate: selectedCurrency !== defaultCurrency ? parseFloat(exchangeRate) || 1 : undefined,
       cardNumber: cardNumber.trim() ? cardNumber.trim() : undefined,
       isDefault: accountType !== 'savings' ? isDefault : false,
       isIncludedInTotal,
@@ -132,6 +141,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     // Очищаем форму
     setName('');
     setBalance('');
+    setSelectedCurrency(defaultCurrency);
+    setExchangeRate('1');
     setCardNumber('');
     setIsDefault(false);
     setIsIncludedInTotal(true);
@@ -238,6 +249,44 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 keyboardType="numeric"
               />
             </View>
+
+            {/* Выбор валюты */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.currency')}</Text>
+              <TouchableOpacity
+                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => setShowCurrencyPicker(true)}
+              >
+                <View style={styles.selectorContent}>
+                  <Text style={[styles.selectorText, { color: colors.text }]}>
+                    {currencies[selectedCurrency]?.symbol} {selectedCurrency} - {currencies[selectedCurrency]?.name}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Курс конвертации */}
+            {selectedCurrency !== defaultCurrency && (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.exchangeRate')}</Text>
+                <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                  1 {selectedCurrency} = ? {defaultCurrency}
+                </Text>
+                <TextInput
+                  style={[styles.input, { 
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderColor: colors.border,
+                  }]}
+                  value={exchangeRate}
+                  onChangeText={setExchangeRate}
+                  placeholder="1"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
 
             {accountType === 'savings' && (
               <View style={styles.inputContainer}>
@@ -540,6 +589,68 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
           </View>
         </Modal>
       )}
+
+      {/* Currency Picker */}
+      <Modal
+        visible={showCurrencyPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCurrencyPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.datePickerModal}
+          activeOpacity={1}
+          onPress={() => setShowCurrencyPicker(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.datePickerContent, { backgroundColor: colors.card }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.datePickerHeader}>
+              <Text style={[styles.datePickerTitle, { color: colors.text }]}>
+                {t('accounts.selectCurrency')}
+              </Text>
+              <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }}>
+              {Object.entries(currencies).map(([code, currency]) => (
+                <TouchableOpacity
+                  key={code}
+                  style={[
+                    styles.currencyItem,
+                    { backgroundColor: colors.background },
+                    selectedCurrency === code && { borderColor: colors.primary, borderWidth: 2 }
+                  ]}
+                  onPress={() => {
+                    setSelectedCurrency(code);
+                    setShowCurrencyPicker(false);
+                  }}
+                >
+                  <View style={styles.currencyItemContent}>
+                    <Text style={[styles.currencySymbol, { color: colors.text }]}>
+                      {currency.symbol}
+                    </Text>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[styles.currencyCode, { color: colors.text }]}>
+                        {code}
+                      </Text>
+                      <Text style={[styles.currencyName, { color: colors.textSecondary }]}>
+                        {currency.name}
+                      </Text>
+                    </View>
+                    {selectedCurrency === code && (
+                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 };
@@ -710,5 +821,49 @@ const styles = StyleSheet.create({
   datePickerTitle: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  selector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  selectorContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectorText: {
+    fontSize: 16,
+  },
+  helperText: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  currencyItem: {
+    marginHorizontal: 16,
+    marginVertical: 4,
+    padding: 12,
+    borderRadius: 8,
+  },
+  currencyItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  currencySymbol: {
+    fontSize: 24,
+    fontWeight: '500',
+    width: 40,
+    textAlign: 'center',
+  },
+  currencyCode: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  currencyName: {
+    fontSize: 14,
+    marginTop: 2,
   },
 }); 

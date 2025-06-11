@@ -80,6 +80,7 @@ export default {
     initialBalance: 'Initial Balance',
     currency: 'Currency',
     selectCurrency: 'Select Currency',
+    exchangeRate: 'Exchange Rate',
     accountType: 'Account Type',
     types: {
       cash: 'Cash',

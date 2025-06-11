@@ -4,6 +4,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { Account } from '../types';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useCurrency } from '../context/CurrencyContext';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface AccountCardProps {
   account: Account;
@@ -17,6 +19,8 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   onLongPress,
 }) => {
   const { colors, isDark } = useTheme();
+  const { defaultCurrency, formatAmount, getCurrencyInfo } = useCurrency();
+  const { t } = useLocalization();
   const [isPressed, setIsPressed] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
@@ -80,15 +84,42 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     }
   };
 
-  const formatBalance = (amount: number) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const getBalanceDisplay = (amount: number, showConverted: boolean = false) => {
+    const accountCurrency = account.currency || defaultCurrency;
+    const currencyInfo = getCurrencyInfo(accountCurrency);
+    
+    // Форматируем сумму в валюте счета
+    const formattedAmount = formatAmount(amount, accountCurrency);
+    
+    // Если валюта счета отличается от основной и есть курс обмена, показываем конвертированную сумму
+    if (showConverted && accountCurrency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+      const convertedAmount = amount * ((account as any).exchangeRate || 1);
+      const convertedFormatted = formatAmount(convertedAmount, defaultCurrency);
+      
+      return (
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}>
+            {formattedAmount}
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 2 }}>
+            ≈ {convertedFormatted}
+          </Text>
+        </View>
+      );
+    }
+    
+    return (
+      <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}>
+        {formattedAmount}
+      </Text>
+    );
   };
 
+  const formatBalance = (amount: number) => {
+    const accountCurrency = account.currency || defaultCurrency;
+    return formatAmount(amount, accountCurrency);
+  };
+  
   const getProgress = () => {
     if (account.type !== 'savings' || !account.targetAmount) return 0;
     return Math.min((account.balance / account.targetAmount) * 100, 100);
@@ -218,7 +249,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                       marginTop: 2,
                     }}
                   >
-                    ₽{account.balance} / ₽{account.targetAmount}
+                    {formatBalance(account.balance)} / {formatBalance(account.targetAmount || 0)}
                   </Text>
                 </View>
                 <Text
@@ -271,14 +302,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12, marginBottom: 2 }]}>
                       Осталось выплатить:
                     </Text>
-                    <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}> 
-                      {formatBalance(Math.abs(account.balance))}
-                    </Text>
+                    {getBalanceDisplay(Math.abs(account.balance), true)}
                   </>
                 ) : (
-                  <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}> 
-                    {formatBalance(account.balance)}
-                  </Text>
+                  getBalanceDisplay(account.balance, true)
                 )}
               </View>
             </View>
@@ -340,6 +367,7 @@ const styles = StyleSheet.create({
   balance: {
     fontSize: 20,
     fontWeight: '700',
+    textAlign: 'right',
   },
   targetAmount: {
     fontSize: 13,

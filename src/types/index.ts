@@ -4,6 +4,7 @@ export interface Account {
   type: 'cash' | 'card' | 'bank' | 'savings' | 'debt' | 'credit';
   balance: number;
   currency: string;
+  exchangeRate?: number;
   cardNumber?: string;
   color?: string;
   icon?: string;
