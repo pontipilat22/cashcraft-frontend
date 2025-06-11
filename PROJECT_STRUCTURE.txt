@@ -1,0 +1,117 @@
+ПРОЕКТ CASHCRAFT3 - МОБИЛЬНОЕ ПРИЛОЖЕНИЕ ДЛЯ УЧЕТА ФИНАНСОВ (React Native/Expo)
+
+КОРНЕВЫЕ ФАЙЛЫ:
+- App.tsx - главный компонент приложения, точка входа
+- app.json - конфигурация Expo приложения
+- package.json - зависимости и скрипты проекта
+- index.ts - входная точка приложения
+- tsconfig.json - конфигурация TypeScript
+- babel.config.js - конфигурация Babel
+- metro.config.js - конфигурация Metro bundler
+- start-expo.ps1 - скрипт запуска Expo на Windows
+
+ОСНОВНЫЕ ДИРЕКТОРИИ:
+
+/src/screens/ - ЭКРАНЫ ПРИЛОЖЕНИЯ:
+- AuthScreen.tsx - экран авторизации/регистрации
+- AccountsScreen.tsx - управление счетами
+- TransactionsScreen.tsx - список транзакций
+- CategoriesScreen.tsx - управление категориями
+- SettingsScreen.tsx - настройки приложения
+- MoreScreen.tsx - дополнительные функции
+- DebtsScreen.tsx - управление долгами
+- DebtListScreen.tsx - список долгов
+- SubscriptionScreen.tsx - управление подписками
+
+/src/components/ - КОМПОНЕНТЫ UI:
+МОДАЛЬНЫЕ ОКНА:
+- AddTransactionModal.tsx - добавление транзакции
+- EditTransactionModal.tsx - редактирование транзакции
+- TransferModal.tsx - перевод между счетами
+- AddAccountModal.tsx - добавление счета
+- EditAccountModal.tsx - редактирование счета
+- AddCategoryModal.tsx - добавление категории
+- AddDebtModal.tsx - добавление долга
+- EditDebtModal.tsx - редактирование долга
+- DebtOperationModal.tsx - операции с долгами
+- ForgotPasswordModal.tsx - восстановление пароля
+
+КОМПОНЕНТЫ:
+- AccountCard.tsx - карточка счета
+- TransactionItem.tsx - элемент транзакции
+- FABMenu.tsx - плавающее меню действий
+- GoogleSignInButton.tsx - кнопка входа через Google
+- SplashScreen.tsx - экран загрузки
+- AccountTypeSelector.tsx - выбор типа счета
+- DebtTypeSelector.tsx - выбор типа долга
+- ExchangeRatesManager.tsx - управление курсами валют
+
+/src/services/ - СЕРВИСЫ:
+- database.ts - работа с SQLite базой данных
+- localDatabase.ts - локальное хранилище данных
+- firebaseAuth.ts - авторизация через Firebase
+- cloudSync.ts - синхронизация с облаком
+- userDataService.ts - управление данными пользователя
+- i18n.ts - интернационализация (мультиязычность)
+- sync.ts - синхронизация данных
+
+/src/context/ - КОНТЕКСТЫ (ГЛОБАЛЬНОЕ СОСТОЯНИЕ):
+- AuthContext.tsx - контекст авторизации
+- DataContext.tsx - контекст данных приложения
+- ThemeContext.tsx - контекст темы
+- CurrencyContext.tsx - контекст валюты
+- LocalizationContext.tsx - контекст локализации
+- SubscriptionContext.tsx - контекст подписок
+
+/src/navigation/ - НАВИГАЦИЯ:
+- BottomTabNavigator.tsx - нижняя панель навигации
+- AccountsNavigator.tsx - навигация по счетам
+- MoreNavigator.tsx - навигация доп. функций
+
+/src/utils/ - УТИЛИТЫ:
+- categoryUtils.ts - работа с категориями
+- clearStorage.ts - очистка хранилища
+
+/src/config/ - КОНФИГУРАЦИЯ:
+- currencies.ts - список поддерживаемых валют
+
+/src/locales/ - ЛОКАЛИЗАЦИЯ:
+- Файлы переводов: en, ru, uk, fr, de, it, es, pl, tr, ar, zh, hi, el, kk
+
+/src/types/ - ТИПЫ TYPESCRIPT:
+- index.ts - основные типы данных
+- Account.ts - типы для счетов
+
+/services/ - ВНЕШНИЕ СЕРВИСЫ:
+- authService.ts - сервис авторизации
+
+/contexts/ - ГЛОБАЛЬНЫЕ КОНТЕКСТЫ:
+- AuthContext.tsx - контекст авторизации (дубликат)
+
+/firebase/ - FIREBASE:
+- firebaseConfig.ts - конфигурация Firebase
+
+/scripts/ - СКРИПТЫ:
+- startAndroid.js - запуск Android эмулятора
+- clearDatabase.ts - очистка базы данных
+
+/assets/ - РЕСУРСЫ:
+- icon.png - иконка приложения
+- splash-icon.png - иконка заставки
+- adaptive-icon.png - адаптивная иконка
+- favicon.png - фавикон
+
+ОСНОВНЫЕ ФУНКЦИИ ПРИЛОЖЕНИЯ:
+1. Управление счетами (добавление, редактирование, удаление)
+2. Учет транзакций (доходы/расходы)
+3. Категоризация операций
+4. Управление долгами
+5. Переводы между счетами с учетом курсов валют
+6. Мультивалютность с настройкой курсов обмена
+7. Мультиязычность (14 языков)
+8. Синхронизация с облаком
+9. Авторизация через Google
+10. Темная/светлая тема
+11. Управление подписками
+12. Локальное хранение данных в SQLite
+13. Управление курсами валют (добавление, редактирование, удаление) 

@@ -165,6 +165,7 @@ export default {
     notFound: 'Transactions not found',
     changeSearchQuery: 'Try changing the search query',
     addFirstTransaction: 'Add your first transaction',
+    noExchangeRate: 'No exchange rate found between {{from}} and {{to}}. Please set up exchange rates in Settings.',
   },
   categories: {
     // Income categories
@@ -204,6 +205,18 @@ export default {
     defaultCurrency: 'Default Currency',
     useSuggestedRate: 'Use suggested rate: {{rate}}',
     useAllSuggestedRates: 'Use all suggested rates',
+    exchangeRates: 'Exchange Rates',
+    manageExchangeRates: 'Manage Exchange Rates',
+    addNewRate: 'Add New Rate',
+    noExchangeRates: 'No exchange rates set',
+    invalidExchangeRate: 'Invalid exchange rate',
+    sameCurrencyError: 'Cannot set rate between same currencies',
+    exchangeRateSaved: 'Exchange rate saved',
+    errorSavingRate: 'Error saving exchange rate',
+    deleteRateConfirm: 'Delete exchange rate between {{from}} and {{to}}?',
+    errorDeletingRate: 'Error deleting exchange rate',
+    exchangeRateUpdated: 'Exchange rate updated',
+    errorUpdatingRate: 'Error updating exchange rate',
   },
   currencies: {
     USD: 'US Dollar',

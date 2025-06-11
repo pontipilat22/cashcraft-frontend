@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -62,23 +63,69 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       const transferDate = selectedDate.toISOString();
       const transferDescription = description.trim() || t('transactions.transfer');
       
-      // Создаем расходную транзакцию
+      // Получаем информацию о счетах
+      const fromAccount = accounts.find(a => a.id === fromAccountId);
+      const toAccount = accounts.find(a => a.id === toAccountId);
+      
+      if (!fromAccount || !toAccount) return;
+      
+      // Определяем сумму для зачисления с учетом курса валют
+      let toAmount = transferAmount;
+      
+      const fromCurrency = fromAccount.currency || defaultCurrency;
+      const toCurrency = toAccount.currency || defaultCurrency;
+      
+      if (fromCurrency !== toCurrency) {
+        // Нужна конвертация валют
+        const { LocalDatabaseService } = await import('../services/localDatabase');
+        
+        // Пытаемся получить прямой курс
+        let exchangeRate = await LocalDatabaseService.getExchangeRate(
+          fromCurrency,
+          toCurrency
+        );
+        
+        // Если нет прямого курса, пытаемся через кросс-курс
+        if (!exchangeRate) {
+          exchangeRate = await LocalDatabaseService.calculateCrossRate(
+            fromCurrency,
+            toCurrency,
+            defaultCurrency
+          );
+        }
+        
+        if (exchangeRate) {
+          toAmount = transferAmount * exchangeRate;
+        } else {
+          // Если курс не найден, показываем предупреждение
+          Alert.alert(
+            t('common.error'),
+            t('transactions.noExchangeRate', {
+              from: fromCurrency,
+              to: toCurrency
+            })
+          );
+          return;
+        }
+      }
+      
+      // Создаем расходную транзакцию (в валюте счета-источника)
       await createTransaction({
         amount: transferAmount,
         type: 'expense',
         accountId: fromAccountId,
         categoryId: 'other_expense',
-        description: `${transferDescription} → ${accounts.find(a => a.id === toAccountId)?.name}`,
+        description: `${transferDescription} → ${toAccount.name}`,
         date: transferDate,
       });
       
-      // Создаем доходную транзакцию
+      // Создаем доходную транзакцию (в валюте счета-получателя)
       await createTransaction({
-        amount: transferAmount,
+        amount: toAmount,
         type: 'income',
         accountId: toAccountId,
         categoryId: 'other_income',
-        description: `${transferDescription} ← ${accounts.find(a => a.id === fromAccountId)?.name}`,
+        description: `${transferDescription} ← ${fromAccount.name}`,
         date: transferDate,
       });
       

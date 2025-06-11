@@ -165,6 +165,7 @@ export default {
     notFound: 'Транзакции не найдены',
     changeSearchQuery: 'Попробуйте изменить поисковый запрос',
     addFirstTransaction: 'Добавьте первую транзакцию',
+    noExchangeRate: 'Не найден курс обмена между {{from}} и {{to}}. Пожалуйста, настройте курсы валют в Настройках.',
   },
   categories: {
     // Income categories
@@ -204,6 +205,18 @@ export default {
     defaultCurrency: 'Валюта по умолчанию',
     useSuggestedRate: 'Использовать предложенный курс: {{rate}}',
     useAllSuggestedRates: 'Использовать все предложенные курсы',
+    exchangeRates: 'Курсы валют',
+    manageExchangeRates: 'Управление курсами валют',
+    addNewRate: 'Добавить новый курс',
+    noExchangeRates: 'Курсы валют не установлены',
+    invalidExchangeRate: 'Неверный курс валют',
+    sameCurrencyError: 'Нельзя установить курс между одинаковыми валютами',
+    exchangeRateSaved: 'Курс валют сохранен',
+    errorSavingRate: 'Ошибка при сохранении курса валют',
+    deleteRateConfirm: 'Удалить курс между {{from}} и {{to}}?',
+    errorDeletingRate: 'Ошибка при удалении курса валют',
+    exchangeRateUpdated: 'Курс валют обновлен',
+    errorUpdatingRate: 'Ошибка при обновлении курса валют',
   },
   currencies: {
     USD: 'Доллар США',

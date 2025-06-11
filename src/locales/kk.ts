@@ -165,6 +165,7 @@ export default {
     notFound: 'Транзакциялар табылмады',
     changeSearchQuery: 'Іздеу сұрауын өзгертіп көріңіз',
     addFirstTransaction: 'Алғашқы транзакцияны қосыңыз',
+    noExchangeRate: '{{from}} және {{to}} арасында айырбас бағамы табылмады. Параметрлерде валюта бағамдарын орнатыңыз.',
   },
   categories: {
     // Income categories
@@ -204,6 +205,18 @@ export default {
     defaultCurrency: 'Әдепкі валюта',
     useSuggestedRate: 'Ұсынылған бағамды қолдану: {{rate}}',
     useAllSuggestedRates: 'Барлық ұсынылған бағамдарды қолдану',
+    exchangeRates: 'Валюта бағамдары',
+    manageExchangeRates: 'Валюта бағамдарын басқару',
+    addNewRate: 'Жаңа бағам қосу',
+    noExchangeRates: 'Валюта бағамдары орнатылмаған',
+    invalidExchangeRate: 'Жарамсыз валюта бағамы',
+    sameCurrencyError: 'Бірдей валюталар арасында бағам орнату мүмкін емес',
+    exchangeRateSaved: 'Валюта бағамы сақталды',
+    errorSavingRate: 'Валюта бағамын сақтау кезінде қате',
+    deleteRateConfirm: '{{from}} және {{to}} арасындағы бағамды жою керек пе?',
+    errorDeletingRate: 'Валюта бағамын жою кезінде қате',
+    exchangeRateUpdated: 'Валюта бағамы жаңартылды',
+    errorUpdatingRate: 'Валюта бағамын жаңарту кезінде қате',
   },
   currencies: {
     USD: 'АҚШ доллары',

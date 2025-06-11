@@ -25,6 +25,8 @@ import { useData } from '../context/DataContext';
 import { CURRENCIES } from '../config/currencies';
 import { useNavigation } from '@react-navigation/native';
 import { LocalDatabaseService } from '../services/localDatabase';
+import { ExchangeRatesManager } from '../components/ExchangeRatesManager';
+
 
 type ExchangeRates = { [accountId: string]: { 
   name: string; 
@@ -45,6 +47,7 @@ export const SettingsScreen: React.FC = () => {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showExchangeRatesModal, setShowExchangeRatesModal] = useState(false);
+  const [showExchangeRatesManager, setShowExchangeRatesManager] = useState(false);
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({});
   const [newCurrency, setNewCurrency] = useState(defaultCurrency);
 
@@ -269,6 +272,13 @@ export const SettingsScreen: React.FC = () => {
             t('settings.currency'),
             `${CURRENCIES[defaultCurrency]?.symbol} ${defaultCurrency}`,
             () => setShowCurrencyModal(true)
+          )}
+          
+          {renderSettingItem(
+            'calculator-outline',
+            t('settings.exchangeRates'),
+            undefined,
+            () => setShowExchangeRatesManager(true)
           )}
           
           {renderSettingItem(
@@ -557,6 +567,12 @@ export const SettingsScreen: React.FC = () => {
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Exchange Rates Manager */}
+      <ExchangeRatesManager
+        visible={showExchangeRatesManager}
+        onClose={() => setShowExchangeRatesManager(false)}
+      />
     </SafeAreaView>
   );
 };
