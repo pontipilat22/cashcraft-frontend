@@ -14,7 +14,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { Transaction } from '../types';
+import { getLocalizedCategory } from '../utils/categoryUtils';
 
 interface EditTransactionModalProps {
   visible: boolean;
@@ -29,6 +31,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const { accounts, categories, updateTransaction } = useData();
+  const { t } = useLocalization();
   
   const [isIncome, setIsIncome] = useState(false);
   const [amount, setAmount] = useState('');
@@ -120,7 +123,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Редактировать транзакцию
+              {t('transactions.editTransaction')}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -131,7 +134,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Переключатель типа транзакции */}
             <View style={styles.typeContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Тип операции
+                {t('common.type')}
               </Text>
               <View style={[styles.typeSwitch, { backgroundColor: colors.background }]}>
                 <TouchableOpacity
@@ -145,7 +148,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                     styles.typeButtonText,
                     { color: !isIncome ? '#fff' : colors.text }
                   ]}>
-                    Расход
+                    {t('transactions.expense')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -159,7 +162,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                     styles.typeButtonText,
                     { color: isIncome ? '#fff' : colors.text }
                   ]}>
-                    Доход
+                    {t('transactions.income')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -168,7 +171,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Сумма */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Сумма
+                {t('transactions.amount')}
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: isIncome ? '#4CAF50' : colors.primary }]}>
@@ -220,7 +223,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                     </View>
                   )}
                   <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {selectedCategory?.name || 'Выберите категорию'}
+                    {selectedCategory ? getLocalizedCategory(selectedCategory, t).name : t('transactions.selectCategory')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
@@ -340,27 +343,35 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           onPress={() => setShowCategoryPicker(false)}
         >
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              Выберите категорию
-            </Text>
+            <View style={styles.pickerHeader}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                Выберите категорию
+              </Text>
+              <TouchableOpacity onPress={() => setShowCategoryPicker(false)} style={styles.pickerCloseButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <ScrollView>
-              {filteredCategories.map(category => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[styles.categoryPickerItem, { backgroundColor: colors.background }]}
-                  onPress={() => {
-                    setSelectedCategoryId(category.id);
-                    setShowCategoryPicker(false);
-                  }}
-                >
-                  <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                    <Ionicons name={category.icon as any} size={20} color={category.color} />
-                  </View>
-                  <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                    {category.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {filteredCategories.map(category => {
+                const localizedCategory = getLocalizedCategory(category, t);
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[styles.categoryPickerItem, { backgroundColor: colors.background }]}
+                    onPress={() => {
+                      setSelectedCategoryId(category.id);
+                      setShowCategoryPicker(false);
+                    }}
+                  >
+                    <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                      <Ionicons name={category.icon as any} size={20} color={category.color} />
+                    </View>
+                    <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                      {localizedCategory.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -378,9 +389,14 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           onPress={() => setShowAccountPicker(false)}
         >
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              Выберите счет
-            </Text>
+            <View style={styles.pickerHeader}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                Выберите счет
+              </Text>
+              <TouchableOpacity onPress={() => setShowAccountPicker(false)} style={styles.pickerCloseButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <ScrollView>
               {accounts.map(account => (
                 <TouchableOpacity
@@ -542,8 +558,19 @@ const styles = StyleSheet.create({
   pickerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
+    flex: 1,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  pickerCloseButton: {
+    padding: 4,
+    marginLeft: 12,
   },
   pickerItem: {
     flexDirection: 'row',

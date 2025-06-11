@@ -8,6 +8,7 @@ import {
   Text,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Localization from 'expo-localization';
 
 const { width, height } = Dimensions.get('window');
 
@@ -16,6 +17,10 @@ export const SplashScreen: React.FC = () => {
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
+
+  // Определяем язык устройства для отображения правильного текста
+  const deviceLanguage = Localization.locale?.split('-')[0] || 'en';
+  const tagline = deviceLanguage === 'ru' ? 'УПРАВЛЯЙТЕ ФИНАНСАМИ ЛЕГКО' : 'MANAGE YOUR FINANCES EASILY';
 
   useEffect(() => {
     // Анимация появления
@@ -99,7 +104,7 @@ export const SplashScreen: React.FC = () => {
           </Animated.View>
           
           <Animated.View style={{ opacity: fadeAnim }}>
-            <Text style={styles.tagline}>УПРАВЛЯЙТЕ ФИНАНСАМИ ЛЕГКО</Text>
+            <Text style={styles.tagline}>{tagline}</Text>
           </Animated.View>
         </Animated.View>
 

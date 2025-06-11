@@ -16,7 +16,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { getLocalizedCategory } from '../utils/categoryUtils';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -268,7 +270,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     </View>
                   )}
                   <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {selectedCategory?.name || t('transactions.selectCategory')}
+                    {selectedCategory ? getLocalizedCategory(selectedCategory, t).name : t('transactions.selectCategory')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
@@ -392,27 +394,35 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           onPress={() => setShowCategoryPicker(false)}
         >
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              {t('transactions.selectCategory')}
-            </Text>
+            <View style={styles.pickerHeader}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                {t('transactions.selectCategory')}
+              </Text>
+              <TouchableOpacity onPress={() => setShowCategoryPicker(false)} style={styles.pickerCloseButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <ScrollView>
-              {filteredCategories.map(category => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[styles.categoryPickerItem, { backgroundColor: colors.background }]}
-                  onPress={() => {
-                    setSelectedCategoryId(category.id);
-                    setShowCategoryPicker(false);
-                  }}
-                >
-                  <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                    <Ionicons name={category.icon as any} size={20} color={category.color} />
-                  </View>
-                  <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                    {category.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {filteredCategories.map(category => {
+                const localizedCategory = getLocalizedCategory(category, t);
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[styles.categoryPickerItem, { backgroundColor: colors.background }]}
+                    onPress={() => {
+                      setSelectedCategoryId(category.id);
+                      setShowCategoryPicker(false);
+                    }}
+                  >
+                    <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                      <Ionicons name={category.icon as any} size={20} color={category.color} />
+                    </View>
+                    <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                      {localizedCategory.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -430,9 +440,14 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           onPress={() => setShowAccountPicker(false)}
         >
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              {t('transactions.selectAccount')}
-            </Text>
+            <View style={styles.pickerHeader}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                {t('transactions.selectAccount')}
+              </Text>
+              <TouchableOpacity onPress={() => setShowAccountPicker(false)} style={styles.pickerCloseButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <ScrollView>
               {accounts.filter(acc => acc.type !== 'savings').map(account => (
                 <TouchableOpacity
@@ -594,8 +609,19 @@ const styles = StyleSheet.create({
   pickerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
+    flex: 1,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  pickerCloseButton: {
+    padding: 4,
+    marginLeft: 12,
   },
   pickerItem: {
     flexDirection: 'row',

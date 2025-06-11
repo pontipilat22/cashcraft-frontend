@@ -74,19 +74,37 @@ export const MoreScreen: React.FC = () => {
       id: 'statistics',
       title: t('common.statistics'),
       icon: 'stats-chart-outline',
-      onPress: () => {},
+      onPress: () => {
+        Alert.alert(
+          t('common.statistics'),
+          t('common.featureNotAvailable') || 'Эта функция пока не доступна',
+          [{ text: t('common.ok') || 'OK', style: 'default' }]
+        );
+      },
     },
     {
       id: 'export',
       title: t('common.export'),
       icon: 'download-outline',
-      onPress: () => {},
+      onPress: () => {
+        Alert.alert(
+          t('common.export'),
+          t('common.featureNotAvailable') || 'Эта функция пока не доступна',
+          [{ text: t('common.ok') || 'OK', style: 'default' }]
+        );
+      },
     },
     {
       id: 'help',
       title: t('common.help'),
       icon: 'help-circle-outline',
-      onPress: () => {},
+      onPress: () => {
+        Alert.alert(
+          t('common.help'),
+          t('common.featureNotAvailable') || 'Эта функция пока не доступна',
+          [{ text: t('common.ok') || 'OK', style: 'default' }]
+        );
+      },
     },
   ];
 

@@ -10,12 +10,15 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { Category } from '../types';
 import { AddCategoryModal } from '../components/AddCategoryModal';
+import { getLocalizedCategory } from '../utils/categoryUtils';
 
 export const CategoriesScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const { categories, deleteCategory } = useData();
+  const { t } = useLocalization();
   const [selectedType, setSelectedType] = useState<'income' | 'expense'>('expense');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -25,29 +28,30 @@ export const CategoriesScreen: React.FC = () => {
     // Проверяем, что это не базовая категория "Другое"
     if (category.id === 'other_income' || category.id === 'other_expense') {
       Alert.alert(
-        'Невозможно удалить',
-        'Базовую категорию "Другое" нельзя удалить'
+        t('common.error'),
+        t('categories.cannotDeleteDefault') || 'Базовую категорию "Другое" нельзя удалить'
       );
       return;
     }
 
+    const localizedCategory = getLocalizedCategory(category, t);
     Alert.alert(
-      'Удалить категорию?',
-      `Все транзакции категории "${category.name}" будут перемещены в "Другое"`,
+      t('categories.deleteCategory') || 'Удалить категорию?',
+      t('categories.deleteCategoryMessage', { name: localizedCategory.name }) || `Все транзакции категории "${localizedCategory.name}" будут перемещены в "Другое"`,
       [
         {
-          text: 'Отмена',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Удалить',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteCategory(category.id);
             } catch (error) {
               console.error('Error deleting category:', error);
-              Alert.alert('Ошибка', 'Не удалось удалить категорию');
+              Alert.alert(t('common.error'), t('categories.deleteError') || 'Не удалось удалить категорию');
             }
           },
         },
@@ -70,7 +74,7 @@ export const CategoriesScreen: React.FC = () => {
             styles.typeButtonText,
             { color: selectedType === 'expense' ? '#fff' : colors.text }
           ]}>
-            Расходы
+            {t('accounts.expenses')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -84,32 +88,35 @@ export const CategoriesScreen: React.FC = () => {
             styles.typeButtonText,
             { color: selectedType === 'income' ? '#fff' : colors.text }
           ]}>
-            Доходы
+            {t('accounts.income')}
           </Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.categoriesGrid}>
-          {filteredCategories.map(category => (
-            <TouchableOpacity
-              key={category.id}
-              style={[styles.categoryItem, { backgroundColor: colors.card }]}
-              onLongPress={() => handleDeleteCategory(category)}
-            >
-              <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                <Ionicons name={category.icon as any} size={28} color={category.color} />
-              </View>
-              <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-                {category.name}
-              </Text>
-              {(category.id !== 'other_income' && category.id !== 'other_expense') && (
-                <View style={styles.deleteHint}>
-                  <Ionicons name="trash-outline" size={16} color={colors.textSecondary} />
+          {filteredCategories.map(category => {
+            const localizedCategory = getLocalizedCategory(category, t);
+            return (
+              <TouchableOpacity
+                key={category.id}
+                style={[styles.categoryItem, { backgroundColor: colors.card }]}
+                onLongPress={() => handleDeleteCategory(category)}
+              >
+                <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                  <Ionicons name={category.icon as any} size={28} color={category.color} />
                 </View>
-              )}
-            </TouchableOpacity>
-          ))}
+                <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
+                  {localizedCategory.name}
+                </Text>
+                {(category.id !== 'other_income' && category.id !== 'other_expense') && (
+                  <View style={styles.deleteHint}>
+                    <Ionicons name="trash-outline" size={16} color={colors.textSecondary} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
           {/* Кнопка добавления */}
           <TouchableOpacity
             style={[styles.categoryItem, styles.addButton, { backgroundColor: colors.card }]}
@@ -119,7 +126,7 @@ export const CategoriesScreen: React.FC = () => {
               <Ionicons name="add" size={28} color={colors.primary} />
             </View>
             <Text style={[styles.categoryName, { color: colors.primary }]}>
-              Добавить
+              {t('common.add')}
             </Text>
           </TouchableOpacity>
         </View>

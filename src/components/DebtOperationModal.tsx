@@ -438,9 +438,14 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           onPress={() => setShowPersonPicker(false)}
         >
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              Выберите долг для погашения
-            </Text>
+            <View style={styles.pickerHeader}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                Выберите долг для погашения
+              </Text>
+              <TouchableOpacity onPress={() => setShowPersonPicker(false)} style={styles.pickerCloseButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <ScrollView>
               {existingDebts.map(debt => (
                 <TouchableOpacity
@@ -484,9 +489,14 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           onPress={() => setShowAccountPicker(false)}
         >
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              Выберите счет
-            </Text>
+            <View style={styles.pickerHeader}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                Выберите счет
+              </Text>
+              <TouchableOpacity onPress={() => setShowAccountPicker(false)} style={styles.pickerCloseButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <ScrollView>
               {accounts.filter(acc => acc.type !== 'savings').map(account => (
                 <TouchableOpacity
@@ -616,7 +626,19 @@ const styles = StyleSheet.create({
   pickerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
+    flex: 1,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  pickerCloseButton: {
+    padding: 4,
+    marginLeft: 12,
   },
   pickerItem: {
     flexDirection: 'row',

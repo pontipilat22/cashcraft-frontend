@@ -67,9 +67,14 @@ export const AccountTypeSelector: React.FC<AccountTypeSelectorProps> = ({
           style={[styles.container, { backgroundColor: colors.card }]}
           onPress={(e) => e.stopPropagation()}
         >
-          <Text style={[styles.title, { color: colors.text }]}>
-            {t('accounts.selectAccountType')}
-          </Text>
+          <View style={styles.headerTop}>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {t('accounts.selectAccountType')}
+            </Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
           
           {options.map((option) => (
             <TouchableOpacity
@@ -118,11 +123,18 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
+  },
+  closeButton: {
+    padding: 8,
   },
   option: {
     flexDirection: 'row',

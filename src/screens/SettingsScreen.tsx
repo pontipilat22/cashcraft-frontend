@@ -153,9 +153,14 @@ export const SettingsScreen: React.FC = () => {
         onPress={() => setShowLanguageModal(false)}
       >
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
-            {t('settings.language')}
-          </Text>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('settings.language')}
+            </Text>
+            <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
           <FlatList
             data={Object.values(languages)}
             keyExtractor={(item) => item.code}
@@ -190,8 +195,6 @@ export const SettingsScreen: React.FC = () => {
       </TouchableOpacity>
     </Modal>
   );
-
-
 
   const renderSettingItem = (
     icon: string,
@@ -237,9 +240,16 @@ export const SettingsScreen: React.FC = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={() => navigation.goBack()} 
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             {t('settings.title')}
           </Text>
+          <View style={styles.headerSpacer} />
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
@@ -802,5 +812,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerSpacer: {
+    flex: 1,
   },
 }); 

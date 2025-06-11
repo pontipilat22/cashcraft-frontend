@@ -63,25 +63,30 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
         >
           {/* Заголовок с информацией о транзакции */}
           <View style={styles.header}>
-            <View style={styles.transactionInfo}>
-              {category && (
-                <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                  <Ionicons name={category.icon as any} size={24} color={category.color} />
-                </View>
-              )}
-              <View style={styles.transactionDetails}>
-                <Text style={[styles.categoryName, { color: colors.text }]}>
-                  {category?.name || (isIncome ? 'Доход' : 'Расход')}
-                </Text>
-                {Boolean(transaction.description) && (
-                  <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {transaction.description}
-                  </Text>
+            <View style={styles.headerTop}>
+              <View style={styles.transactionInfo}>
+                {category && (
+                  <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                    <Ionicons name={category.icon as any} size={24} color={category.color} />
+                  </View>
                 )}
+                <View style={styles.transactionDetails}>
+                  <Text style={[styles.categoryName, { color: colors.text }]}>
+                    {category?.name || (isIncome ? 'Доход' : 'Расход')}
+                  </Text>
+                  {Boolean(transaction.description) && (
+                    <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {transaction.description}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.amount, { color: isIncome ? '#4CAF50' : colors.text }]}>
+                  {amount}
+                </Text>
               </View>
-              <Text style={[styles.amount, { color: isIncome ? '#4CAF50' : colors.text }]}>
-                {amount}
-              </Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -152,9 +157,21 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 16,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   transactionInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 4,
+    marginLeft: 8,
+    marginTop: -4,
+    marginRight: -4,
   },
   categoryIcon: {
     width: 44,

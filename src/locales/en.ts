@@ -29,9 +29,10 @@ export default {
     reset: 'Reset',
     dataResetSuccess: 'All data has been reset',
     dataResetError: 'Failed to reset data',
-    type: 'Type',
+    type: 'Operation type',
     optional: 'optional',
     done: 'Done',
+    featureNotAvailable: 'This feature is not available yet',
   },
   auth: {
     login: 'Login',
@@ -164,23 +165,19 @@ export default {
     addFirstTransaction: 'Add your first transaction',
   },
   categories: {
-    income: {
-      salary: 'Salary',
-      business: 'Business',
-      investments: 'Investments',
-      gifts: 'Gifts',
-      other: 'Other Income',
-    },
-    expense: {
-      food: 'Food & Dining',
-      transport: 'Transportation',
-      shopping: 'Shopping',
-      entertainment: 'Entertainment',
-      bills: 'Bills & Utilities',
-      healthcare: 'Healthcare',
-      education: 'Education',
-      other: 'Other Expenses',
-    },
+    // Income categories
+    salary: 'Salary',
+    business: 'Business',
+    investments: 'Investments',
+    otherIncome: 'Other',
+    // Expense categories  
+    food: 'Food',
+    transport: 'Transport',
+    housing: 'Housing',
+    entertainment: 'Entertainment',
+    health: 'Health',
+    shopping: 'Shopping',
+    otherExpense: 'Other',
   },
   settings: {
     title: 'Settings',
