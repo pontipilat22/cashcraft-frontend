@@ -21,6 +21,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { AccountsStackParamList } from '../navigation/AccountsNavigator';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { useFocusEffect } from '@react-navigation/native';
+import { TransferModal } from '../components/TransferModal';
 
 type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
 
@@ -40,13 +41,14 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [actionsModalVisible, setActionsModalVisible] = useState(false);
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
-  const [debts, setDebts] = useState<Debt[]>([]);
-  const [debtOperationType, setDebtOperationType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
-  const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
   const [showDebtTypeSelector, setShowDebtTypeSelector] = useState(false);
+  const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
+  const [debtOperationType, setDebtOperationType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedAccountType, setSelectedAccountType] = useState<AccountType>('cash');
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [sectionToAdd, setSectionToAdd] = useState<'cards' | 'savings' | 'debts' | 'credits'>('cards');
+  const [debts, setDebts] = useState<Debt[]>([]);
 
   const stats = getStatistics();
 
@@ -330,6 +332,31 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     setShowDebtTypeSelector(true);
   };
 
+  const handleQuickTransfer = () => {
+    // Проверяем количество счетов
+    if (accounts.length < 2) {
+      Alert.alert(
+        t('transactions.transfer'),
+        t('accounts.needTwoAccountsForTransfer') || 'Для перевода необходимо иметь минимум два счета',
+        [
+          {
+            text: t('common.close') || 'Закрыть',
+            style: 'cancel'
+          },
+          {
+            text: t('accounts.openAccount') || 'Открыть счет',
+            onPress: () => {
+              // Открываем селектор типа счета для создания нового
+              setTypeSelectorVisible(true);
+            }
+          }
+        ]
+      );
+      return;
+    }
+    setShowTransferModal(true);
+  };
+
   const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
     setDebtOperationType(type);
     setShowDebtOperationModal(true);
@@ -464,6 +491,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         onIncomePress={handleQuickIncome}
         onExpensePress={handleQuickExpense}
         onDebtPress={handleQuickDebt}
+        onTransferPress={handleQuickTransfer}
       />
 
       <AccountTypeSelector
@@ -498,6 +526,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         visible={transactionModalVisible}
         onClose={() => setTransactionModalVisible(false)}
         initialType={transactionType}
+      />
+      
+      <TransferModal
+        visible={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
       />
 
       <DebtTypeSelector

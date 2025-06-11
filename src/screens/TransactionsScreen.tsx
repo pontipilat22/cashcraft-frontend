@@ -19,6 +19,7 @@ import { AddTransactionModal } from '../components/AddTransactionModal';
 import { FABMenu } from '../components/FABMenu';
 import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
+import { TransferModal } from '../components/TransferModal';
 import { Transaction } from '../types';
 import { useLocalization } from '../context/LocalizationContext';
 import { getCurrentLanguage } from '../services/i18n';
@@ -37,6 +38,7 @@ export const TransactionsScreen = () => {
   const [debtOperationType, setDebtOperationType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
   const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
   const [showDebtTypeSelector, setShowDebtTypeSelector] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   // Фильтрация транзакций по поиску
   const filteredTransactions = useMemo(() => {
@@ -140,6 +142,10 @@ export const TransactionsScreen = () => {
     setShowDebtTypeSelector(true);
   };
 
+  const handleQuickTransfer = () => {
+    setShowTransferModal(true);
+  };
+
   const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
     setDebtOperationType(type);
     setShowDebtOperationModal(true);
@@ -233,12 +239,18 @@ export const TransactionsScreen = () => {
         onIncomePress={handleQuickIncome}
         onExpensePress={handleQuickExpense}
         onDebtPress={handleQuickDebt}
+        onTransferPress={handleQuickTransfer}
       />
 
       <AddTransactionModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
         initialType={transactionType}
+      />
+      
+      <TransferModal
+        visible={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
       />
       
       <DebtTypeSelector

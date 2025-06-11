@@ -130,6 +130,8 @@ export default {
     cardDescription: 'Bank or credit card',
     bankDescription: 'For tracking bank accounts and deposits',
     savedRate: 'Saved rate',
+    needTwoAccountsForTransfer: 'You need at least two accounts to make a transfer',
+    openAccount: 'Open Account',
   },
   transactions: {
     title: 'Transactions',

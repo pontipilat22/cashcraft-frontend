@@ -130,6 +130,8 @@ export default {
     cardDescription: 'Банковская или кредитная карта',
     bankDescription: 'Для учета расчетных счетов и депозитов',
     savedRate: 'Сохраненный курс',
+    needTwoAccountsForTransfer: 'Для перевода необходимо иметь минимум два счета',
+    openAccount: 'Открыть счет',
   },
   transactions: {
     title: 'Операции',
