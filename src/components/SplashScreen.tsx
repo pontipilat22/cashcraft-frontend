@@ -20,7 +20,26 @@ export const SplashScreen: React.FC = () => {
 
   // Определяем язык устройства для отображения правильного текста
   const deviceLanguage = Localization.locale?.split('-')[0] || 'en';
-  const tagline = deviceLanguage === 'ru' ? 'УПРАВЛЯЙТЕ ФИНАНСАМИ ЛЕГКО' : 'MANAGE YOUR FINANCES EASILY';
+  
+  // Словарь тагланов для всех поддерживаемых языков
+  const taglines: Record<string, string> = {
+    en: 'MANAGE YOUR FINANCES EASILY',
+    ru: 'УПРАВЛЯЙТЕ ФИНАНСАМИ ЛЕГКО',
+    kk: 'ҚАРЖЫНЫ ОҢАЙ БАСҚАРЫҢЫЗ',
+    uk: 'КЕРУЙТЕ ФІНАНСАМИ ЛЕГКО',
+    zh: '轻松管理您的财务',
+    ar: 'إدارة أموالك بسهولة',
+    de: 'VERWALTEN SIE IHRE FINANZEN EINFACH',
+    fr: 'GÉREZ VOS FINANCES FACILEMENT',
+    hi: 'अपने वित्त को आसानी से प्रबंधित करें',
+    tr: 'FİNANSLARINIZI KOLAYCA YÖNETİN',
+    el: 'ΔΙΑΧΕΙΡΙΣΤΕΙΤΕ ΤΑ ΟΙΚΟΝΟΜΙΚΑ ΣΑΣ ΕΥΚΟΛΑ',
+    it: 'GESTISCI LE TUE FINANZE FACILMENTE',
+    pl: 'ZARZĄDZAJ SWOIMI FINANSAMI ŁATWO',
+  };
+  
+  // Используем тагланд для языка устройства или английский по умолчанию
+  const tagline = taglines[deviceLanguage] || taglines.en;
 
   useEffect(() => {
     // Анимация появления
