@@ -194,6 +194,13 @@ export default {
     shareApp: 'Share App',
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
+    enterExchangeRates: 'Enter Exchange Rates',
+    exchangeRatesDescription: 'Please enter exchange rates for your accounts in other currencies to {{currency}}',
+    success: 'Success',
+    currencyChangedWithRates: 'Currency changed successfully',
+    errorChangingCurrency: 'Error changing currency',
+    selectCurrency: 'Select Currency',
+    defaultCurrency: 'Default Currency',
   },
   currencies: {
     USD: 'US Dollar',

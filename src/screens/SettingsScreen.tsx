@@ -8,6 +8,8 @@ import {
   Switch,
   Modal,
   FlatList,
+  Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,22 +17,80 @@ import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { CURRENCIES } from '../config/currencies';
+import { useNavigation } from '@react-navigation/native';
+
+type ExchangeRates = { [accountId: string]: { name: string; currency: string; rate: number } };
 
 export const SettingsScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
   const { t, currentLanguage, setLanguage, languages } = useLocalization();
-  const { defaultCurrency, setDefaultCurrency } = useCurrency();
-  const { user, logout } = useAuth();
+  const { defaultCurrency, setDefaultCurrency, currencies, formatAmount } = useCurrency();
+  const { user, logout, login } = useAuth();
+  const { accounts, updateAccount } = useData();
+  const navigation = useNavigation();
   
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showExchangeRatesModal, setShowExchangeRatesModal] = useState(false);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({});
+  const [newCurrency, setNewCurrency] = useState(defaultCurrency);
 
   const handleLogout = async () => {
     try {
       await logout();
     } catch (error) {
       console.error('Logout error:', error);
+    }
+  };
+
+  const handleCurrencySelect = async (currencyCode: string) => {
+    setShowCurrencyModal(false);
+    
+    // Проверяем, есть ли счета в других валютах
+    const accountsInOtherCurrencies = accounts.filter(
+      account => account.currency && account.currency !== currencyCode
+    );
+    
+    if (accountsInOtherCurrencies.length > 0) {
+      // Показываем модальное окно для ввода курсов
+      setNewCurrency(currencyCode);
+      const rates: ExchangeRates = {};
+      
+      accountsInOtherCurrencies.forEach(account => {
+        rates[account.id] = {
+          name: account.name,
+          currency: account.currency || defaultCurrency,
+          rate: 1 // Начальное значение
+        };
+      });
+      
+      setExchangeRates(rates);
+      setShowExchangeRatesModal(true);
+    } else {
+      // Просто меняем валюту
+      await setDefaultCurrency(currencyCode);
+    }
+  };
+
+  const handleSaveExchangeRates = async () => {
+    try {
+      // Обновляем курсы для всех счетов
+      for (const [accountId, data] of Object.entries(exchangeRates)) {
+        await updateAccount(accountId, { exchangeRate: data.rate } as any);
+      }
+      
+      // Теперь меняем валюту по умолчанию
+      await setDefaultCurrency(newCurrency);
+      
+      setShowExchangeRatesModal(false);
+      Alert.alert(
+        t('settings.success'),
+        t('settings.currencyChangedWithRates')
+      );
+    } catch (error) {
+      Alert.alert(t('common.error'), t('settings.errorChangingCurrency'));
     }
   };
 
@@ -85,78 +145,7 @@ export const SettingsScreen: React.FC = () => {
     </Modal>
   );
 
-  const renderCurrencyModal = () => (
-    <Modal
-      visible={showCurrencyModal}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowCurrencyModal(false)}
-    >
-      <TouchableOpacity
-        style={styles.modalBackdrop}
-        activeOpacity={1}
-        onPress={() => setShowCurrencyModal(false)}
-      >
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
-            {t('settings.currency')}
-          </Text>
-          <FlatList
-            data={Object.values(CURRENCIES)}
-            keyExtractor={(item) => item.code}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.modalItem,
-                  { borderBottomColor: colors.border },
-                  item.code === defaultCurrency && styles.selectedItem,
-                ]}
-                onPress={async () => {
-                  await setDefaultCurrency(item.code);
-                  setShowCurrencyModal(false);
-                }}
-              >
-                <View style={styles.modalItemContent}>
-                  <Text
-                    style={[
-                      styles.currencySymbol,
-                      { color: colors.text },
-                      item.code === defaultCurrency && { color: colors.primary },
-                    ]}
-                  >
-                    {item.symbol}
-                  </Text>
-                  <View style={styles.currencyInfo}>
-                    <Text
-                      style={[
-                        styles.modalItemText,
-                        { color: colors.text },
-                        item.code === defaultCurrency && { color: colors.primary },
-                      ]}
-                    >
-                      {item.code}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.currencyName,
-                        { color: colors.textSecondary },
-                        item.code === defaultCurrency && { color: colors.primary },
-                      ]}
-                    >
-                      {t(`currencies.${item.code}`)}
-                    </Text>
-                  </View>
-                </View>
-                {item.code === defaultCurrency && (
-                  <Ionicons name="checkmark" size={20} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
+
 
   const renderSettingItem = (
     icon: string,
@@ -291,7 +280,125 @@ export const SettingsScreen: React.FC = () => {
       </ScrollView>
 
       {renderLanguageModal()}
-      {renderCurrencyModal()}
+
+      {/* Currency Picker Modal */}
+      <Modal
+        visible={showCurrencyModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCurrencyModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {t('settings.selectCurrency')}
+              </Text>
+              <TouchableOpacity onPress={() => setShowCurrencyModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
+              {Object.entries(currencies).map(([code, currency]) => (
+                <TouchableOpacity
+                  key={code}
+                  style={[
+                    styles.optionItem,
+                    defaultCurrency === code && { backgroundColor: colors.background }
+                  ]}
+                  onPress={() => handleCurrencySelect(code)}
+                >
+                  <Text style={[styles.optionText, { color: colors.text }]}>
+                    {currency.symbol} {code} - {currency.name}
+                  </Text>
+                  {defaultCurrency === code && (
+                    <Ionicons name="checkmark" size={20} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Exchange Rates Modal */}
+      <Modal
+        visible={showExchangeRatesModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowExchangeRatesModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {t('settings.enterExchangeRates')}
+              </Text>
+            </View>
+            
+            <ScrollView style={styles.ratesList} showsVerticalScrollIndicator={false}>
+              <Text style={[styles.ratesDescription, { color: colors.textSecondary }]}>
+                {t('settings.exchangeRatesDescription', { currency: newCurrency })}
+              </Text>
+              
+              {Object.entries(exchangeRates).map(([accountId, data]) => (
+                <View key={accountId} style={styles.rateItem}>
+                  <Text style={[styles.rateLabel, { color: colors.text }]}>
+                    {data.name} ({data.currency})
+                  </Text>
+                  <View style={styles.rateInputContainer}>
+                    <Text style={[styles.rateText, { color: colors.textSecondary }]}>
+                      1 {data.currency} =
+                    </Text>
+                    <TextInput
+                      style={[styles.rateInput, { 
+                        color: colors.text,
+                        borderColor: colors.border,
+                        backgroundColor: colors.background
+                      }]}
+                      value={data.rate.toString()}
+                      onChangeText={(text) => {
+                        const rate = parseFloat(text) || 0;
+                        setExchangeRates(prev => ({
+                          ...prev,
+                          [accountId]: { ...data, rate }
+                        }));
+                      }}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                    <Text style={[styles.rateText, { color: colors.textSecondary }]}>
+                      {newCurrency}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.background }]}
+                onPress={() => setShowExchangeRatesModal(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>
+                  {t('common.cancel')}
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                onPress={handleSaveExchangeRates}
+              >
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
+                  {t('common.save')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -420,5 +527,78 @@ const styles = StyleSheet.create({
   currencyName: {
     fontSize: 12,
     marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  optionsList: {
+    maxHeight: 300,
+    paddingHorizontal: 16,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  optionText: {
+    fontSize: 16,
+  },
+  ratesList: {
+    maxHeight: 300,
+    paddingHorizontal: 16,
+  },
+  ratesDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  rateItem: {
+    marginBottom: 16,
+  },
+  rateLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  rateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rateText: {
+    fontSize: 14,
+    marginHorizontal: 8,
+  },
+  rateInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginHorizontal: 6,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

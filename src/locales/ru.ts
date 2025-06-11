@@ -194,6 +194,13 @@ export default {
     shareApp: 'Поделиться',
     privacyPolicy: 'Политика конфиденциальности',
     termsOfService: 'Условия использования',
+    enterExchangeRates: 'Введите курсы обмена',
+    exchangeRatesDescription: 'Пожалуйста, введите курсы обмена для ваших счетов в других валютах к {{currency}}',
+    success: 'Успешно',
+    currencyChangedWithRates: 'Валюта успешно изменена',
+    errorChangingCurrency: 'Ошибка при изменении валюты',
+    selectCurrency: 'Выберите валюту',
+    defaultCurrency: 'Валюта по умолчанию',
   },
   currencies: {
     USD: 'Доллар США',

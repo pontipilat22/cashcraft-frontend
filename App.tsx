@@ -12,6 +12,7 @@ import { LocalizationProvider } from './src/context/LocalizationContext';
 import { CurrencyProvider } from './src/context/CurrencyContext';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { SplashScreen } from './src/components/SplashScreen';
+import { useCurrency } from './src/context/CurrencyContext';
 
 // Предотвращаем автоматическое скрытие нативного splash screen
 SplashScreenExpo.preventAutoHideAsync();
@@ -19,8 +20,10 @@ SplashScreenExpo.preventAutoHideAsync();
 function AppContent() {
   const { isDark, colors } = useTheme();
   const { user, isLoading: authLoading } = useAuth();
+  const { defaultCurrency } = useCurrency();
   const [showCustomSplash, setShowCustomSplash] = useState(true);
   const [forceHideSplash, setForceHideSplash] = useState(false);
+  const [dataProviderKey, setDataProviderKey] = useState(0);
 
   console.log('AppContent render:', {
     user: user?.email || 'null',
@@ -57,6 +60,12 @@ function AppContent() {
     prepare();
   }, []);
 
+  // Обновляем DataProvider при изменении валюты
+  useEffect(() => {
+    // Принудительно перемонтируем DataProvider чтобы обновить валюту
+    setDataProviderKey(prev => prev + 1);
+  }, [defaultCurrency]);
+
   console.log('App: Rendering, conditions:', {
     showCustomSplash,
     authLoading,
@@ -78,7 +87,7 @@ function AppContent() {
       ) : (
         <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
           <SubscriptionProvider userId={user.id} isGuest={user.isGuest}>
-            <DataProvider userId={user.id}>
+            <DataProvider key={dataProviderKey} userId={user.id} defaultCurrency={defaultCurrency}>
               <BottomTabNavigator />
             </DataProvider>
           </SubscriptionProvider>

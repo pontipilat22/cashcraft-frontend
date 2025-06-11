@@ -46,7 +46,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-export const DataProvider: React.FC<{ children: ReactNode; userId?: string | null }> = ({ children, userId }) => {
+export const DataProvider: React.FC<{ children: ReactNode; userId?: string | null; defaultCurrency?: string }> = ({ children, userId, defaultCurrency = 'USD' }) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -82,7 +82,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       // Устанавливаем userId для базы данных
       if (userId) {
         LocalDatabaseService.setUserId(userId);
-        await LocalDatabaseService.initDatabase();
+        await LocalDatabaseService.initDatabase(defaultCurrency);
         await refreshData();
         
         // Проверяем есть ли данные в облаке
@@ -163,10 +163,18 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     setTransactions(transactions);
     setCategories(categories);
     
-    // Считаем общий баланс только по счетам
+    // Считаем общий баланс только по счетам с учетом курса обмена
     const accountsTotal = accounts
       .filter((acc: Account) => acc.isIncludedInTotal !== false)
-      .reduce((sum: number, account: Account) => sum + account.balance, 0);
+      .reduce((sum: number, account: Account) => {
+        // Если валюта счета отличается от основной и есть курс обмена
+        if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+          // Конвертируем баланс в основную валюту
+          return sum + (account.balance * (account as any).exchangeRate);
+        }
+        // Иначе используем баланс как есть
+        return sum + account.balance;
+      }, 0);
     
     setTotalBalance(accountsTotal);
   };
@@ -179,7 +187,12 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       
       // Обновляем общий баланс
       if (newAccount.isIncludedInTotal !== false) {
-        setTotalBalance(prev => prev + newAccount.balance);
+        let balanceToAdd = newAccount.balance;
+        // Если валюта счета отличается от основной и есть курс обмена
+        if (newAccount.currency && newAccount.currency !== defaultCurrency && 'exchangeRate' in newAccount && (newAccount as any).exchangeRate) {
+          balanceToAdd = newAccount.balance * (newAccount as any).exchangeRate;
+        }
+        setTotalBalance(prev => prev + balanceToAdd);
       }
     } catch (error) {
       console.error('Error creating account:', error);
@@ -204,12 +217,22 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         // Убираем старый баланс из общего
         let newTotalBalance = totalBalance;
         if (oldAccount.isIncludedInTotal !== false) {
-          newTotalBalance -= oldAccount.balance;
+          let oldConvertedBalance = oldAccount.balance;
+          // Конвертируем старый баланс если нужно
+          if (oldAccount.currency && oldAccount.currency !== defaultCurrency && 'exchangeRate' in oldAccount && (oldAccount as any).exchangeRate) {
+            oldConvertedBalance = oldAccount.balance * (oldAccount as any).exchangeRate;
+          }
+          newTotalBalance -= oldConvertedBalance;
         }
         
         // Добавляем новый баланс к общему
         if (newAccount.isIncludedInTotal !== false) {
-          newTotalBalance += newAccount.balance;
+          let newConvertedBalance = newAccount.balance;
+          // Конвертируем новый баланс если нужно
+          if (newAccount.currency && newAccount.currency !== defaultCurrency && 'exchangeRate' in newAccount && (newAccount as any).exchangeRate) {
+            newConvertedBalance = newAccount.balance * (newAccount as any).exchangeRate;
+          }
+          newTotalBalance += newConvertedBalance;
         }
         
         setTotalBalance(newTotalBalance);
@@ -231,7 +254,12 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       
       // Обновляем общий баланс если счет был включен в него
       if (accountToDelete.isIncludedInTotal !== false) {
-        setTotalBalance(prev => prev - accountToDelete.balance);
+        let balanceToRemove = accountToDelete.balance;
+        // Конвертируем баланс если валюта отличается от основной
+        if (accountToDelete.currency && accountToDelete.currency !== defaultCurrency && 'exchangeRate' in accountToDelete && (accountToDelete as any).exchangeRate) {
+          balanceToRemove = accountToDelete.balance * (accountToDelete as any).exchangeRate;
+        }
+        setTotalBalance(prev => prev - balanceToRemove);
       }
     } catch (error) {
       console.error('Error deleting account:', error);
@@ -257,7 +285,12 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         
         // Обновляем общий баланс если счет включен в него
         if (account.isIncludedInTotal !== false) {
-          setTotalBalance(prev => prev + balanceChange);
+          let convertedBalanceChange = balanceChange;
+          // Конвертируем изменение баланса если валюта счета отличается от основной
+          if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+            convertedBalanceChange = balanceChange * (account as any).exchangeRate;
+          }
+          setTotalBalance(prev => prev + convertedBalanceChange);
         }
       }
     } catch (error) {
@@ -310,7 +343,12 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         
         // Обновляем общий баланс если счет включен в него
         if (account.isIncludedInTotal !== false) {
-          setTotalBalance(prev => prev + balanceChange);
+          let convertedBalanceChange = balanceChange;
+          // Конвертируем изменение баланса если валюта счета отличается от основной
+          if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+            convertedBalanceChange = balanceChange * (account as any).exchangeRate;
+          }
+          setTotalBalance(prev => prev + convertedBalanceChange);
         }
       }
     } catch (error) {
@@ -382,7 +420,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Сброс всех данных
   const resetAllData = async () => {
     try {
-      await LocalDatabaseService.resetAllData();
+      await LocalDatabaseService.resetAllData(defaultCurrency);
       await refreshData();
     } catch (error) {
       console.error('Error resetting data:', error);

@@ -23,7 +23,7 @@ export class LocalDatabaseService {
     return this.db;
   }
 
-  static async initDatabase(): Promise<void> {
+  static async initDatabase(defaultCurrency: string = 'USD'): Promise<void> {
     if (!this.db || !this.currentUserId) {
       console.warn('Database not initialized. Call setUserId first.');
       return;
@@ -40,6 +40,7 @@ export class LocalDatabaseService {
           type TEXT NOT NULL,
           balance REAL DEFAULT 0,
           currency TEXT DEFAULT 'RUB',
+          exchangeRate REAL DEFAULT 1,
           cardNumber TEXT,
           color TEXT,
           icon TEXT,
@@ -56,6 +57,13 @@ export class LocalDatabaseService {
           syncedAt TEXT
         );
       `);
+
+      // Миграция: добавляем колонку exchangeRate если её нет
+      try {
+        db.execSync(`ALTER TABLE accounts ADD COLUMN exchangeRate REAL DEFAULT 1`);
+      } catch (error) {
+        // Колонка уже существует, игнорируем ошибку
+      }
 
       db.execSync(`
         CREATE TABLE IF NOT EXISTS transactions (
@@ -113,12 +121,12 @@ export class LocalDatabaseService {
       )?.count || 0;
 
       if (accountsCount === 0) {
-        // Создаем счет "Наличные" по умолчанию
+        // Создаем счет "Наличные" по умолчанию с валютой пользователя
         const now = new Date().toISOString();
         db.runSync(
-          `INSERT INTO accounts (id, name, type, balance, isDefault, isIncludedInTotal, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          '1', 'Наличные', 'cash', 0, 1, 1, now, now
+          `INSERT INTO accounts (id, name, type, balance, currency, isDefault, isIncludedInTotal, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          '1', 'Наличные', 'cash', 0, defaultCurrency, 1, 1, now, now
         );
 
         // Добавляем базовые категории
@@ -168,11 +176,12 @@ export class LocalDatabaseService {
     }
 
     db.runSync(
-      `INSERT INTO accounts (id, name, type, balance, cardNumber, icon, isDefault, isIncludedInTotal, 
+      `INSERT INTO accounts (id, name, type, balance, currency, exchangeRate, cardNumber, icon, isDefault, isIncludedInTotal, 
        targetAmount, creditStartDate, creditTerm, creditRate, creditPaymentType, creditInitialAmount, 
        createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      id, account.name, account.type, account.balance || 0, account.cardNumber || null,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, account.name, account.type, account.balance || 0, account.currency || 'USD', 
+      (account as any).exchangeRate || 1, account.cardNumber || null,
       account.icon || null, account.isDefault ? 1 : 0, account.isIncludedInTotal !== false ? 1 : 0,
       account.targetAmount || null, account.creditStartDate || null, account.creditTerm || null,
       account.creditRate || null, account.creditPaymentType || null, account.creditInitialAmount || null,
@@ -400,7 +409,7 @@ export class LocalDatabaseService {
   }
 
   // Сброс всех данных
-  static async resetAllData(): Promise<void> {
+  static async resetAllData(defaultCurrency: string = 'USD'): Promise<void> {
     const db = this.getDb();
     
     // Удаляем все данные
@@ -411,7 +420,7 @@ export class LocalDatabaseService {
     db.runSync('DELETE FROM sync_metadata');
     
     // Пересоздаем базовые данные
-    await this.initDatabase();
+    await this.initDatabase(defaultCurrency);
   }
 
   // Методы для синхронизации
