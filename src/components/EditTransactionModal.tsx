@@ -14,9 +14,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { Transaction } from '../types';
 import { getLocalizedCategory } from '../utils/categoryUtils';
+import { CURRENCIES } from '../config/currencies';
 
 interface EditTransactionModalProps {
   visible: boolean;
@@ -32,6 +34,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const { colors, isDark } = useTheme();
   const { accounts, categories, updateTransaction } = useData();
   const { t } = useLocalization();
+  const { defaultCurrency } = useCurrency();
   
   const [isIncome, setIsIncome] = useState(false);
   const [amount, setAmount] = useState('');
@@ -107,6 +110,10 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
   const selectedCategory = categories.find(c => c.id === selectedCategoryId);
   
+  // Получаем символ валюты выбранного счета
+  const accountCurrency = selectedAccount?.currency || defaultCurrency;
+  const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
+  
   if (!transaction) return null;
   
   return (
@@ -175,7 +182,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: isIncome ? '#4CAF50' : colors.primary }]}>
-                  {isIncome ? '+' : '-'}₽
+                  {isIncome ? '+' : '-'}{currencySymbol}
                 </Text>
                 <TextInput
                   style={[styles.amountTextInput, { color: colors.text }]}
@@ -411,7 +418,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                     {account.name}
                   </Text>
                   <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
-                    {account.balance.toLocaleString('ru-RU')} ₽
+                    {CURRENCIES[account.currency || defaultCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol}{account.balance.toLocaleString('ru-RU')}
                   </Text>
                 </TouchableOpacity>
               ))}

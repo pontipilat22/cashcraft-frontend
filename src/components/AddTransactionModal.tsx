@@ -19,6 +19,7 @@ import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { getLocalizedCategory } from '../utils/categoryUtils';
+import { CURRENCIES } from '../config/currencies';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -156,6 +157,11 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
   const selectedCategory = categories.find(c => c.id === selectedCategoryId);
   
+  // Получаем символ валюты выбранного счета
+  const { defaultCurrency } = useCurrency();
+  const accountCurrency = selectedAccount?.currency || defaultCurrency;
+  const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
+  
   return (
     <Modal
       visible={visible}
@@ -222,7 +228,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: isIncome ? '#4CAF50' : colors.primary }]}>
-                  {isIncome ? '+' : '-'}₽
+                  {isIncome ? '+' : '-'}{currencySymbol}
                 </Text>
                 <TextInput
                   style={[styles.amountTextInput, { color: colors.text }]}
@@ -462,7 +468,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     {account.name}
                   </Text>
                   <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
-                    {account.balance.toLocaleString('ru-RU')} ₽
+                    {CURRENCIES[account.currency || defaultCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol}{account.balance.toLocaleString('ru-RU')}
                   </Text>
                 </TouchableOpacity>
               ))}

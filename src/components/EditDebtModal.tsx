@@ -13,8 +13,11 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
+import { useData } from '../context/DataContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt } from '../types';
+import { CURRENCIES } from '../config/currencies';
 
 interface EditDebtModalProps {
   visible: boolean;
@@ -32,9 +35,13 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
   onSave 
 }) => {
   const { colors } = useTheme();
+  const { defaultCurrency } = useCurrency();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Получаем символ валюты по умолчанию
+  const currencySymbol = CURRENCIES[defaultCurrency]?.symbol || '$';
 
   useEffect(() => {
     if (debt) {
@@ -125,7 +132,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: colors.primary }]}>
-                  ₽
+                  {currencySymbol}
                 </Text>
                 <TextInput
                   style={[styles.amountTextInput, { color: colors.text }]}

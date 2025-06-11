@@ -16,6 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { CURRENCIES } from '../config/currencies';
 
 interface TransferModalProps {
   visible: boolean;
@@ -28,7 +29,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const { accounts, createTransaction } = useData();
-  const { formatAmount } = useCurrency();
+  const { formatAmount, defaultCurrency } = useCurrency();
   const { t } = useLocalization();
   
   const [amount, setAmount] = useState('');
@@ -122,6 +123,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const fromAccount = accounts.find(a => a.id === fromAccountId);
   const toAccount = accounts.find(a => a.id === toAccountId);
   
+  // Получаем символ валюты из счета-источника
+  const accountCurrency = fromAccount?.currency || defaultCurrency;
+  const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
+  
   return (
     <Modal
       visible={visible}
@@ -151,7 +156,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: colors.primary }]}>
-                  {formatAmount(0).replace(/0/g, '')}
+                  {currencySymbol}
                 </Text>
                 <TextInput
                   style={[styles.amountTextInput, { color: colors.text }]}

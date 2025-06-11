@@ -16,8 +16,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import DateTimePickerModal from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt, Account } from '../types';
+import { CURRENCIES } from '../config/currencies';
 
 type OperationType = 'give' | 'return' | 'borrow' | 'payback';
 
@@ -36,6 +38,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const { accounts, createTransaction, refreshData } = useData();
+  const { defaultCurrency } = useCurrency();
   
   const [amount, setAmount] = useState('');
   const [person, setPerson] = useState('');
@@ -144,7 +147,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         }
 
         if (amountNum > selectedDebt.amount) {
-          Alert.alert('Ошибка', `Сумма погашения больше долга (${selectedDebt.amount.toLocaleString('ru-RU')} ₽)`);
+          Alert.alert('Ошибка', `Сумма погашения больше долга (${selectedDebt.amount.toLocaleString('ru-RU')} ${currencySymbol})`);
           return;
         }
 
@@ -227,6 +230,10 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
 
   const isReturnOperation = operationType === 'return' || operationType === 'payback';
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+  
+  // Получаем символ валюты выбранного счета
+  const accountCurrency = selectedAccount?.currency || defaultCurrency;
+  const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
 
   return (
     <Modal
@@ -256,13 +263,13 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                 Сумма
                 {selectedDebt && (
                   <Text style={{ fontSize: 12 }}>
-                    {' '}(долг: {selectedDebt.amount.toLocaleString('ru-RU')} ₽)
+                    {' '}(долг: {selectedDebt.amount.toLocaleString('ru-RU')} {currencySymbol})
                   </Text>
                 )}
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: colors.primary }]}>
-                  ₽
+                  {currencySymbol}
                 </Text>
                 <TextInput
                   style={[styles.amountTextInput, { color: colors.text }]}
@@ -463,7 +470,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                   </View>
                   <View style={styles.debtAmountInfo}>
                     <Text style={[styles.pickerItemBalance, { color: colors.primary }]}>
-                      {debt.amount.toLocaleString('ru-RU')} ₽
+                      {debt.amount.toLocaleString('ru-RU')} {currencySymbol}
                     </Text>
                     <Text style={[styles.debtLabel, { color: colors.textSecondary }]}>
                       осталось
@@ -511,7 +518,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                     {account.name}
                   </Text>
                   <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
-                    {account.balance.toLocaleString('ru-RU')} ₽
+                    {CURRENCIES[account.currency || defaultCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol}{account.balance.toLocaleString('ru-RU')}
                   </Text>
                 </TouchableOpacity>
               ))}
