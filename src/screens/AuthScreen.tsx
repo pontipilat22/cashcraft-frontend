@@ -20,6 +20,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { ForgotPasswordModal } from '../components/ForgotPasswordModal';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const AuthScreen: React.FC = () => {
@@ -150,14 +151,7 @@ export const AuthScreen: React.FC = () => {
     setName('');
   };
 
-  const clearAllData = async () => {
-    try {
-      await AsyncStorage.clear();
-      Alert.alert(t('common.success'), 'All data cleared. Please restart the app.');
-    } catch (error) {
-      Alert.alert(t('common.error'), 'Failed to clear data');
-    }
-  };
+
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -372,8 +366,14 @@ export const AuthScreen: React.FC = () => {
                 <View style={[styles.orLine, { backgroundColor: colors.border }]} />
               </View>
 
+              <GoogleSignInButton
+                onError={(error) => {
+                  Alert.alert(t('common.error'), error.message || t('auth.loginError'));
+                }}
+              />
+
               <TouchableOpacity
-                style={[styles.guestButton, { borderColor: colors.border }]}
+                style={[styles.guestButton, { borderColor: colors.border, marginTop: 12 }]}
                 onPress={handleGuestLogin}
                 disabled={loading}
               >
@@ -389,12 +389,6 @@ export const AuthScreen: React.FC = () => {
                   <Text style={{ color: colors.primary }}>
                     {isLogin ? t('auth.register') : t('auth.login')}
                   </Text>
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={clearAllData} style={styles.debugButton}>
-                <Text style={[styles.debugText, { color: colors.textSecondary }]}>
-                  Debug: Clear Storage
                 </Text>
               </TouchableOpacity>
             </View>

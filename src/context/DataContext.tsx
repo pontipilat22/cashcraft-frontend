@@ -420,10 +420,23 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Сброс всех данных
   const resetAllData = async () => {
     try {
+      // Проверяем, что пользователь авторизован
+      if (!userId) {
+        throw new Error('Пользователь не авторизован');
+      }
+      
       await LocalDatabaseService.resetAllData(defaultCurrency);
       await refreshData();
     } catch (error) {
       console.error('Error resetting data:', error);
+      // Если база данных не инициализирована, пробуем инициализировать заново
+      if (error instanceof Error && error.message.includes('База данных не инициализирована')) {
+        try {
+          await initializeApp();
+        } catch (initError) {
+          console.error('Failed to reinitialize database:', initError);
+        }
+      }
       throw error;
     }
   };

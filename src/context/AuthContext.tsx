@@ -21,6 +21,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   loginAsGuest: () => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,10 +33,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Проверка авторизации при запуске
   useEffect(() => {
-    console.log('AuthContext: Setting up auth state listener');
-    
     const unsubscribe = FirebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
-      console.log('AuthContext: Auth state changed, firebaseUser:', firebaseUser?.email || 'null');
       
       try {
         setIsLoading(true);
@@ -49,7 +47,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             isGuest: false
           };
           
-          console.log('AuthContext: Setting authenticated user:', authUser.email);
           setUser(authUser);
           setFirebaseUser(firebaseUser);
           
@@ -65,11 +62,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           await UserDataService.initializeUserData();
         } else {
           // Проверяем, есть ли гостевой пользователь
-          console.log('AuthContext: No Firebase user, checking for guest');
-          
           try {
             const savedUser = await AsyncStorage.getItem('currentUser');
-            console.log('AuthContext: Raw AsyncStorage value:', savedUser);
             
             if (savedUser && savedUser !== 'null' && savedUser !== 'undefined') {
               // Проверяем, что это валидный JSON
@@ -77,7 +71,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               
               if (parsedUser && typeof parsedUser === 'object' && parsedUser.id) {
                 if (parsedUser.isGuest) {
-                  console.log('AuthContext: Found guest user');
                   setUser(parsedUser);
                   DatabaseService.setUserId(parsedUser.id);
                   await DatabaseService.initDatabase();
@@ -85,24 +78,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   await UserDataService.initializeUserData();
                 } else {
                   // Сохраненный пользователь не гость, но Firebase не авторизован
-                  console.log('AuthContext: Saved user is not guest, clearing');
                   await AsyncStorage.removeItem('currentUser');
                   setUser(null);
                   setFirebaseUser(null);
                 }
               } else {
-                console.log('AuthContext: Invalid user data structure, clearing');
                 await AsyncStorage.removeItem('currentUser');
                 setUser(null);
                 setFirebaseUser(null);
               }
             } else {
-              console.log('AuthContext: No valid saved user');
               setUser(null);
               setFirebaseUser(null);
             }
           } catch (parseError) {
-            console.error('AuthContext: Error parsing saved user, clearing storage:', parseError);
             // Очищаем невалидные данные
             await AsyncStorage.removeItem('currentUser');
             setUser(null);
@@ -110,17 +99,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
       } catch (error) {
-        console.error('AuthContext: Error in auth state handler:', error);
         setUser(null);
         setFirebaseUser(null);
       } finally {
-        console.log('AuthContext: Setting isLoading to false');
         setIsLoading(false);
       }
     });
 
     return () => {
-      console.log('AuthContext: Cleaning up auth listener');
       unsubscribe();
     };
   }, []);
@@ -159,7 +145,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(null);
       setFirebaseUser(null);
     } catch (error) {
-      console.error('Error during logout:', error);
       throw error;
     }
   };
@@ -189,6 +174,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await UserDataService.initializeUserData();
   };
 
+  const loginWithGoogle = async (idToken: string) => {
+    try {
+      await FirebaseAuthService.loginWithGoogle(idToken);
+      // onAuthStateChanged обработает остальное
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     firebaseUser,
@@ -197,7 +191,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     register,
     logout,
     resetPassword,
-    loginAsGuest
+    loginAsGuest,
+    loginWithGoogle
   };
 
   return (

@@ -25,34 +25,24 @@ function AppContent() {
   const [forceHideSplash, setForceHideSplash] = useState(false);
   const [dataProviderKey, setDataProviderKey] = useState(0);
 
-  console.log('AppContent render:', {
-    user: user?.email || 'null',
-    authLoading,
-    showCustomSplash,
-    forceHideSplash
-  });
+
 
   useEffect(() => {
     const prepare = async () => {
-      console.log('App: Starting prepare function');
-      
       try {
         // Скрываем нативный splash screen
         await SplashScreenExpo.hideAsync();
-        console.log('App: Native splash hidden');
       } catch (error) {
-        console.error('App: Error hiding native splash:', error);
+        // Игнорируем ошибку
       }
       
       // Показываем кастомный splash screen минимум 2 секунды
       setTimeout(() => {
-        console.log('App: Setting showCustomSplash to false');
         setShowCustomSplash(false);
       }, 2000);
       
       // Аварийный таймаут - скрываем splash через 5 секунд в любом случае
       setTimeout(() => {
-        console.log('App: Force hiding splash screen');
         setForceHideSplash(true);
       }, 5000);
     };
@@ -66,19 +56,9 @@ function AppContent() {
     setDataProviderKey(prev => prev + 1);
   }, [defaultCurrency]);
 
-  console.log('App: Rendering, conditions:', {
-    showCustomSplash,
-    authLoading,
-    forceHideSplash,
-    shouldShowSplash: (showCustomSplash || authLoading) && !forceHideSplash
-  });
-
   if ((showCustomSplash || authLoading) && !forceHideSplash) {
-    console.log('App: Showing splash screen');
     return <SplashScreen />;
   }
-
-  console.log('App: Showing main content, user:', user?.email || 'none');
 
   return (
     <SafeAreaProvider>
@@ -98,8 +78,6 @@ function AppContent() {
 }
 
 export default function App() {
-  console.log('App: Root component render');
-  
   return (
     <ThemeProvider>
       <LocalizationProvider>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -18,6 +18,7 @@ import { AccountType, AccountTypeLabels } from '../types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { LocalDatabaseService } from '../services/localDatabase';
 
 interface AddAccountModalProps {
   visible: boolean;
@@ -101,9 +102,50 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const [creditTerm, setCreditTerm] = useState('');
   const [creditRate, setCreditRate] = useState('');
   const [creditPaymentType, setCreditPaymentType] = useState<'annuity' | 'differentiated'>('annuity');
+  const [suggestedRate, setSuggestedRate] = useState<number | null>(null);
 
-  const handleSave = () => {
+  // Загружаем предложенный курс при изменении валюты
+  useEffect(() => {
+    const loadSuggestedRate = async () => {
+      if (selectedCurrency !== defaultCurrency) {
+        // Пытаемся найти сохраненный курс
+        const rate = await LocalDatabaseService.getExchangeRate(selectedCurrency, defaultCurrency);
+        if (rate) {
+          setSuggestedRate(rate);
+          setExchangeRate(rate.toString());
+        } else {
+          // Пытаемся найти через кросс-курс
+          const crossRate = await LocalDatabaseService.calculateCrossRate(
+            selectedCurrency,
+            defaultCurrency,
+            'USD' // используем USD как промежуточную валюту
+          );
+          if (crossRate) {
+            setSuggestedRate(crossRate);
+            setExchangeRate(crossRate.toString());
+          }
+        }
+      } else {
+        setSuggestedRate(null);
+        setExchangeRate('1');
+      }
+    };
+    
+    loadSuggestedRate();
+  }, [selectedCurrency, defaultCurrency]);
+
+  const handleSave = async () => {
     if (!name.trim()) return;
+    
+    // Сохраняем курс в БД для будущего использования
+    if (selectedCurrency !== defaultCurrency && exchangeRate) {
+      const rate = parseFloat(exchangeRate);
+      if (rate > 0) {
+        await LocalDatabaseService.saveExchangeRate(selectedCurrency, defaultCurrency, rate);
+        // Сохраняем и обратный курс
+        await LocalDatabaseService.saveExchangeRate(defaultCurrency, selectedCurrency, 1 / rate);
+      }
+    }
     
     const accountData: any = {
       name: name.trim(),
@@ -273,18 +315,32 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 <Text style={[styles.helperText, { color: colors.textSecondary }]}>
                   1 {selectedCurrency} = ? {defaultCurrency}
                 </Text>
-                <TextInput
-                  style={[styles.input, { 
-                    backgroundColor: colors.background,
-                    color: colors.text,
-                    borderColor: colors.border,
-                  }]}
-                  value={exchangeRate}
-                  onChangeText={setExchangeRate}
-                  placeholder="1"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                />
+                <View style={styles.rateInputWrapper}>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.background,
+                      color: suggestedRate && parseFloat(exchangeRate) === suggestedRate ? colors.primary : colors.text,
+                      borderColor: suggestedRate && parseFloat(exchangeRate) === suggestedRate ? colors.primary : colors.border,
+                    }]}
+                    value={exchangeRate}
+                    onChangeText={setExchangeRate}
+                    placeholder="1"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="decimal-pad"
+                  />
+                  {suggestedRate && (
+                    <View style={styles.rateIndicator}>
+                      <Ionicons 
+                        name="checkmark-circle" 
+                        size={20} 
+                        color={colors.primary} 
+                      />
+                      <Text style={[styles.rateIndicatorText, { color: colors.textSecondary }]}>
+                        {t('accounts.savedRate')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
 
@@ -660,6 +716,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  rateInputWrapper: {
+    position: 'relative',
+  },
+  rateIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  rateIndicatorText: {
+    fontSize: 12,
+    marginLeft: 4,
   },
   modalContent: {
     borderTopLeftRadius: 20,

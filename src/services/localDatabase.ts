@@ -8,16 +8,21 @@ export class LocalDatabaseService {
   static setUserId(userId: string | null) {
     this.currentUserId = userId;
     if (userId) {
-      // Открываем базу данных для конкретного пользователя
-      const safeUserId = userId.replace(/[^a-zA-Z0-9]/g, '_');
-      this.db = SQLite.openDatabaseSync(`cashcraft_${safeUserId}.db`);
+      try {
+        // Открываем базу данных для конкретного пользователя
+        const safeUserId = userId.replace(/[^a-zA-Z0-9]/g, '_');
+        this.db = SQLite.openDatabaseSync(`cashcraft_${safeUserId}.db`);
+      } catch (error) {
+        this.db = null;
+        throw error;
+      }
     } else {
       this.db = null;
     }
   }
 
   private static getDb(): SQLite.SQLiteDatabase {
-    if (!this.db) {
+    if (!this.db || !this.currentUserId) {
       throw new Error('Database not initialized. Call setUserId first.');
     }
     return this.db;
@@ -25,7 +30,6 @@ export class LocalDatabaseService {
 
   static async initDatabase(defaultCurrency: string = 'USD'): Promise<void> {
     if (!this.db || !this.currentUserId) {
-      console.warn('Database not initialized. Call setUserId first.');
       return;
     }
 
@@ -115,6 +119,18 @@ export class LocalDatabaseService {
         );
       `);
 
+      // Создаем таблицу для курсов валют
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS exchange_rates (
+          id TEXT PRIMARY KEY NOT NULL,
+          fromCurrency TEXT NOT NULL,
+          toCurrency TEXT NOT NULL,
+          rate REAL NOT NULL,
+          updatedAt TEXT NOT NULL,
+          UNIQUE(fromCurrency, toCurrency)
+        );
+      `);
+
       // Инициализируем базовые данные если это первый запуск
       const accountsCount = db.getFirstSync<{ count: number }>(
         'SELECT COUNT(*) as count FROM accounts'
@@ -128,7 +144,14 @@ export class LocalDatabaseService {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           '1', 'Наличные', 'cash', 0, defaultCurrency, 1, 1, now, now
         );
+      }
 
+      // Проверяем и добавляем базовые категории если их нет
+      const categoriesCount = db.getFirstSync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM categories'
+      )?.count || 0;
+
+      if (categoriesCount === 0) {
         // Добавляем базовые категории
         const categories = [
           // Доходы
@@ -147,20 +170,26 @@ export class LocalDatabaseService {
         ];
 
         categories.forEach(cat => {
-          db.runSync(
-            `INSERT INTO categories (id, name, type, icon, color) VALUES (?, ?, ?, ?, ?)`,
-            cat.id, cat.name, cat.type, cat.icon, cat.color
-          );
+          try {
+            db.runSync(
+              `INSERT OR IGNORE INTO categories (id, name, type, icon, color) VALUES (?, ?, ?, ?, ?)`,
+              cat.id, cat.name, cat.type, cat.icon, cat.color
+            );
+          } catch (error) {
+            // Игнорируем ошибку, категория может уже существовать
+          }
         });
       }
     } catch (error) {
-      console.error('Error initializing database:', error);
       throw error;
     }
   }
 
   // Методы для работы со счетами
   static async getAccounts(): Promise<Account[]> {
+    if (!this.db || !this.currentUserId) {
+      return [];
+    }
     const db = this.getDb();
     const accounts = db.getAllSync('SELECT * FROM accounts ORDER BY createdAt DESC');
     return accounts as Account[];
@@ -224,6 +253,9 @@ export class LocalDatabaseService {
 
   // Методы для работы с транзакциями
   static async getTransactions(): Promise<Transaction[]> {
+    if (!this.db || !this.currentUserId) {
+      return [];
+    }
     const db = this.getDb();
     const transactions = db.getAllSync('SELECT * FROM transactions ORDER BY date DESC, createdAt DESC');
     return transactions as Transaction[];
@@ -309,6 +341,9 @@ export class LocalDatabaseService {
 
   // Методы для работы с категориями
   static async getCategories(): Promise<Category[]> {
+    if (!this.db || !this.currentUserId) {
+      return [];
+    }
     const db = this.getDb();
     const categories = db.getAllSync('SELECT * FROM categories ORDER BY name');
     return categories as Category[];
@@ -364,6 +399,10 @@ export class LocalDatabaseService {
 
   // Методы для работы с долгами
   static async getDebts(): Promise<Debt[]> {
+    if (!this.db || !this.currentUserId) {
+      // Не логируем предупреждение, так как это нормальная ситуация при инициализации
+      return [];
+    }
     const db = this.getDb();
     const debts = db.getAllSync('SELECT * FROM debts ORDER BY createdAt DESC');
     return debts as Debt[];
@@ -410,21 +449,33 @@ export class LocalDatabaseService {
 
   // Сброс всех данных
   static async resetAllData(defaultCurrency: string = 'USD'): Promise<void> {
-    const db = this.getDb();
+          // Проверяем, что база данных инициализирована
+      if (!this.db || !this.currentUserId) {
+        throw new Error('База данных не инициализирована');
+      }
     
-    // Удаляем все данные
-    db.runSync('DELETE FROM transactions');
-    db.runSync('DELETE FROM debts');
-    db.runSync('DELETE FROM accounts');
-    db.runSync('DELETE FROM categories');
-    db.runSync('DELETE FROM sync_metadata');
-    
-    // Пересоздаем базовые данные
-    await this.initDatabase(defaultCurrency);
+    try {
+      const db = this.getDb();
+      
+      // Удаляем все данные
+      db.runSync('DELETE FROM transactions');
+      db.runSync('DELETE FROM debts');
+      db.runSync('DELETE FROM accounts');
+      db.runSync('DELETE FROM categories');
+      db.runSync('DELETE FROM sync_metadata');
+      
+      // Пересоздаем базовые данные
+      await this.initDatabase(defaultCurrency);
+    } catch (error) {
+      throw error;
+    }
   }
 
   // Методы для синхронизации
   static async getLastSyncTime(): Promise<string | null> {
+    if (!this.db || !this.currentUserId) {
+      return null;
+    }
     const db = this.getDb();
     const result = db.getFirstSync<{ lastSyncAt: string }>(
       'SELECT lastSyncAt FROM sync_metadata ORDER BY id DESC LIMIT 1'
@@ -471,5 +522,77 @@ export class LocalDatabaseService {
         syncTime, id
       );
     });
+  }
+
+  // Методы для работы с курсами валют
+  static async getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number | null> {
+    const db = this.getDb();
+    const result = db.getFirstSync<{ rate: number }>(
+      'SELECT rate FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
+      fromCurrency, toCurrency
+    );
+    return result?.rate || null;
+  }
+
+  static async saveExchangeRate(fromCurrency: string, toCurrency: string, rate: number): Promise<void> {
+    const db = this.getDb();
+    const id = `${fromCurrency}_${toCurrency}`;
+    const now = new Date().toISOString();
+    
+    db.runSync(
+      `INSERT OR REPLACE INTO exchange_rates (id, fromCurrency, toCurrency, rate, updatedAt) 
+       VALUES (?, ?, ?, ?, ?)`,
+      id, fromCurrency, toCurrency, rate, now
+    );
+  }
+
+  static async getStoredRates(currency: string): Promise<{ [key: string]: number }> {
+    const db = this.getDb();
+    const rates = db.getAllSync<{ fromCurrency: string; toCurrency: string; rate: number }>(
+      'SELECT * FROM exchange_rates WHERE fromCurrency = ? OR toCurrency = ?',
+      currency, currency
+    );
+    
+    const ratesMap: { [key: string]: number } = {};
+    rates.forEach(r => {
+      if (r.fromCurrency === currency) {
+        ratesMap[r.toCurrency] = r.rate;
+      } else if (r.toCurrency === currency) {
+        // Обратный курс
+        ratesMap[r.fromCurrency] = 1 / r.rate;
+      }
+    });
+    
+    return ratesMap;
+  }
+
+  static async calculateCrossRate(fromCurrency: string, toCurrency: string, baseCurrency: string): Promise<number | null> {
+    const db = this.getDb();
+    
+    // Пытаемся найти прямой курс
+    let directRate = await this.getExchangeRate(fromCurrency, toCurrency);
+    if (directRate) return directRate;
+    
+    // Пытаемся найти обратный курс
+    const reverseRate = await this.getExchangeRate(toCurrency, fromCurrency);
+    if (reverseRate) return 1 / reverseRate;
+    
+    // Пытаемся найти через базовую валюту
+    const fromToBase = await this.getExchangeRate(fromCurrency, baseCurrency);
+    const baseToTo = await this.getExchangeRate(baseCurrency, toCurrency);
+    
+    if (fromToBase && baseToTo) {
+      return fromToBase * baseToTo;
+    }
+    
+    // Пытаемся найти обратные курсы через базовую валюту
+    const baseToFrom = await this.getExchangeRate(baseCurrency, fromCurrency);
+    const toToBase = await this.getExchangeRate(toCurrency, baseCurrency);
+    
+    if (baseToFrom && toToBase) {
+      return (1 / baseToFrom) * (1 / toToBase);
+    }
+    
+    return null;
   }
 } 

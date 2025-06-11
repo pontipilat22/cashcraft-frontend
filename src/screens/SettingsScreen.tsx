@@ -10,6 +10,10 @@ import {
   FlatList,
   Alert,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,8 +24,15 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { CURRENCIES } from '../config/currencies';
 import { useNavigation } from '@react-navigation/native';
+import { LocalDatabaseService } from '../services/localDatabase';
 
-type ExchangeRates = { [accountId: string]: { name: string; currency: string; rate: number } };
+type ExchangeRates = { [accountId: string]: { 
+  name: string; 
+  currency: string; 
+  rate: number;
+  suggestedRate?: number;
+  isModified?: boolean;
+} };
 
 export const SettingsScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -58,13 +69,39 @@ export const SettingsScreen: React.FC = () => {
       setNewCurrency(currencyCode);
       const rates: ExchangeRates = {};
       
-      accountsInOtherCurrencies.forEach(account => {
+      // Загружаем сохраненные курсы и рассчитываем предлагаемые
+      for (const account of accountsInOtherCurrencies) {
+        const accountCurrency = account.currency || defaultCurrency;
+        
+        // Пытаемся найти сохраненный курс
+        let suggestedRate = await LocalDatabaseService.getExchangeRate(accountCurrency, currencyCode);
+        
+        // Если нет прямого курса, пытаемся найти через текущую валюту
+        if (!suggestedRate) {
+          suggestedRate = await LocalDatabaseService.calculateCrossRate(
+            accountCurrency, 
+            currencyCode, 
+            defaultCurrency
+          );
+        }
+        
+        // Если у счета есть текущий курс к основной валюте, используем его для расчета
+        if (!suggestedRate && 'exchangeRate' in account && (account as any).exchangeRate) {
+          const currentToDefault = (account as any).exchangeRate;
+          const defaultToNew = await LocalDatabaseService.getExchangeRate(defaultCurrency, currencyCode);
+          if (defaultToNew) {
+            suggestedRate = currentToDefault * defaultToNew;
+          }
+        }
+        
         rates[account.id] = {
           name: account.name,
-          currency: account.currency || defaultCurrency,
-          rate: 1 // Начальное значение
+          currency: accountCurrency,
+          rate: suggestedRate || 1,
+          suggestedRate: suggestedRate || undefined,
+          isModified: false
         };
-      });
+      }
       
       setExchangeRates(rates);
       setShowExchangeRatesModal(true);
@@ -78,7 +115,16 @@ export const SettingsScreen: React.FC = () => {
     try {
       // Обновляем курсы для всех счетов
       for (const [accountId, data] of Object.entries(exchangeRates)) {
+        // Обновляем курс в счете
         await updateAccount(accountId, { exchangeRate: data.rate } as any);
+        
+        // Сохраняем курс в БД для будущего использования
+        await LocalDatabaseService.saveExchangeRate(data.currency, newCurrency, data.rate);
+        
+        // Также сохраняем обратный курс
+        if (data.rate > 0) {
+          await LocalDatabaseService.saveExchangeRate(newCurrency, data.currency, 1 / data.rate);
+        }
       }
       
       // Теперь меняем валюту по умолчанию
@@ -329,75 +375,177 @@ export const SettingsScreen: React.FC = () => {
         transparent={true}
         onRequestClose={() => setShowExchangeRatesModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {t('settings.enterExchangeRates')}
-              </Text>
-            </View>
-            
-            <ScrollView style={styles.ratesList} showsVerticalScrollIndicator={false}>
-              <Text style={[styles.ratesDescription, { color: colors.textSecondary }]}>
-                {t('settings.exchangeRatesDescription', { currency: newCurrency })}
-              </Text>
-              
-              {Object.entries(exchangeRates).map(([accountId, data]) => (
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+                  <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>
+                      {t('settings.enterExchangeRates')}
+                    </Text>
+                    <TouchableOpacity onPress={() => {
+                      Keyboard.dismiss();
+                      setShowExchangeRatesModal(false);
+                    }}>
+                      <Ionicons name="close" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <ScrollView 
+                    style={styles.ratesList} 
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    onScrollBeginDrag={Keyboard.dismiss}
+                  >
+                    <Text style={[styles.ratesDescription, { color: colors.textSecondary }]}>
+                      {t('settings.exchangeRatesDescription', { currency: newCurrency })}
+                    </Text>
+                    
+                    {/* Кнопка для использования всех предложенных курсов */}
+                    {Object.values(exchangeRates).some(data => data.suggestedRate) && (
+                      <TouchableOpacity
+                        style={[styles.useAllSuggestedButton, { backgroundColor: colors.primary + '10' }]}
+                        onPress={() => {
+                          const newRates = { ...exchangeRates };
+                          Object.entries(newRates).forEach(([id, data]) => {
+                            if (data.suggestedRate) {
+                              newRates[id] = { ...data, rate: data.suggestedRate, isModified: false };
+                            }
+                          });
+                          setExchangeRates(newRates);
+                        }}
+                      >
+                        <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />
+                        <Text style={[styles.useAllSuggestedText, { color: colors.primary }]}>
+                          {t('settings.useAllSuggestedRates')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    
+                                  {Object.entries(exchangeRates).map(([accountId, data], index) => (
                 <View key={accountId} style={styles.rateItem}>
-                  <Text style={[styles.rateLabel, { color: colors.text }]}>
-                    {data.name} ({data.currency})
-                  </Text>
+                  <View style={styles.rateHeader}>
+                    <Text style={[styles.rateLabel, { color: colors.text }]}>
+                      {data.name}
+                    </Text>
+                    <View style={styles.currencyBadge}>
+                      <Text style={[styles.currencyBadgeText, { color: colors.primary }]}>
+                        {currencies[data.currency]?.symbol} {data.currency}
+                      </Text>
+                    </View>
+                  </View>
+                  
                   <View style={styles.rateInputContainer}>
                     <Text style={[styles.rateText, { color: colors.textSecondary }]}>
                       1 {data.currency} =
                     </Text>
                     <TextInput
                       style={[styles.rateInput, { 
-                        color: colors.text,
-                        borderColor: colors.border,
+                        color: data.isModified ? colors.primary : colors.text,
+                        borderColor: data.isModified ? colors.primary : colors.border,
                         backgroundColor: colors.background
                       }]}
                       value={data.rate.toString()}
                       onChangeText={(text) => {
                         const rate = parseFloat(text) || 0;
+                        const isModified = data.suggestedRate ? 
+                          Math.abs(rate - data.suggestedRate) > 0.0001 : true;
+                        
                         setExchangeRates(prev => ({
                           ...prev,
-                          [accountId]: { ...data, rate }
+                          [accountId]: { ...data, rate, isModified }
                         }));
                       }}
                       keyboardType="decimal-pad"
                       placeholder="0.00"
                       placeholderTextColor={colors.textSecondary}
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
+                      blurOnSubmit={true}
+                      autoFocus={index === 0}
                     />
                     <Text style={[styles.rateText, { color: colors.textSecondary }]}>
-                      {newCurrency}
+                      {currencies[newCurrency]?.symbol} {newCurrency}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.swapButton}
+                      onPress={() => {
+                        const newRate = data.rate > 0 ? 1 / data.rate : 1;
+                        setExchangeRates(prev => ({
+                          ...prev,
+                          [accountId]: { ...data, rate: newRate, isModified: true }
+                        }));
+                      }}
+                    >
+                      <Ionicons name="swap-horizontal" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {data.suggestedRate && Math.abs(data.rate - data.suggestedRate) > 0.0001 && (
+                    <TouchableOpacity 
+                      style={styles.suggestedRateButton}
+                      onPress={() => {
+                        setExchangeRates(prev => ({
+                          ...prev,
+                          [accountId]: { ...data, rate: data.suggestedRate!, isModified: false }
+                        }));
+                      }}
+                    >
+                      <Text style={[styles.suggestedRateText, { color: colors.primary }]}>
+                        {t('settings.useSuggestedRate', { rate: data.suggestedRate.toFixed(4) })}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {/* Показываем эквивалент для удобства */}
+                  <View style={styles.equivalentContainer}>
+                    <Text style={[styles.equivalentText, { color: colors.textSecondary }]}>
+                      {currencies[data.currency]?.symbol}100 = {currencies[newCurrency]?.symbol}
+                      {(100 * data.rate).toFixed(2)}
+                    </Text>
+                    <Text style={[styles.equivalentText, { color: colors.textSecondary, marginLeft: 12 }]}>
+                      • {currencies[newCurrency]?.symbol}100 = {currencies[data.currency]?.symbol}
+                      {data.rate > 0 ? (100 / data.rate).toFixed(2) : '0'}
                     </Text>
                   </View>
                 </View>
               ))}
-            </ScrollView>
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.background }]}
-                onPress={() => setShowExchangeRatesModal(false)}
-              >
-                <Text style={[styles.modalButtonText, { color: colors.text }]}>
-                  {t('common.cancel')}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                onPress={handleSaveExchangeRates}
-              >
-                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
-                  {t('common.save')}
-                </Text>
-              </TouchableOpacity>
+                  </ScrollView>
+                  
+                  <View style={[styles.modalActions, { paddingBottom: Platform.OS === 'ios' ? 20 : 10 }]}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, { backgroundColor: colors.background }]}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowExchangeRatesModal(false);
+                      }}
+                    >
+                      <Text style={[styles.modalButtonText, { color: colors.text }]}>
+                        {t('common.cancel')}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        handleSaveExchangeRates();
+                      }}
+                    >
+                      <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
+                        {t('common.save')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -484,17 +632,16 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    maxHeight: '70%',
+    maxHeight: Platform.OS === 'ios' ? '70%' : '60%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    flex: 1,
   },
   modalItem: {
     flexDirection: 'row',
@@ -537,7 +684,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginBottom: 8,
   },
   optionsList: {
     maxHeight: 300,
@@ -553,16 +702,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   ratesList: {
-    maxHeight: 300,
+    maxHeight: Platform.OS === 'ios' ? 250 : 200,
     paddingHorizontal: 16,
   },
   ratesDescription: {
     fontSize: 14,
-    marginBottom: 16,
+    marginBottom: 20,
     lineHeight: 20,
+    paddingHorizontal: 4,
   },
   rateItem: {
-    marginBottom: 16,
+    marginBottom: 20,
+    paddingHorizontal: 4,
   },
   rateLabel: {
     fontSize: 16,
@@ -572,6 +723,10 @@ const styles = StyleSheet.create({
   rateInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  swapButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   rateText: {
     fontSize: 14,
@@ -589,6 +744,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
+    paddingHorizontal: 16,
   },
   modalButton: {
     flex: 1,
@@ -600,5 +756,51 @@ const styles = StyleSheet.create({
   modalButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  rateHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  currencyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+  },
+  currencyBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  suggestedRateButton: {
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  suggestedRateText: {
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+  equivalentText: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  equivalentContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
+  useAllSuggestedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  useAllSuggestedText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 }); 

@@ -16,7 +16,8 @@ export const AccountSection: React.FC<AccountSectionProps> = ({
   children,
   onAddPress,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Определяем начальное состояние: если счетов больше 0, секция открыта
+  const [isExpanded, setIsExpanded] = useState(count > 0);
   const { colors } = useTheme();
 
   return (
@@ -39,7 +40,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({
           <Ionicons name="add" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
-      {Boolean(isExpanded && React.Children.count(children) > 0) && (
+      {isExpanded && (
         <View>
           {React.Children.toArray(children).map((child, idx) =>
             (typeof child === 'string' || typeof child === 'number')
@@ -62,12 +63,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   expandButton: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    paddingVertical: 4,
   },
   title: {
     fontSize: 18,

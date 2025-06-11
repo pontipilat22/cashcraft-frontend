@@ -5,10 +5,17 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   User,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signInWithCredential,
+  GoogleAuthProvider
 } from 'firebase/auth';
 import { auth } from '../../firebase/firebaseConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import * as Crypto from 'expo-crypto';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export class FirebaseAuthService {
   // Регистрация нового пользователя
@@ -83,6 +90,30 @@ export class FirebaseAuthService {
   // Подписка на изменения состояния авторизации
   static onAuthStateChanged(callback: (user: User | null) => void) {
     return onAuthStateChanged(auth, callback);
+  }
+  
+  // Вход через Google (упрощенная версия для Expo Go)
+  static async loginWithGoogle(idToken: string): Promise<User> {
+    try {
+      // Создаем credential для Firebase
+      const credential = GoogleAuthProvider.credential(idToken);
+      
+      // Входим в Firebase
+      const userCredential = await signInWithCredential(auth, credential);
+      const user = userCredential.user;
+      
+      // Сохраняем информацию о пользователе локально
+      await AsyncStorage.setItem('currentUser', JSON.stringify({
+        id: user.uid,
+        email: user.email,
+        displayName: user.displayName || user.email?.split('@')[0] || 'User',
+        isGuest: false
+      }));
+      
+      return user;
+    } catch (error: any) {
+      throw this.handleAuthError(error);
+    }
   }
   
   // Обработка ошибок Firebase Auth

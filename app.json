@@ -8,6 +8,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "packagerOpts": {
+      "port": 8081
+    },
+    "scheme": "cashcraft",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",

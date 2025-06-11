@@ -48,6 +48,7 @@ export default {
     registerButton: 'Зарегистрироваться',
     skipAuth: 'Пропустить',
     orLoginWith: 'или',
+    loginWithGoogle: 'Войти через Google',
     loginWithApple: 'Войти через Apple',
     noAccount: 'Нет аккаунта?',
     haveAccount: 'Уже есть аккаунт?',
@@ -127,6 +128,7 @@ export default {
     cashDescription: 'Для учета наличных денег',
     cardDescription: 'Банковская или кредитная карта',
     bankDescription: 'Для учета расчетных счетов и депозитов',
+    savedRate: 'Сохраненный курс',
   },
   transactions: {
     title: 'Операции',
@@ -201,6 +203,8 @@ export default {
     errorChangingCurrency: 'Ошибка при изменении валюты',
     selectCurrency: 'Выберите валюту',
     defaultCurrency: 'Валюта по умолчанию',
+    useSuggestedRate: 'Использовать предложенный курс: {{rate}}',
+    useAllSuggestedRates: 'Использовать все предложенные курсы',
   },
   currencies: {
     USD: 'Доллар США',

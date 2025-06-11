@@ -403,7 +403,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
 
         <AccountSection 
           title={t('accounts.debts')}
-          count={debts.length}
+          count={debts.length > 0 ? 2 : 0}
           onAddPress={() => handleAddAccount('debts')}
         >
           {debts.length === 0 ? (

@@ -48,6 +48,7 @@ export default {
     registerButton: 'Sign Up',
     skipAuth: 'Skip',
     orLoginWith: 'or',
+    loginWithGoogle: 'Sign in with Google',
     loginWithApple: 'Sign in with Apple',
     noAccount: "Don't have an account?",
     haveAccount: 'Already have an account?',
@@ -127,6 +128,7 @@ export default {
     cashDescription: 'For tracking cash money',
     cardDescription: 'Bank or credit card',
     bankDescription: 'For tracking bank accounts and deposits',
+    savedRate: 'Saved rate',
   },
   transactions: {
     title: 'Transactions',
@@ -201,6 +203,8 @@ export default {
     errorChangingCurrency: 'Error changing currency',
     selectCurrency: 'Select Currency',
     defaultCurrency: 'Default Currency',
+    useSuggestedRate: 'Use suggested rate: {{rate}}',
+    useAllSuggestedRates: 'Use all suggested rates',
   },
   currencies: {
     USD: 'US Dollar',
