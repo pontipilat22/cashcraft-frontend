@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { TransactionItem } from '../components/TransactionItem';
 import { TransactionActionsModal } from '../components/TransactionActionsModal';
 import { EditTransactionModal } from '../components/EditTransactionModal';
@@ -23,11 +24,13 @@ import { TransferModal } from '../components/TransferModal';
 import { Transaction } from '../types';
 import { useLocalization } from '../context/LocalizationContext';
 import { getCurrentLanguage } from '../services/i18n';
+import { CURRENCIES } from '../config/currencies';
 
 export const TransactionsScreen = () => {
   const { colors } = useTheme();
   const { transactions, accounts, categories, totalBalance, isLoading, deleteTransaction } = useData();
   const { t } = useLocalization();
+  const { defaultCurrency } = useCurrency();
   const currentLanguage = getCurrentLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -40,22 +43,69 @@ export const TransactionsScreen = () => {
   const [showDebtTypeSelector, setShowDebtTypeSelector] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
 
-  // Фильтрация транзакций по поиску
+  // Фильтрация и объединение парных транзакций переводов
   const filteredTransactions = useMemo(() => {
-    if (!searchQuery.trim()) return transactions;
+    let result = [...transactions];
     
-    const query = searchQuery.toLowerCase();
-    return transactions.filter(transaction => {
-      const category = categories.find(cat => cat.id === transaction.categoryId);
-      const account = accounts.find(acc => acc.id === transaction.accountId);
+    // Объединяем парные транзакции переводов
+    const transferPairs = new Map<string, Transaction[]>();
+    const processedIds = new Set<string>();
+    
+    result.forEach(transaction => {
+      if (processedIds.has(transaction.id)) return;
       
-      return (
-        transaction.description?.toLowerCase().includes(query) ||
-        category?.name.toLowerCase().includes(query) ||
-        account?.name.toLowerCase().includes(query) ||
-        transaction.amount.toString().includes(query)
-      );
+      // Проверяем, является ли это переводом
+      const isTransfer = (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
+        && transaction.description?.match(/[→←]/);
+      
+      if (isTransfer) {
+        // Ищем парную транзакцию
+        const pairTransaction = result.find(t => 
+          t.id !== transaction.id &&
+          !processedIds.has(t.id) &&
+          Math.abs(new Date(t.date).getTime() - new Date(transaction.date).getTime()) < 1000 && // В пределах 1 секунды
+          ((transaction.type === 'expense' && t.type === 'income') || 
+           (transaction.type === 'income' && t.type === 'expense')) &&
+          (t.categoryId === 'other_income' || t.categoryId === 'other_expense')
+        );
+        
+        if (pairTransaction) {
+          // Помечаем обе транзакции как обработанные
+          processedIds.add(transaction.id);
+          processedIds.add(pairTransaction.id);
+          
+          // Оставляем только расходную транзакцию для отображения
+          const expenseTransaction = transaction.type === 'expense' ? transaction : pairTransaction;
+          transferPairs.set(expenseTransaction.id, [expenseTransaction, pairTransaction]);
+        }
+      }
     });
+    
+    // Фильтруем результат, исключая обработанные доходные транзакции переводов
+    result = result.filter(t => {
+      if (processedIds.has(t.id) && t.type === 'income') {
+        return false; // Скрываем доходные транзакции переводов
+      }
+      return true;
+    });
+    
+    // Применяем поисковый фильтр
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(transaction => {
+        const category = categories.find(cat => cat.id === transaction.categoryId);
+        const account = accounts.find(acc => acc.id === transaction.accountId);
+        
+        return (
+          transaction.description?.toLowerCase().includes(query) ||
+          category?.name.toLowerCase().includes(query) ||
+          account?.name.toLowerCase().includes(query) ||
+          transaction.amount.toString().includes(query)
+        );
+      });
+    }
+    
+    return result;
   }, [transactions, searchQuery, categories, accounts]);
 
   // Группировка транзакций по дням
@@ -171,23 +221,27 @@ export const TransactionsScreen = () => {
     </View>
   );
 
-  const renderSectionHeader = ({ section }: { section: any }) => (
-    <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
-      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-        {section.title}
-      </Text>
-      <Text style={[styles.sectionAmount, { color: colors.textSecondary }]}>
-        {(() => {
-          const total = section.data.reduce((sum: number, t: Transaction) => {
-            return sum + (t.type === 'income' ? t.amount : -t.amount);
-          }, 0);
-          return `${total > 0 ? '+' : ''}₽${Math.abs(total).toLocaleString(currentLanguage === 'ru' ? 'ru-RU' : 'en-US')}`;
-        })()}
-      </Text>
-    </View>
-  );
+  const renderSectionHeader = useCallback(({ section }: { section: any }) => {
+    const currencySymbol = CURRENCIES[defaultCurrency]?.symbol || '$';
+    
+    return (
+      <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+          {section.title}
+        </Text>
+        <Text style={[styles.sectionAmount, { color: colors.textSecondary }]}>
+          {(() => {
+            const total = section.data.reduce((sum: number, t: Transaction) => {
+              return sum + (t.type === 'income' ? t.amount : -t.amount);
+            }, 0);
+            return `${total > 0 ? '+' : ''}${currencySymbol}${Math.abs(total).toLocaleString()}`;
+          })()}
+        </Text>
+      </View>
+    );
+  }, [colors, defaultCurrency]);
 
-  const renderItem = ({ item }: { item: Transaction }) => {
+  const renderItem = useCallback(({ item }: { item: Transaction }) => {
     const category = categories.find(cat => cat.id === item.categoryId);
     const account = accounts.find(acc => acc.id === item.accountId);
     
@@ -199,7 +253,7 @@ export const TransactionsScreen = () => {
         onLongPress={() => handleLongPress(item)}
       />
     );
-  };
+  }, [categories, accounts]);
 
   if (isLoading) {
     return (
@@ -214,7 +268,7 @@ export const TransactionsScreen = () => {
       <SectionList
         ListHeaderComponent={renderHeader}
         sections={groupedTransactions}
-        keyExtractor={(item) => item.id}
+        keyExtractor={useCallback((item: Transaction) => item.id, [])}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         ListEmptyComponent={
@@ -233,6 +287,16 @@ export const TransactionsScreen = () => {
         }
         contentContainerStyle={filteredTransactions.length === 0 ? styles.emptyList : undefined}
         stickySectionHeadersEnabled={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={21}
+        removeClippedSubviews={true}
+        updateCellsBatchingPeriod={50}
+        getItemLayout={useCallback((data: any, index: number) => ({
+          length: 88, // Примерная высота элемента
+          offset: 88 * index,
+          index,
+        }), [])}
       />
 
       <FABMenu

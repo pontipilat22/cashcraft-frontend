@@ -9,7 +9,10 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
+import { useCurrency } from '../context/CurrencyContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { Transaction, Category, Account } from '../types';
+import { CURRENCIES } from '../config/currencies';
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -27,6 +30,8 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
   onLongPress,
 }) => {
   const { colors } = useTheme();
+  const { defaultCurrency } = useCurrency();
+  const { t } = useLocalization();
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const [isLongPressed, setIsLongPressed] = React.useState(false);
   
@@ -53,6 +58,15 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
   
   const isIncome = transaction.type === 'income';
   const amountColor = isIncome ? '#4CAF50' : colors.text;
+  
+  // Определяем валюту счета
+  const accountCurrency = account?.currency || defaultCurrency;
+  const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
+  
+  // Проверяем, является ли транзакция переводом
+  const isTransfer = transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense';
+  const transferMatch = transaction.description?.match(/[→←]/);
+  const isTransferTransaction = isTransfer && transferMatch;
   
   // Определяем тип долговой операции
   const getDebtType = (description?: string) => {
@@ -120,7 +134,11 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
         delayLongPress={500}
       >
         <View style={styles.leftSection}>
-          {debtIconData ? (
+          {isTransferTransaction ? (
+            <View style={[styles.categoryIcon, { backgroundColor: '#2196F3' + '20' }]}>
+              <Ionicons name="swap-horizontal" size={24} color="#2196F3" />
+            </View>
+          ) : debtIconData ? (
             <View style={[styles.categoryIcon, { backgroundColor: debtIconData.color + '20' }]}>
               <Ionicons name={debtIconData.icon as any} size={24} color={debtIconData.color} />
             </View>
@@ -140,19 +158,21 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
           
           <View style={styles.info}>
             <Text style={[styles.categoryName, { color: colors.text }]}>
-              {debtType ? (
+              {isTransferTransaction ? (
+                t('transactions.transfer')
+              ) : debtType ? (
                 debtType === 'give' ? 'Дал в долг' :
                 debtType === 'return' ? 'Получил долг' :
                 debtType === 'borrow' ? 'Взял в долг' :
                 'Вернул долг'
-              ) : (category?.name || (isIncome ? 'Доход' : 'Расход'))}
+              ) : (category?.name || (isIncome ? t('transactions.income') : t('transactions.expense')))}
             </Text>
             {Boolean(displayDescription) && (
               <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={1}>
                 {displayDescription}
               </Text>
             )}
-            {Boolean(account) && (
+            {Boolean(account) && !isTransferTransaction && (
               <Text style={[styles.accountName, { color: colors.textSecondary }]}>
                 {account?.name}
               </Text>
@@ -162,10 +182,10 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
         
         <View style={styles.rightSection}>
           <Text style={[styles.amount, { color: amountColor }]}>
-            {isIncome ? '+' : '-'}₽{Math.abs(transaction.amount).toLocaleString('ru-RU')}
+            {isIncome ? '+' : '-'}{currencySymbol}{Math.abs(transaction.amount).toLocaleString()}
           </Text>
           <Text style={[styles.date, { color: colors.textSecondary }]}>
-            {new Date(transaction.date).toLocaleDateString('ru-RU', {
+            {new Date(transaction.date).toLocaleDateString(undefined, {
               day: 'numeric',
               month: 'short',
               hour: '2-digit',
