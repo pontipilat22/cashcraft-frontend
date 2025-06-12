@@ -377,7 +377,14 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         backgroundColor={colors.background}
       />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={[styles.statsCard, { backgroundColor: colors.statsBg }]}>
+        <View style={[styles.statsCard, { 
+          backgroundColor: colors.statsBg,
+          shadowColor: isDark ? '#000' : '#b0b0b0',
+          shadowOffset: { width: 10, height: 10 },
+          shadowOpacity: isDark ? 0.7 : 0.4,
+          shadowRadius: 20,
+          elevation: 15,
+        }]}>
           <Text style={styles.statsTitle}>{t('accounts.statsForPeriod')}</Text>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -438,10 +445,26 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
           ) : (
             <View style={{ paddingHorizontal: 16 }}>
               <TouchableOpacity 
-                style={[styles.debtCard, { backgroundColor: colors.card }]}
+                style={[styles.debtCard, { 
+                  backgroundColor: isDark ? colors.card : '#f5f5f5',
+                  shadowColor: isDark ? '#000' : '#b0b0b0',
+                  shadowOffset: { width: 8, height: 8 },
+                  shadowOpacity: isDark ? 0.7 : 0.4,
+                  shadowRadius: 15,
+                  elevation: 12,
+                }]}
                 onPress={() => navigation.navigate('DebtList')}
               >
-                <Ionicons name="trending-up-outline" size={32} color={colors.primary} />
+                <View style={[styles.debtIconContainer, {
+                  backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
+                  shadowColor: isDark ? '#000' : '#a0a0a0',
+                  shadowOffset: { width: 4, height: 4 },
+                  shadowOpacity: isDark ? 0.6 : 0.3,
+                  shadowRadius: 6,
+                  elevation: 5,
+                }]}>
+                  <Ionicons name="trending-up-outline" size={24} color={colors.primary} />
+                </View>
                 <View style={styles.debtCardContent}>
                   <Text style={[styles.debtCardTitle, { color: colors.text }]}>{t('accounts.owedToMe')}</Text>
                   <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
@@ -451,10 +474,26 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                 <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.debtCard, { backgroundColor: colors.card }]}
+                style={[styles.debtCard, { 
+                  backgroundColor: isDark ? colors.card : '#f5f5f5',
+                  shadowColor: isDark ? '#000' : '#b0b0b0',
+                  shadowOffset: { width: 8, height: 8 },
+                  shadowOpacity: isDark ? 0.7 : 0.4,
+                  shadowRadius: 15,
+                  elevation: 12,
+                }]}
                 onPress={() => navigation.navigate('DebtList')}
               >
-                <Ionicons name="trending-down-outline" size={32} color={colors.primary} />
+                <View style={[styles.debtIconContainer, {
+                  backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
+                  shadowColor: isDark ? '#000' : '#a0a0a0',
+                  shadowOffset: { width: 4, height: 4 },
+                  shadowOpacity: isDark ? 0.6 : 0.3,
+                  shadowRadius: 6,
+                  elevation: 5,
+                }]}>
+                  <Ionicons name="trending-down-outline" size={24} color={colors.primary} />
+                </View>
                 <View style={styles.debtCardContent}>
                   <Text style={[styles.debtCardTitle, { color: colors.text }]}>{t('accounts.owedByMe')}</Text>
                   <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
@@ -604,13 +643,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   debtCardContent: {
     flex: 1,
@@ -623,5 +657,12 @@ const styles = StyleSheet.create({
   debtCardAmount: {
     fontSize: 14,
     marginTop: 4,
+  },
+  debtIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 
