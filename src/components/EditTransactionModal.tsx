@@ -19,6 +19,7 @@ import { useLocalization } from '../context/LocalizationContext';
 import { Transaction } from '../types';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 import { CURRENCIES } from '../config/currencies';
+import { LocalDatabaseService } from '../services/localDatabase';
 
 interface EditTransactionModalProps {
   visible: boolean;
@@ -32,7 +33,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   onClose,
 }) => {
   const { colors, isDark } = useTheme();
-  const { accounts, categories, updateTransaction } = useData();
+  const { accounts, categories, updateTransaction, transactions } = useData();
   const { t } = useLocalization();
   const { defaultCurrency } = useCurrency();
   
@@ -50,17 +51,83 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const isTransfer = transaction && (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
     && transaction.description?.match(/[→←]/);
   
+  // Извлекаем чистое описание перевода (без стрелок и названий счетов)
+  const getCleanTransferDescription = (desc: string) => {
+    if (!desc) return '';
+    // Удаляем стрелку и всё после неё
+    const arrowIndex = desc.search(/[→←]/);
+    if (arrowIndex === -1) return desc;
+    return desc.substring(0, arrowIndex).trim();
+  };
+  
+  // Для переводов нужно найти второй счет
+  const [transferToAccountId, setTransferToAccountId] = useState<string>('');
+  const [showTransferAccountPicker, setShowTransferAccountPicker] = useState(false);
+  
   // Заполняем форму данными транзакции
   useEffect(() => {
     if (transaction) {
       setIsIncome(transaction.type === 'income');
       setAmount(transaction.amount.toString());
-      setDescription(transaction.description || '');
+      
+      // Проверяем, является ли транзакция переводом
+      const checkIsTransfer = (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
+        && transaction.description?.match(/[→←]/);
+      
+      // Для переводов используем чистое описание
+      if (checkIsTransfer) {
+        setDescription(getCleanTransferDescription(transaction.description || ''));
+        
+        // Для перевода нужно определить второй счет
+        // Если это расход (→), то нужно найти парную доходную транзакцию
+        // Если это доход (←), то нужно найти парную расходную транзакцию
+        const findPairedTransferAccount = () => {
+          // Находим все транзакции в эту же дату
+          const sameDate = transactions.filter(t => 
+            new Date(t.date).toDateString() === new Date(transaction.date).toDateString()
+          );
+          
+          // Ищем парную транзакцию
+          const pairedTransaction = sameDate.find(t => {
+            if (t.id === transaction.id) return false;
+            
+            // Проверяем, что это перевод
+            const isOtherTransfer = (t.categoryId === 'other_income' || t.categoryId === 'other_expense') 
+              && t.description?.match(/[→←]/);
+            if (!isOtherTransfer) return false;
+            
+            // Проверяем, что описания совпадают (без учета стрелок и счетов)
+            const otherCleanDesc = getCleanTransferDescription(t.description || '');
+            const thisCleanDesc = getCleanTransferDescription(transaction.description || '');
+            if (otherCleanDesc !== thisCleanDesc) return false;
+            
+            // Проверяем, что типы противоположные
+            if (transaction.type === 'expense' && t.type === 'income') {
+              return true;
+            } else if (transaction.type === 'income' && t.type === 'expense') {
+              return true;
+            }
+            
+            return false;
+          });
+          
+          if (pairedTransaction) {
+            // Для расходной транзакции второй счет - это счет парной доходной транзакции
+            // Для доходной транзакции второй счет - это счет парной расходной транзакции
+            setTransferToAccountId(pairedTransaction.accountId);
+          }
+        };
+        
+        findPairedTransferAccount();
+      } else {
+        setDescription(transaction.description || '');
+      }
+      
       setSelectedAccountId(transaction.accountId);
       setSelectedCategoryId(transaction.categoryId || '');
       setSelectedDate(new Date(transaction.date));
     }
-  }, [transaction]);
+  }, [transaction?.id]); // Используем только id для избежания циклов
   
   // Фильтруем категории по типу транзакции
   const filteredCategories = categories.filter(cat => cat.type === (isIncome ? 'income' : 'expense'));
@@ -69,14 +136,104 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     if (!amount || !selectedAccountId || !transaction) return;
     
     try {
-      await updateTransaction(transaction.id, {
-        amount: parseFloat(amount),
-        type: isIncome ? 'income' : 'expense',
-        accountId: selectedAccountId,
-        categoryId: selectedCategoryId || undefined,
-        description: description.trim() || undefined,
-        date: selectedDate.toISOString(),
-      });
+      if (isTransfer && transferToAccountId) {
+        // Для переводов нужно обновить обе транзакции
+        const cleanDesc = description.trim();
+        
+        // Находим парную транзакцию
+        const pairedTransaction = transactions.find(t => {
+          if (t.id === transaction.id) return false;
+          
+          const isOtherTransfer = (t.categoryId === 'other_income' || t.categoryId === 'other_expense') 
+            && t.description?.match(/[→←]/);
+          if (!isOtherTransfer) return false;
+          
+          const otherCleanDesc = getCleanTransferDescription(t.description || '');
+          const thisCleanDesc = getCleanTransferDescription(transaction.description || '');
+          if (otherCleanDesc !== thisCleanDesc) return false;
+          
+          // Проверяем дату
+          if (new Date(t.date).toDateString() !== new Date(transaction.date).toDateString()) return false;
+          
+          return (transaction.type === 'expense' && t.type === 'income') ||
+                 (transaction.type === 'income' && t.type === 'expense');
+        });
+        
+        if (pairedTransaction) {
+          // Определяем счета и валюты
+          const fromAccount = transaction.type === 'expense' 
+            ? accounts.find(a => a.id === selectedAccountId)
+            : accounts.find(a => a.id === transferToAccountId);
+          const toAccount = transaction.type === 'expense'
+            ? accounts.find(a => a.id === transferToAccountId)
+            : accounts.find(a => a.id === selectedAccountId);
+            
+          if (!fromAccount || !toAccount) return;
+          
+          // Проверяем нужна ли конверсия валют
+          let fromAmount = parseFloat(amount);
+          let toAmount = parseFloat(amount);
+          
+          if (fromAccount.currency !== toAccount.currency) {
+            // Нужна конверсия
+            const exchangeRate = await LocalDatabaseService.getExchangeRate(
+              fromAccount.currency || defaultCurrency,
+              toAccount.currency || defaultCurrency
+            );
+            
+            if (exchangeRate) {
+              toAmount = fromAmount * exchangeRate;
+            } else {
+              // Попробуем через базовую валюту
+              const fromToDefault = await LocalDatabaseService.getExchangeRate(
+                fromAccount.currency || defaultCurrency,
+                defaultCurrency
+              );
+              const defaultToTo = await LocalDatabaseService.getExchangeRate(
+                defaultCurrency,
+                toAccount.currency || defaultCurrency
+              );
+              
+              if (fromToDefault && defaultToTo) {
+                toAmount = fromAmount * fromToDefault * defaultToTo;
+              }
+            }
+          }
+          
+          // Обновляем расходную транзакцию
+          const expenseTransaction = transaction.type === 'expense' ? transaction : pairedTransaction;
+          const incomeTransaction = transaction.type === 'income' ? transaction : pairedTransaction;
+          
+          await updateTransaction(expenseTransaction.id, {
+            amount: fromAmount,
+            type: 'expense',
+            accountId: fromAccount.id,
+            categoryId: 'other_expense',
+            description: cleanDesc ? `${cleanDesc} → ${toAccount.name}` : `→ ${toAccount.name}`,
+            date: selectedDate.toISOString(),
+          });
+          
+          // Обновляем доходную транзакцию
+          await updateTransaction(incomeTransaction.id, {
+            amount: toAmount,
+            type: 'income',
+            accountId: toAccount.id,
+            categoryId: 'other_income',
+            description: cleanDesc ? `${cleanDesc} ← ${fromAccount.name}` : `← ${fromAccount.name}`,
+            date: selectedDate.toISOString(),
+          });
+        }
+      } else {
+        // Обычная транзакция
+        await updateTransaction(transaction.id, {
+          amount: parseFloat(amount),
+          type: isIncome ? 'income' : 'expense',
+          accountId: selectedAccountId,
+          categoryId: selectedCategoryId || undefined,
+          description: description.trim() || undefined,
+          date: selectedDate.toISOString(),
+        });
+      }
       
       onClose();
     } catch (error) {
@@ -263,7 +420,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Счет */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Счет
+                {isTransfer && transaction?.type === 'expense' ? 'Со счета' : isTransfer && transaction?.type === 'income' ? 'На счет' : 'Счет'}
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
@@ -275,6 +432,24 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
+            
+            {/* Второй счет для переводов */}
+            {isTransfer && (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  {transaction?.type === 'expense' ? 'На счет' : 'Со счета'}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => setShowTransferAccountPicker(true)}
+                >
+                  <Text style={[styles.selectorText, { color: colors.text }]}>
+                    {accounts.find(a => a.id === transferToAccountId)?.name || 'Выберите счет'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Описание */}
             <View style={styles.inputContainer}>
@@ -445,6 +620,52 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                   </Text>
                 </TouchableOpacity>
               ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      
+      {/* Модальное окно для выбора второго счета при переводах */}
+      <Modal
+        visible={showTransferAccountPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowTransferAccountPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTransferAccountPicker(false)}
+        >
+          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
+            <View style={styles.pickerHeader}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                {transaction?.type === 'expense' ? 'Выберите счет назначения' : 'Выберите счет источник'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowTransferAccountPicker(false)} style={styles.pickerCloseButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {accounts
+                .filter(account => account.id !== selectedAccountId) // Исключаем уже выбранный счет
+                .map(account => (
+                  <TouchableOpacity
+                    key={account.id}
+                    style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                    onPress={() => {
+                      setTransferToAccountId(account.id);
+                      setShowTransferAccountPicker(false);
+                    }}
+                  >
+                    <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                      {account.name}
+                    </Text>
+                    <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
+                      {CURRENCIES[account.currency || defaultCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol}{account.balance.toLocaleString('ru-RU')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
             </ScrollView>
           </View>
         </TouchableOpacity>

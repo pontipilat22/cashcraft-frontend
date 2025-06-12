@@ -243,16 +243,17 @@ export const SettingsScreen: React.FC = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t('settings.title')}
-          </Text>
-          <View style={styles.headerSpacer} />
+          <View style={styles.headerLeft}>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()} 
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {t('settings.title')}
+            </Text>
+          </View>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
@@ -582,12 +583,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 20,
-    paddingBottom: 10,
+    padding: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
+    marginLeft: 8,
   },
   section: {
     marginHorizontal: 16,
@@ -830,9 +833,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   backButton: {
-    padding: 8,
+    padding: 0,
   },
-  headerSpacer: {
-    flex: 1,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 }); 

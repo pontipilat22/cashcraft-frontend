@@ -128,14 +128,15 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
       // Сохраняем курс
       await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, rate);
       
-      // Обновляем список
-      await loadExchangeRates();
-      
-      // Очищаем поля
+      // Очищаем поля сразу для лучшего UX
       setFromAmount('1');
       setToAmount('');
       
-      Alert.alert(t('common.success'), t('settings.exchangeRateSaved'));
+      // Обновляем список
+      await loadExchangeRates();
+      
+      // Убираем блокирующий Alert чтобы список обновился визуально
+      // Alert.alert(t('common.success'), t('settings.exchangeRateSaved'));
     } catch (error) {
       Alert.alert(t('common.error'), t('settings.errorSavingRate'));
     }

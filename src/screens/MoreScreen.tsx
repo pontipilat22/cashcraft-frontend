@@ -71,30 +71,6 @@ export const MoreScreen: React.FC = () => {
       onPress: () => setShowCategories(true),
     },
     {
-      id: 'statistics',
-      title: t('common.statistics'),
-      icon: 'stats-chart-outline',
-      onPress: () => {
-        Alert.alert(
-          t('common.statistics'),
-          t('common.featureNotAvailable') || 'Эта функция пока не доступна',
-          [{ text: t('common.ok') || 'OK', style: 'default' }]
-        );
-      },
-    },
-    {
-      id: 'export',
-      title: t('common.export'),
-      icon: 'download-outline',
-      onPress: () => {
-        Alert.alert(
-          t('common.export'),
-          t('common.featureNotAvailable') || 'Эта функция пока не доступна',
-          [{ text: t('common.ok') || 'OK', style: 'default' }]
-        );
-      },
-    },
-    {
       id: 'help',
       title: t('common.help'),
       icon: 'help-circle-outline',
@@ -118,7 +94,7 @@ export const MoreScreen: React.FC = () => {
         <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
           <Ionicons name={item.icon as any} size={24} color={colors.primary} />
         </View>
-        <Text style={[styles.menuItemTitle, { color: colors.text }]}>
+        <Text style={[styles.menuItemTitle, { color: colors.text, marginLeft: 16 }]}>
           {item.title}
         </Text>
       </View>
