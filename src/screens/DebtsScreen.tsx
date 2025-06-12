@@ -10,12 +10,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { Debt } from '../types';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { AddDebtModal } from '../components/AddDebtModal';
 
 export const DebtsScreen: React.FC = () => {
   const { colors } = useTheme();
+  const { formatAmount } = useCurrency();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -87,10 +89,6 @@ export const DebtsScreen: React.FC = () => {
         },
       ],
     );
-  };
-
-  const formatAmount = (amount: number) => {
-    return `${amount.toLocaleString('ru-RU')} ₽`;
   };
 
   const formatDate = (dateString?: string) => {

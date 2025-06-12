@@ -5,6 +5,7 @@ import { useData } from '../context/DataContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useAuth } from '../context/AuthContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
 import { FABMenu } from '../components/FABMenu';
@@ -35,6 +36,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const { isPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
+  const { formatAmount } = useCurrency();
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -390,13 +392,13 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
             <View style={styles.statItem}>
               <Ionicons name="arrow-down" size={24} color="#fff" />
               <Text style={styles.statLabel}>{t('accounts.expenses')}</Text>
-              <Text style={styles.statAmount}>{stats.expense.toLocaleString('ru-RU')} ₽</Text>
+              <Text style={styles.statAmount}>{formatAmount(stats.expense)}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Ionicons name="arrow-up" size={24} color="#fff" />
               <Text style={styles.statLabel}>{t('accounts.income')}</Text>
-              <Text style={styles.statAmount}>{stats.income.toLocaleString('ru-RU')} ₽</Text>
+              <Text style={styles.statAmount}>{formatAmount(stats.income)}</Text>
             </View>
           </View>
         </View>
@@ -468,7 +470,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                 <View style={styles.debtCardContent}>
                   <Text style={[styles.debtCardTitle, { color: colors.text }]}>{t('accounts.owedToMe')}</Text>
                   <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
-                    {debtTotals.owed.toLocaleString('ru-RU')} ₽
+                    {formatAmount(debtTotals.owed)}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
@@ -497,7 +499,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                 <View style={styles.debtCardContent}>
                   <Text style={[styles.debtCardTitle, { color: colors.text }]}>{t('accounts.owedByMe')}</Text>
                   <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
-                    {debtTotals.owe.toLocaleString('ru-RU')} ₽
+                    {formatAmount(debtTotals.owe)}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />

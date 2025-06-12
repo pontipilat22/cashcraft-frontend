@@ -3,6 +3,7 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt } from '../types';
 import { DebtOperationModal } from './DebtOperationModal';
@@ -22,6 +23,7 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
   onUpdate,
 }) => {
   const { colors } = useTheme();
+  const { formatAmount } = useCurrency();
   const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
   const [debtOperationType, setDebtOperationType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -100,7 +102,7 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
               <Text style={[styles.debtName, { color: colors.text }]}>{debt.name}</Text>
               <Text style={[styles.debtAmount, { color: debt.type === 'owed_to_me' ? '#4CAF50' : '#FF5252' }]}>
-                {debt.type === 'owed_to_me' ? '+' : '-'}{debt.amount.toLocaleString('ru-RU')} ₽
+                {debt.type === 'owed_to_me' ? '+' : '-'}{formatAmount(debt.amount)}
               </Text>
             </View>
             

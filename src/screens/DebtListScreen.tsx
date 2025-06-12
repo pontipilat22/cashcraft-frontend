@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useCurrency } from '../context/CurrencyContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt } from '../types';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -18,6 +20,8 @@ interface DebtListScreenProps {
 
 export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigation }) => {
   const { colors } = useTheme();
+  const { formatAmount } = useCurrency();
+  const { t } = useLocalization();
   const { type } = route.params;
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +66,7 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
             </Text>
           </View>
           <Text style={[styles.debtAmount, { color: colors.primary }]}>
-            {item.amount.toLocaleString('ru-RU')} ₽
+            {formatAmount(item.amount)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -84,21 +88,19 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>
-          {type === 'owed_to_me' ? 'Мне должны' : 'Я должен'}
+          {type === 'owed_to_me' ? t('accounts.owedToMe') : t('accounts.owedByMe')}
         </Text>
         <View style={{ width: 24 }} />
       </View>
       
       <Text style={[styles.description, { color: colors.textSecondary }]}>
-        {type === 'owed_to_me' 
-          ? 'Список людей, которые должны вам деньги' 
-          : 'Список людей, которым вы должны деньги'}
+        {t(type === 'owed_to_me' ? 'debts.owedToMeDescription' : 'debts.owedByMeDescription')}
       </Text>
 
       {debts.length === 0 ? (
         <View style={[styles.center, { flex: 1 }]}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            {type === 'owed_to_me' ? 'Никто вам не должен' : 'Вы никому не должны'}
+            {t(type === 'owed_to_me' ? 'debts.owedToMeEmpty' : 'debts.owedByMeEmpty')}
           </Text>
         </View>
       ) : (

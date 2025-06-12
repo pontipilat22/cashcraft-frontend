@@ -280,5 +280,9 @@ export default {
     borrowMoneyDescription: 'Borrow money from someone',
     paybackDebt: 'Payback debt',
     paybackDebtDescription: 'Return debt to someone',
+    owedToMeDescription: 'List of people who owe you money',
+    owedByMeDescription: 'List of people you owe money to',
+    owedToMeEmpty: 'Nobody owes you money',
+    owedByMeEmpty: 'You don\'t owe anyone money',
   },
 }; 
