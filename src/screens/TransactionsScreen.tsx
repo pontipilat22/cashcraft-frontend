@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  InteractionManager,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
@@ -25,6 +26,24 @@ import { Transaction } from '../types';
 import { useLocalization } from '../context/LocalizationContext';
 import { getCurrentLanguage } from '../services/i18n';
 import { CURRENCIES } from '../config/currencies';
+import { SectionHeader } from '../components/SectionHeader';
+
+// Хук для debounce
+const useDebounce = (value: string, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 export const TransactionsScreen = () => {
   const { colors } = useTheme();
@@ -43,8 +62,22 @@ export const TransactionsScreen = () => {
   const [showDebtTypeSelector, setShowDebtTypeSelector] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
 
+  // Используем debounce для поиска
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // Состояние для отложенной загрузки
+  const [isFilteringTransactions, setIsFilteringTransactions] = useState(false);
+
   // Фильтрация и объединение парных транзакций переводов
   const filteredTransactions = useMemo(() => {
+    // Для больших списков откладываем фильтрацию
+    if (transactions.length > 500 && debouncedSearchQuery.trim()) {
+      setIsFilteringTransactions(true);
+      InteractionManager.runAfterInteractions(() => {
+        setIsFilteringTransactions(false);
+      });
+    }
+
     let result = [...transactions];
     
     // Объединяем парные транзакции переводов
@@ -90,8 +123,8 @@ export const TransactionsScreen = () => {
     });
     
     // Применяем поисковый фильтр
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
       result = result.filter(transaction => {
         const category = categories.find(cat => cat.id === transaction.categoryId);
         const account = accounts.find(acc => acc.id === transaction.accountId);
@@ -106,7 +139,7 @@ export const TransactionsScreen = () => {
     }
     
     return result;
-  }, [transactions, searchQuery, categories, accounts]);
+  }, [transactions, debouncedSearchQuery, categories, accounts]);
 
   // Группировка транзакций по дням
   const groupedTransactions = useMemo(() => {
@@ -141,18 +174,18 @@ export const TransactionsScreen = () => {
       title: date,
       data: items,
     }));
-  }, [filteredTransactions]);
+  }, [filteredTransactions, t, currentLanguage]);
 
-  const handleLongPress = (transaction: Transaction) => {
+  const handleLongPress = useCallback((transaction: Transaction) => {
     setSelectedTransaction(transaction);
     setShowActionsModal(true);
-  };
+  }, []);
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     if (!selectedTransaction) return;
     
     Alert.alert(
@@ -176,32 +209,36 @@ export const TransactionsScreen = () => {
         },
       ]
     );
-  };
+  }, [selectedTransaction, t, deleteTransaction]);
 
-  const handleQuickIncome = () => {
+  const handleQuickIncome = useCallback(() => {
     setTransactionType('income');
     setShowAddModal(true);
-  };
+  }, []);
 
-  const handleQuickExpense = () => {
+  const handleQuickExpense = useCallback(() => {
     setTransactionType('expense');
     setShowAddModal(true);
-  };
+  }, []);
 
-  const handleQuickDebt = () => {
+  const handleQuickDebt = useCallback(() => {
     setShowDebtTypeSelector(true);
-  };
+  }, []);
 
-  const handleQuickTransfer = () => {
+  const handleQuickTransfer = useCallback(() => {
     setShowTransferModal(true);
-  };
+  }, []);
 
-  const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
+  const handleDebtTypeSelect = useCallback((type: 'give' | 'return' | 'borrow' | 'payback') => {
     setDebtOperationType(type);
     setShowDebtOperationModal(true);
-  };
+  }, []);
 
-  const renderHeader = () => (
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+
+  const renderHeader = useCallback(() => (
     <View>
       <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
         <Ionicons name="search" size={20} color={colors.textSecondary} />
@@ -213,33 +250,17 @@ export const TransactionsScreen = () => {
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity onPress={clearSearch}>
             <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
     </View>
-  );
+  ), [colors, t, searchQuery, clearSearch]);
 
   const renderSectionHeader = useCallback(({ section }: { section: any }) => {
-    const currencySymbol = CURRENCIES[defaultCurrency]?.symbol || '$';
-    
-    return (
-      <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-          {section.title}
-        </Text>
-        <Text style={[styles.sectionAmount, { color: colors.textSecondary }]}>
-          {(() => {
-            const total = section.data.reduce((sum: number, t: Transaction) => {
-              return sum + (t.type === 'income' ? t.amount : -t.amount);
-            }, 0);
-            return `${total > 0 ? '+' : ''}${currencySymbol}${Math.abs(total).toLocaleString()}`;
-          })()}
-        </Text>
-      </View>
-    );
-  }, [colors, defaultCurrency]);
+    return <SectionHeader title={section.title} data={section.data} />;
+  }, []);
 
   const renderItem = useCallback(({ item }: { item: Transaction }) => {
     const category = categories.find(cat => cat.id === item.categoryId);
@@ -253,7 +274,22 @@ export const TransactionsScreen = () => {
         onLongPress={() => handleLongPress(item)}
       />
     );
-  }, [categories, accounts]);
+  }, [categories, accounts, handleLongPress]);
+
+  const ListEmptyComponent = useMemo(() => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="receipt-outline" size={64} color={colors.textSecondary} />
+      <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+        {debouncedSearchQuery ? t('transactions.notFound') : t('transactions.noTransactions')}
+      </Text>
+      <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+        {debouncedSearchQuery 
+          ? t('transactions.changeSearchQuery') 
+          : t('transactions.addFirstTransaction')
+        }
+      </Text>
+    </View>
+  ), [colors, debouncedSearchQuery, t]);
 
   if (isLoading) {
     return (
@@ -271,32 +307,24 @@ export const TransactionsScreen = () => {
         keyExtractor={useCallback((item: Transaction) => item.id, [])}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="receipt-outline" size={64} color={colors.textSecondary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {searchQuery ? t('transactions.notFound') : t('transactions.noTransactions')}
-            </Text>
-            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-              {searchQuery 
-                ? t('transactions.changeSearchQuery') 
-                : t('transactions.addFirstTransaction')
-              }
-            </Text>
-          </View>
-        }
+        ListEmptyComponent={ListEmptyComponent}
         contentContainerStyle={filteredTransactions.length === 0 ? styles.emptyList : undefined}
         stickySectionHeadersEnabled={false}
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={21}
+        initialNumToRender={20}
+        maxToRenderPerBatch={15}
+        windowSize={10}
         removeClippedSubviews={true}
         updateCellsBatchingPeriod={50}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
         getItemLayout={useCallback((data: any, index: number) => ({
-          length: 88, // Примерная высота элемента
-          offset: 88 * index,
+          length: 80, // Уменьшенная высота элемента для более точного расчета
+          offset: 80 * index + 44 * Math.floor(index / 10), // Учитываем высоту заголовков секций
           index,
         }), [])}
+        onScrollToIndexFailed={useCallback(() => {
+          // Обработка ошибок при прокрутке к элементу
+        }, [])}
       />
 
       <FABMenu
@@ -306,50 +334,62 @@ export const TransactionsScreen = () => {
         onTransferPress={handleQuickTransfer}
       />
 
-      <AddTransactionModal
-        visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        initialType={transactionType}
-      />
+      {showAddModal && (
+        <AddTransactionModal
+          visible={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          initialType={transactionType}
+        />
+      )}
       
-      <TransferModal
-        visible={showTransferModal}
-        onClose={() => setShowTransferModal(false)}
-      />
+      {showTransferModal && (
+        <TransferModal
+          visible={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+        />
+      )}
       
-      <DebtTypeSelector
-        visible={showDebtTypeSelector}
-        onClose={() => setShowDebtTypeSelector(false)}
-        onSelect={handleDebtTypeSelect}
-      />
+      {showDebtTypeSelector && (
+        <DebtTypeSelector
+          visible={showDebtTypeSelector}
+          onClose={() => setShowDebtTypeSelector(false)}
+          onSelect={handleDebtTypeSelect}
+        />
+      )}
       
-      <DebtOperationModal
-        visible={showDebtOperationModal}
-        operationType={debtOperationType}
-        onClose={() => {
-          setShowDebtOperationModal(false);
-          setDebtOperationType(null);
-        }}
-      />
+      {showDebtOperationModal && (
+        <DebtOperationModal
+          visible={showDebtOperationModal}
+          operationType={debtOperationType}
+          onClose={() => {
+            setShowDebtOperationModal(false);
+            setDebtOperationType(null);
+          }}
+        />
+      )}
 
-      <TransactionActionsModal
-        visible={showActionsModal}
-        transaction={selectedTransaction}
-        category={selectedTransaction ? categories.find(cat => cat.id === selectedTransaction.categoryId) : undefined}
-        account={selectedTransaction ? accounts.find(acc => acc.id === selectedTransaction.accountId) : undefined}
-        onClose={() => setShowActionsModal(false)}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      {showActionsModal && selectedTransaction && (
+        <TransactionActionsModal
+          visible={showActionsModal}
+          transaction={selectedTransaction}
+          category={selectedTransaction ? categories.find(cat => cat.id === selectedTransaction.categoryId) : undefined}
+          account={selectedTransaction ? accounts.find(acc => acc.id === selectedTransaction.accountId) : undefined}
+          onClose={() => setShowActionsModal(false)}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      )}
 
-      <EditTransactionModal
-        visible={showEditModal}
-        transaction={selectedTransaction}
-        onClose={() => {
-          setShowEditModal(false);
-          setSelectedTransaction(null);
-        }}
-      />
+      {showEditModal && selectedTransaction && (
+        <EditTransactionModal
+          visible={showEditModal}
+          transaction={selectedTransaction}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedTransaction(null);
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -374,21 +414,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sectionAmount: {
-    fontSize: 14,
-    fontWeight: '500',
   },
   emptyContainer: {
     alignItems: 'center',

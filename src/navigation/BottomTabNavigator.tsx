@@ -51,7 +51,7 @@ export const BottomTabNavigator: React.FC = () => {
           if (route.name === 'Accounts') {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Transactions') {
-            iconName = focused ? 'list' : 'list-outline';
+            iconName = focused ? 'receipt' : 'receipt-outline';
           } else if (route.name === 'More') {
             iconName = focused ? 'menu' : 'menu-outline';
           } else {

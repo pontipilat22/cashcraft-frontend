@@ -22,7 +22,7 @@ interface TransactionItemProps {
   onLongPress?: () => void;
 }
 
-export const TransactionItem: React.FC<TransactionItemProps> = ({ 
+const TransactionItemComponent: React.FC<TransactionItemProps> = ({ 
   transaction, 
   category,
   account,
@@ -249,4 +249,6 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
   },
-}); 
+});
+
+export const TransactionItem = React.memo(TransactionItemComponent); 
