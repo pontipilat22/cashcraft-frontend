@@ -336,6 +336,7 @@ export const TransactionsScreen = () => {
         visible={showActionsModal}
         transaction={selectedTransaction}
         category={selectedTransaction ? categories.find(cat => cat.id === selectedTransaction.categoryId) : undefined}
+        account={selectedTransaction ? accounts.find(acc => acc.id === selectedTransaction.accountId) : undefined}
         onClose={() => setShowActionsModal(false)}
         onEdit={handleEdit}
         onDelete={handleDelete}

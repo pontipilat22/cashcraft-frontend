@@ -46,6 +46,10 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   
+  // Проверяем, является ли транзакция переводом
+  const isTransfer = transaction && (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
+    && transaction.description?.match(/[→←]/);
+  
   // Заполняем форму данными транзакции
   useEffect(() => {
     if (transaction) {
@@ -138,42 +142,59 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Переключатель типа транзакции */}
-            <View style={styles.typeContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('common.type')}
-              </Text>
-              <View style={[styles.typeSwitch, { backgroundColor: colors.background }]}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeButton,
-                    !isIncome && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => setIsIncome(false)}
-                >
-                  <Text style={[
-                    styles.typeButtonText,
-                    { color: !isIncome ? '#fff' : colors.text }
-                  ]}>
-                    {t('transactions.expense')}
+            {/* Для переводов показываем специальную метку */}
+            {isTransfer && (
+              <View style={styles.typeContainer}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  {t('common.type')}
+                </Text>
+                <View style={[styles.transferLabel, { backgroundColor: '#2196F3' + '20' }]}>
+                  <Ionicons name="swap-horizontal" size={20} color="#2196F3" style={{ marginRight: 8 }} />
+                  <Text style={[styles.transferLabelText, { color: '#2196F3' }]}>
+                    {t('transactions.transfer')}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.typeButton,
-                    isIncome && { backgroundColor: '#4CAF50' },
-                  ]}
-                  onPress={() => setIsIncome(true)}
-                >
-                  <Text style={[
-                    styles.typeButtonText,
-                    { color: isIncome ? '#fff' : colors.text }
-                  ]}>
-                    {t('transactions.income')}
-                  </Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            )}
+            
+            {/* Переключатель типа транзакции (скрываем для переводов) */}
+            {!isTransfer && (
+              <View style={styles.typeContainer}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  {t('common.type')}
+                </Text>
+                <View style={[styles.typeSwitch, { backgroundColor: colors.background }]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.typeButton,
+                      !isIncome && { backgroundColor: colors.primary },
+                    ]}
+                    onPress={() => setIsIncome(false)}
+                  >
+                    <Text style={[
+                      styles.typeButtonText,
+                      { color: !isIncome ? '#fff' : colors.text }
+                    ]}>
+                      {t('transactions.expense')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.typeButton,
+                      isIncome && { backgroundColor: '#4CAF50' },
+                    ]}
+                    onPress={() => setIsIncome(true)}
+                  >
+                    <Text style={[
+                      styles.typeButtonText,
+                      { color: isIncome ? '#fff' : colors.text }
+                    ]}>
+                      {t('transactions.income')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             {/* Сумма */}
             <View style={styles.inputContainer}>
@@ -214,28 +235,30 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Категория */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Категория
-              </Text>
-              <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => setShowCategoryPicker(true)}
-              >
-                <View style={styles.selectorContent}>
-                  {selectedCategory && (
-                    <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color + '20' }]}>
-                      <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
-                    </View>
-                  )}
-                  <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {selectedCategory ? getLocalizedCategory(selectedCategory, t).name : t('transactions.selectCategory')}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+            {/* Категория (скрываем для переводов) */}
+            {!isTransfer && (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  Категория
+                </Text>
+                <TouchableOpacity
+                  style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => setShowCategoryPicker(true)}
+                >
+                  <View style={styles.selectorContent}>
+                    {selectedCategory && (
+                      <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color + '20' }]}>
+                        <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
+                      </View>
+                    )}
+                    <Text style={[styles.selectorText, { color: colors.text }]}>
+                      {selectedCategory ? getLocalizedCategory(selectedCategory, t).name : t('transactions.selectCategory')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Счет */}
             <View style={styles.inputContainer}>
@@ -610,6 +633,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   datePickerButton: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  transferLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  transferLabelText: {
     fontSize: 16,
     fontWeight: '600',
   },

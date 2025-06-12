@@ -8,12 +8,16 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
+import { useLocalization } from '../context/LocalizationContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { Transaction, Category } from '../types';
+import { CURRENCIES } from '../config/currencies';
 
 interface TransactionActionsModalProps {
   visible: boolean;
   transaction: Transaction | null;
   category?: Category;
+  account?: any; // Account type
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -23,11 +27,14 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
   visible,
   transaction,
   category,
+  account,
   onClose,
   onEdit,
   onDelete,
 }) => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
+  const { defaultCurrency } = useCurrency();
 
   if (!transaction) return null;
 
@@ -42,7 +49,16 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
   };
 
   const isIncome = transaction.type === 'income';
-  const amount = `${isIncome ? '+' : '-'}${transaction.amount.toLocaleString('ru-RU')} ₽`;
+  
+  // Проверяем, является ли транзакция переводом
+  const isTransfer = (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
+    && transaction.description?.match(/[→←]/);
+  
+  // Определяем валюту счета
+  const accountCurrency = account?.currency || defaultCurrency;
+  const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
+  
+  const amount = `${isIncome ? '+' : '-'}${currencySymbol}${transaction.amount.toLocaleString()}`;
   
   return (
     <Modal
@@ -65,14 +81,18 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
           <View style={styles.header}>
             <View style={styles.headerTop}>
               <View style={styles.transactionInfo}>
-                {category && (
+                {isTransfer ? (
+                  <View style={[styles.categoryIcon, { backgroundColor: '#2196F3' + '20' }]}>
+                    <Ionicons name="swap-horizontal" size={24} color="#2196F3" />
+                  </View>
+                ) : category ? (
                   <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
                     <Ionicons name={category.icon as any} size={24} color={category.color} />
                   </View>
-                )}
+                ) : null}
                 <View style={styles.transactionDetails}>
                   <Text style={[styles.categoryName, { color: colors.text }]}>
-                    {category?.name || (isIncome ? 'Доход' : 'Расход')}
+                    {isTransfer ? t('transactions.transfer') : (category?.name || (isIncome ? t('transactions.income') : t('transactions.expense')))}
                   </Text>
                   {Boolean(transaction.description) && (
                     <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={1}>

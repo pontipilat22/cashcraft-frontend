@@ -43,7 +43,8 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
   const [loading, setLoading] = useState(true);
   const [fromCurrency, setFromCurrency] = useState(defaultCurrency);
   const [toCurrency, setToCurrency] = useState('USD');
-  const [newRate, setNewRate] = useState('');
+  const [fromAmount, setFromAmount] = useState('1');
+  const [toAmount, setToAmount] = useState('');
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
 
@@ -107,7 +108,10 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
   };
 
   const handleAddRate = async () => {
-    if (!newRate || parseFloat(newRate) <= 0) {
+    const fromValue = parseFloat(fromAmount);
+    const toValue = parseFloat(toAmount);
+    
+    if (!fromAmount || fromValue <= 0 || !toAmount || toValue <= 0) {
       Alert.alert(t('common.error'), t('settings.invalidExchangeRate'));
       return;
     }
@@ -118,7 +122,8 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
     }
     
     try {
-      const rate = parseFloat(newRate);
+      // Рассчитываем курс: сколько единиц toCurrency за 1 единицу fromCurrency
+      const rate = toValue / fromValue;
       
       // Сохраняем курс
       await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, rate);
@@ -126,8 +131,9 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
       // Обновляем список
       await loadExchangeRates();
       
-      // Очищаем поле
-      setNewRate('');
+      // Очищаем поля
+      setFromAmount('1');
+      setToAmount('');
       
       Alert.alert(t('common.success'), t('settings.exchangeRateSaved'));
     } catch (error) {
@@ -265,40 +271,55 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
                 </Text>
                 
                 <View style={styles.addRateForm}>
-                  <TouchableOpacity
-                    style={[styles.currencySelector, { borderColor: colors.border }]}
-                    onPress={() => setShowFromPicker(true)}
-                  >
-                    <Text style={[styles.currencyCode, { color: colors.text }]}>
-                      {currencies[fromCurrency]?.symbol} {fromCurrency}
-                    </Text>
-                    <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
-                  </TouchableOpacity>
+                  <View style={styles.currencyAmountGroup}>
+                    <TextInput
+                      style={[styles.amountInput, { 
+                        color: colors.text,
+                        borderColor: colors.border,
+                        backgroundColor: colors.card
+                      }]}
+                      value={fromAmount}
+                      onChangeText={setFromAmount}
+                      placeholder="1"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                    />
+                    <TouchableOpacity
+                      style={[styles.currencySelector, { borderColor: colors.border }]}
+                      onPress={() => setShowFromPicker(true)}
+                    >
+                      <Text style={[styles.currencyCode, { color: colors.text }]}>
+                        {currencies[fromCurrency]?.symbol} {fromCurrency}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
                   
                   <Text style={[styles.equals, { color: colors.textSecondary }]}>=</Text>
                   
-                  <TextInput
-                    style={[styles.rateInput, { 
-                      color: colors.text,
-                      borderColor: colors.border,
-                      backgroundColor: colors.card
-                    }]}
-                    value={newRate}
-                    onChangeText={setNewRate}
-                    placeholder="0.00"
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="numeric"
-                  />
-                  
-                  <TouchableOpacity
-                    style={[styles.currencySelector, { borderColor: colors.border }]}
-                    onPress={() => setShowToPicker(true)}
-                  >
-                    <Text style={[styles.currencyCode, { color: colors.text }]}>
-                      {currencies[toCurrency]?.symbol} {toCurrency}
-                    </Text>
-                    <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
-                  </TouchableOpacity>
+                  <View style={styles.currencyAmountGroup}>
+                    <TextInput
+                      style={[styles.amountInput, { 
+                        color: colors.text,
+                        borderColor: colors.border,
+                        backgroundColor: colors.card
+                      }]}
+                      value={toAmount}
+                      onChangeText={setToAmount}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                    />
+                    <TouchableOpacity
+                      style={[styles.currencySelector, { borderColor: colors.border }]}
+                      onPress={() => setShowToPicker(true)}
+                    >
+                      <Text style={[styles.currencyCode, { color: colors.text }]}>
+                        {currencies[toCurrency]?.symbol} {toCurrency}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
                   
                   <TouchableOpacity
                     style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -326,63 +347,17 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
                           {currencies[rate.fromCurrency]?.symbol} {rate.fromCurrency} → {currencies[rate.toCurrency]?.symbol} {rate.toCurrency}
                         </Text>
                         
-                        {rate.isEditing ? (
-                          <View style={styles.editRateContainer}>
-                            <TextInput
-                              style={[styles.editRateInput, { 
-                                color: colors.text,
-                                borderColor: colors.border,
-                                backgroundColor: colors.card
-                              }]}
-                              value={rate.rate.toString()}
-                              onChangeText={(text) => {
-                                const updatedRates = [...exchangeRates];
-                                updatedRates[index] = { ...rate, rate: parseFloat(text) || 0 };
-                                setExchangeRates(updatedRates);
-                              }}
-                              keyboardType="numeric"
-                              autoFocus
-                            />
-                            <TouchableOpacity
-                              onPress={() => {
-                                handleUpdateRate(rate.fromCurrency, rate.toCurrency, rate.rate.toString());
-                                const updatedRates = [...exchangeRates];
-                                updatedRates[index] = { ...rate, isEditing: false };
-                                setExchangeRates(updatedRates);
-                              }}
-                            >
-                              <Ionicons name="checkmark" size={20} color={colors.primary} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => {
-                                const updatedRates = [...exchangeRates];
-                                updatedRates[index] = { ...rate, isEditing: false };
-                                setExchangeRates(updatedRates);
-                                loadExchangeRates();
-                              }}
-                            >
-                              <Ionicons name="close" size={20} color={colors.danger} />
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
-                          <Text style={[styles.rateValue, { color: colors.primary }]}>
-                            {rate.rate.toFixed(4)}
+                        <View>
+                          <Text style={[styles.currencyPair, { color: colors.text, fontSize: 14 }]}>
+                            1 {currencies[rate.fromCurrency]?.symbol} = {rate.rate.toFixed(4)} {currencies[rate.toCurrency]?.symbol}
                           </Text>
-                        )}
+                          <Text style={[styles.rateEquivalent, { color: colors.textSecondary }]}>
+                            100 {currencies[rate.fromCurrency]?.symbol} = {(100 * rate.rate).toFixed(2)} {currencies[rate.toCurrency]?.symbol}
+                          </Text>
+                        </View>
                       </View>
                       
                       <View style={styles.rateActions}>
-                        <TouchableOpacity
-                          style={styles.actionButton}
-                          onPress={() => {
-                            const updatedRates = [...exchangeRates];
-                            updatedRates[index] = { ...rate, isEditing: true };
-                            setExchangeRates(updatedRates);
-                          }}
-                        >
-                          <Ionicons name="pencil" size={18} color={colors.primary} />
-                        </TouchableOpacity>
-                        
                         <TouchableOpacity
                           style={styles.actionButton}
                           onPress={() => handleDeleteRate(rate.fromCurrency, rate.toCurrency)}
@@ -582,5 +557,24 @@ const styles = StyleSheet.create({
   },
   currencyText: {
     fontSize: 16,
+  },
+  currencyAmountGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  amountInput: {
+    minWidth: 60,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    marginRight: 8,
+  },
+  rateEquivalent: {
+    fontSize: 12,
+    marginTop: 2,
   },
 }); 
