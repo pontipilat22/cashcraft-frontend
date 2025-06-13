@@ -122,21 +122,22 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
         },
       ]}
     >
-      <TouchableOpacity
-        style={[
-          styles.content,
-          { 
-            backgroundColor: isSelected ? colors.primary + '20' : isLongPressed ? colors.primary + '10' : colors.card,
-            borderColor: isSelected ? colors.primary : isLongPressed ? colors.primary : colors.border,
-            borderWidth: isSelected || isLongPressed ? 1.5 : 0,
-          }
-        ]}
-        onPress={onPress}
-        onLongPress={handleLongPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        delayLongPress={500}
-      >
+      <View style={isSelected ? [styles.glowContainer, { shadowColor: colors.primary }] : {}}>
+        <TouchableOpacity
+          style={[
+            styles.content,
+            { 
+              backgroundColor: isLongPressed ? colors.primary + '10' : colors.card,
+              borderColor: isSelected ? colors.primary : isLongPressed ? colors.primary : colors.border,
+              borderWidth: isSelected ? 2.5 : isLongPressed ? 1.5 : 0,
+            }
+          ]}
+          onPress={onPress}
+          onLongPress={handleLongPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          delayLongPress={500}
+        >
         <View style={styles.leftSection}>
           {isSelectionMode ? (
             <View style={[styles.categoryIcon, { 
@@ -208,6 +209,7 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
           </Text>
         </View>
       </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 };
@@ -216,6 +218,13 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
     marginVertical: 4,
+  },
+  glowContainer: {
+    borderRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8,
   },
   content: {
     flexDirection: 'row',
