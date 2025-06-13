@@ -214,15 +214,6 @@ export const TransactionsScreen = () => {
     }));
   }, [filteredTransactions, t, currentLanguage]);
 
-  const handleLongPress = useCallback((transaction: Transaction) => {
-    if (isSelectionMode) {
-      toggleTransactionSelection(transaction.id);
-    } else {
-      setSelectedTransaction(transaction);
-      setShowActionsModal(true);
-    }
-  }, [isSelectionMode]);
-  
   const toggleTransactionSelection = useCallback((id: string) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev);
@@ -235,12 +226,6 @@ export const TransactionsScreen = () => {
     });
   }, []);
   
-  const handleTransactionPress = useCallback((transaction: Transaction) => {
-    if (isSelectionMode) {
-      toggleTransactionSelection(transaction.id);
-    }
-  }, [isSelectionMode, toggleTransactionSelection]);
-  
   const enterSelectionMode = useCallback(() => {
     setIsSelectionMode(true);
     setSelectedIds(new Set());
@@ -250,6 +235,24 @@ export const TransactionsScreen = () => {
     setIsSelectionMode(false);
     setSelectedIds(new Set());
   }, []);
+  
+  const handleLongPress = useCallback((transaction: Transaction) => {
+    if (!isSelectionMode) {
+      // При долгом нажатии активируем режим выделения
+      enterSelectionMode();
+      toggleTransactionSelection(transaction.id);
+    }
+  }, [isSelectionMode, enterSelectionMode, toggleTransactionSelection]);
+  
+  const handleTransactionPress = useCallback((transaction: Transaction) => {
+    if (isSelectionMode) {
+      toggleTransactionSelection(transaction.id);
+    } else {
+      // При обычном клике открываем детали транзакции
+      setSelectedTransaction(transaction);
+      setShowActionsModal(true);
+    }
+  }, [isSelectionMode, toggleTransactionSelection]);
   
   const deleteSelectedTransactions = useCallback(() => {
     if (selectedIds.size === 0) return;

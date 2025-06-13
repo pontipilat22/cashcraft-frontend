@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  ScrollView,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
@@ -54,16 +55,70 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
   const isTransfer = (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
     && transaction.description?.match(/[→←]/);
   
+  // Определяем тип долговой операции
+  const getDebtType = (description?: string) => {
+    if (!description) return null;
+    const match = description.match(/\[DEBT:(give|return|borrow|payback)\]/);
+    if (match) return match[1];
+    const lowerDesc = description.toLowerCase();
+    if (lowerDesc.includes('дал в долг') || lowerDesc.includes('дала в долг')) return 'give';
+    if (lowerDesc.includes('получил долг') || lowerDesc.includes('получила долг')) return 'return';
+    if (lowerDesc.includes('взял в долг') || lowerDesc.includes('взяла в долг')) return 'borrow';
+    if (lowerDesc.includes('вернул долг') || lowerDesc.includes('вернула долг')) return 'payback';
+    return null;
+  };
+  
+  const debtType = getDebtType(transaction.description);
+  
+  // Получаем иконку и цвет для долговой операции
+  const getDebtIconAndColor = () => {
+    switch (debtType) {
+      case 'give':
+        return { icon: 'arrow-up-circle', color: '#2196F3' };
+      case 'return':
+        return { icon: 'checkmark-circle', color: '#4CAF50' };
+      case 'borrow':
+        return { icon: 'arrow-down-circle', color: '#9C27B0' };
+      case 'payback':
+        return { icon: 'checkmark-circle', color: '#FF5252' };
+      default:
+        return null;
+    }
+  };
+  
+  const debtIconData = getDebtIconAndColor();
+  
+  // Убираем префикс [DEBT:type] из отображаемого описания
+  const displayDescription = transaction.description?.replace(/\[DEBT:\w+\]\s*/, '');
+  
   // Определяем валюту счета
   const accountCurrency = account?.currency || defaultCurrency;
   const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
   
-  const amount = `${isIncome ? '+' : '-'}${currencySymbol}${transaction.amount.toLocaleString()}`;
+  const amount = `${currencySymbol}${transaction.amount.toLocaleString()}`;
+  
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString(undefined, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+  
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+  
+  const transactionDate = new Date(transaction.date);
   
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType="slide"
       transparent={true}
       onRequestClose={onClose}
     >
@@ -72,85 +127,142 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
         activeOpacity={1}
         onPress={onClose}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          style={[styles.container, { backgroundColor: colors.card }]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Заголовок с информацией о транзакции */}
-          <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <View style={styles.transactionInfo}>
-                {isTransfer ? (
-                  <View style={[styles.categoryIcon, { backgroundColor: '#2196F3' + '20' }]}>
-                    <Ionicons name="swap-horizontal" size={24} color="#2196F3" />
-                  </View>
-                ) : category ? (
-                  <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                    <Ionicons name={category.icon as any} size={24} color={category.color} />
-                  </View>
-                ) : null}
-                <View style={styles.transactionDetails}>
-                  <Text style={[styles.categoryName, { color: colors.text }]}>
-                    {isTransfer ? t('transactions.transfer') : (category?.name || (isIncome ? t('transactions.income') : t('transactions.expense')))}
-                  </Text>
-                  {Boolean(transaction.description) && (
-                    <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={1}>
-                      {transaction.description}
-                    </Text>
-                  )}
-                </View>
-                <Text style={[styles.amount, { color: isIncome ? '#4CAF50' : colors.text }]}>
-                  {amount}
-                </Text>
-              </View>
+        <View style={styles.bottomSheet}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.container, { backgroundColor: colors.card }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Индикатор для свайпа */}
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+            
+            {/* Заголовок */}
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: colors.text }]}>Детали операции</Text>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
+                <Ionicons name="close-circle" size={28} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-          </View>
 
-          <View style={[styles.divider, { backgroundColor: colors.border }]}></View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Основная информация */}
+              <View style={styles.mainInfo}>
+                <View style={styles.amountSection}>
+                  {isTransfer ? (
+                    <View style={[styles.categoryIcon, { backgroundColor: '#2196F3' + '20' }]}>
+                      <Ionicons name="swap-horizontal" size={32} color="#2196F3" />
+                    </View>
+                  ) : debtIconData ? (
+                    <View style={[styles.categoryIcon, { backgroundColor: debtIconData.color + '20' }]}>
+                      <Ionicons name={debtIconData.icon as any} size={32} color={debtIconData.color} />
+                    </View>
+                  ) : category ? (
+                    <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                      <Ionicons name={category.icon as any} size={32} color={category.color} />
+                    </View>
+                  ) : (
+                    <View style={[styles.categoryIcon, { backgroundColor: colors.primary + '20' }]}>
+                      <Ionicons 
+                        name={isIncome ? 'trending-up' : 'trending-down'} 
+                        size={32} 
+                        color={isIncome ? '#4CAF50' : colors.primary} 
+                      />
+                    </View>
+                  )}
+                  <View style={styles.amountText}>
+                    <Text style={[styles.amount, { color: isIncome ? '#4CAF50' : colors.text }]}>
+                      {isIncome ? '+' : '-'}{amount}
+                    </Text>
+                    <Text style={[styles.categoryName, { color: colors.textSecondary }]}>
+                      {isTransfer ? (
+                        t('transactions.transfer')
+                      ) : debtType ? (
+                        debtType === 'give' ? 'Дал в долг' :
+                        debtType === 'return' ? 'Получил долг' :
+                        debtType === 'borrow' ? 'Взял в долг' :
+                        'Вернул долг'
+                      ) : (category?.name || (isIncome ? t('transactions.income') : t('transactions.expense')))}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-          {/* Действия */}
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleEdit}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="pencil-outline" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.actionTextContainer}>
-                <Text style={[styles.actionTitle, { color: colors.text }]}>
-                  Редактировать
-                </Text>
-                <Text style={[styles.actionDescription, { color: colors.textSecondary }]}>
-                  Изменить детали транзакции
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+              {/* Детальная информация */}
+              <View style={styles.details}>
+                {/* Описание */}
+                {displayDescription && (
+                  <View style={styles.detailRow}>
+                    <View style={[styles.detailIcon, { backgroundColor: colors.background }]}>
+                      <Ionicons name="document-text-outline" size={20} color={colors.textSecondary} />
+                    </View>
+                    <View style={styles.detailContent}>
+                      <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Описание</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]}>{displayDescription}</Text>
+                    </View>
+                  </View>
+                )}
 
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleDelete}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: '#F44336' + '20' }]}>
-                <Ionicons name="trash-outline" size={20} color="#F44336" />
+                {/* Счет */}
+                <View style={styles.detailRow}>
+                  <View style={[styles.detailIcon, { backgroundColor: colors.background }]}>
+                    <Ionicons name="wallet-outline" size={20} color={colors.textSecondary} />
+                  </View>
+                  <View style={styles.detailContent}>
+                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Счёт</Text>
+                    <Text style={[styles.detailValue, { color: colors.text }]}>
+                      {account?.name || 'Неизвестный счёт'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Дата */}
+                <View style={styles.detailRow}>
+                  <View style={[styles.detailIcon, { backgroundColor: colors.background }]}>
+                    <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
+                  </View>
+                  <View style={styles.detailContent}>
+                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Дата</Text>
+                    <Text style={[styles.detailValue, { color: colors.text }]}>
+                      {formatDate(transactionDate)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Время */}
+                <View style={styles.detailRow}>
+                  <View style={[styles.detailIcon, { backgroundColor: colors.background }]}>
+                    <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
+                  </View>
+                  <View style={styles.detailContent}>
+                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Время</Text>
+                    <Text style={[styles.detailValue, { color: colors.text }]}>
+                      {formatTime(transactionDate)}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.actionTextContainer}>
-                <Text style={[styles.actionTitle, { color: colors.text }]}>
-                  Удалить
-                </Text>
-                <Text style={[styles.actionDescription, { color: colors.textSecondary }]}>
-                  Удалить транзакцию безвозвратно
-                </Text>
+
+              {/* Действия */}
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                  onPress={handleEdit}
+                >
+                  <Ionicons name="pencil" size={20} color="#fff" />
+                  <Text style={styles.actionButtonText}>Редактировать</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: '#FF3B30' }]}
+                  onPress={handleDelete}
+                >
+                  <Ionicons name="trash" size={20} color="#fff" />
+                  <Text style={styles.actionButtonText}>Удалить</Text>
+                </TouchableOpacity>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
+            </ScrollView>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
@@ -160,76 +272,81 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: 'transparent',
   },
   container: {
-    width: '100%',
-    borderRadius: 16,
-    padding: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: 20,
+    maxHeight: '85%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowRadius: 5,
     elevation: 5,
   },
-  header: {
-    marginBottom: 16,
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 8,
   },
-  headerTop: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  transactionInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
   },
   closeButton: {
     padding: 4,
-    marginLeft: 8,
-    marginTop: -4,
-    marginRight: -4,
+  },
+  mainInfo: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  amountSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   categoryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
-  transactionDetails: {
+  amountText: {
     flex: 1,
+  },
+  amount: {
+    fontSize: 32,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   categoryName: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
   },
-  description: {
-    fontSize: 14,
+  details: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
-  amount: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  divider: {
-    height: 1,
-    marginBottom: 16,
-  },
-  actions: {
-    // gap не поддерживается, используем marginBottom для элементов
-  },
-  actionButton: {
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  actionIcon: {
+  detailIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -237,15 +354,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  actionTextContainer: {
+  detailContent: {
     flex: 1,
   },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+  detailLabel: {
+    fontSize: 12,
     marginBottom: 2,
   },
-  actionDescription: {
-    fontSize: 13,
+  detailValue: {
+    fontSize: 16,
+  },
+  actions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 
