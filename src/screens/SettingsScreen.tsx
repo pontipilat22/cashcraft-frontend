@@ -322,7 +322,7 @@ export const SettingsScreen: React.FC = () => {
             'shield-checkmark-outline',
             t('settings.privacyPolicy'),
             undefined,
-            () => {}
+            () => (navigation as any).navigate('PrivacyPolicy')
           )}
           
           {renderSettingItem(

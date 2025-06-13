@@ -74,13 +74,7 @@ export const MoreScreen: React.FC = () => {
       id: 'help',
       title: t('common.help'),
       icon: 'help-circle-outline',
-      onPress: () => {
-        Alert.alert(
-          t('common.help'),
-          t('common.featureNotAvailable') || 'Эта функция пока не доступна',
-          [{ text: t('common.ok') || 'OK', style: 'default' }]
-        );
-      },
+      onPress: () => navigation.navigate('Help'),
     },
   ];
 

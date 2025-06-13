@@ -268,4 +268,39 @@ export default {
     paybackDebt: 'Rembourser une dette',
     paybackDebtDescription: 'Rembourser une dette à quelqu\'un',
   },
+  privacy: {
+    title: 'Privacy Policy',
+    appName: 'Application: Cashcraft',
+    version: 'Version: 1.0',
+    lastUpdated: 'Last updated: June 12, 2025',
+    intro: 'Cashcraft application (hereinafter referred to as the "Application") respects user privacy. Below is described what data is collected, how it is used and stored.',
+    section1: {
+      title: 'What data we collect',
+      content: 'The Application may collect the following information:\n\n• Email address and username (when logging in via Google)\n• Financial data that the user enters independently (income, expenses, transactions)\n\nThe developer does not have access to the content of the entered financial data.',
+    },
+    section2: {
+      title: 'Where data is stored',
+      content: 'User data is stored:\n\n• Locally on the device (in SQLite database)\n• In Firebase cloud database (for authorization and synchronization)',
+    },
+    section3: {
+      title: 'Data transfer to third parties',
+      content: 'The Application does not transfer or sell personal data to third parties.',
+    },
+    section4: {
+      title: 'Data deletion',
+      content: 'Currently, automatic data deletion is not provided. The deletion feature may be added in future updates.',
+    },
+    section5: {
+      title: 'Data security',
+      content: 'Data is protected by standard Firebase and SQLite tools. Additional data encryption is not yet implemented.',
+    },
+    section6: {
+      title: 'Advertising and analytics',
+      content: 'The Application does not use advertising and does not connect third-party analytics.',
+    },
+    section7: {
+      title: 'Contacts',
+      content: 'If you have questions about privacy or a request to delete data, please contact us:',
+    },
+  },
 }; 
