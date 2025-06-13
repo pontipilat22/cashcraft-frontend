@@ -20,6 +20,8 @@ interface TransactionItemProps {
   account?: Account;
   onPress?: () => void;
   onLongPress?: () => void;
+  isSelected?: boolean;
+  isSelectionMode?: boolean;
 }
 
 const TransactionItemComponent: React.FC<TransactionItemProps> = ({ 
@@ -28,6 +30,8 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
   account,
   onPress,
   onLongPress,
+  isSelected = false,
+  isSelectionMode = false,
 }) => {
   const { colors } = useTheme();
   const { defaultCurrency } = useCurrency();
@@ -122,9 +126,9 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
         style={[
           styles.content,
           { 
-            backgroundColor: isLongPressed ? colors.primary + '20' : colors.card,
-            borderColor: isLongPressed ? colors.primary : colors.border,
-            borderWidth: isLongPressed ? 1 : 0,
+            backgroundColor: isSelected ? colors.primary + '20' : isLongPressed ? colors.primary + '10' : colors.card,
+            borderColor: isSelected ? colors.primary : isLongPressed ? colors.primary : colors.border,
+            borderWidth: isSelected || isLongPressed ? 1.5 : 0,
           }
         ]}
         onPress={onPress}
@@ -134,7 +138,17 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
         delayLongPress={500}
       >
         <View style={styles.leftSection}>
-          {isTransferTransaction ? (
+          {isSelectionMode ? (
+            <View style={[styles.categoryIcon, { 
+              backgroundColor: isSelected ? colors.primary : colors.card,
+              borderWidth: isSelected ? 0 : 1,
+              borderColor: colors.border,
+            }]}>
+              {isSelected && (
+                <Ionicons name="checkmark" size={24} color="#fff" />
+              )}
+            </View>
+          ) : isTransferTransaction ? (
             <View style={[styles.categoryIcon, { backgroundColor: '#2196F3' + '20' }]}>
               <Ionicons name="swap-horizontal" size={24} color="#2196F3" />
             </View>

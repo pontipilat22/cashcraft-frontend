@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   InteractionManager,
+  ScrollView,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
@@ -61,6 +62,13 @@ export const TransactionsScreen = () => {
   const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
   const [showDebtTypeSelector, setShowDebtTypeSelector] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  
+  // Состояния для режима выделения
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // Состояния для фильтра по дням
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
 
   // Используем debounce для поиска
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -79,6 +87,36 @@ export const TransactionsScreen = () => {
     }
 
     let result = [...transactions];
+    
+    // Фильтрация по дате
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const monthAgo = new Date(today);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      
+      result = result.filter(transaction => {
+        const transactionDate = new Date(transaction.date);
+        const transactionDateOnly = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
+        
+        switch (dateFilter) {
+          case 'today':
+            return transactionDateOnly.getTime() === today.getTime();
+          case 'yesterday':
+            return transactionDateOnly.getTime() === yesterday.getTime();
+          case 'week':
+            return transactionDate >= weekAgo;
+          case 'month':
+            return transactionDate >= monthAgo;
+          default:
+            return true;
+        }
+      });
+    }
     
     // Объединяем парные транзакции переводов
     const transferPairs = new Map<string, Transaction[]>();
@@ -139,7 +177,7 @@ export const TransactionsScreen = () => {
     }
     
     return result;
-  }, [transactions, debouncedSearchQuery, categories, accounts]);
+  }, [transactions, debouncedSearchQuery, categories, accounts, dateFilter]);
 
   // Группировка транзакций по дням
   const groupedTransactions = useMemo(() => {
@@ -177,9 +215,70 @@ export const TransactionsScreen = () => {
   }, [filteredTransactions, t, currentLanguage]);
 
   const handleLongPress = useCallback((transaction: Transaction) => {
-    setSelectedTransaction(transaction);
-    setShowActionsModal(true);
+    if (isSelectionMode) {
+      toggleTransactionSelection(transaction.id);
+    } else {
+      setSelectedTransaction(transaction);
+      setShowActionsModal(true);
+    }
+  }, [isSelectionMode]);
+  
+  const toggleTransactionSelection = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
   }, []);
+  
+  const handleTransactionPress = useCallback((transaction: Transaction) => {
+    if (isSelectionMode) {
+      toggleTransactionSelection(transaction.id);
+    }
+  }, [isSelectionMode, toggleTransactionSelection]);
+  
+  const enterSelectionMode = useCallback(() => {
+    setIsSelectionMode(true);
+    setSelectedIds(new Set());
+  }, []);
+  
+  const exitSelectionMode = useCallback(() => {
+    setIsSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+  
+  const deleteSelectedTransactions = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    
+    Alert.alert(
+      t('transactions.deleteTransaction'),
+      `${t('transactions.deleteSelectedConfirm')} (${selectedIds.size})?`,
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              for (const id of selectedIds) {
+                await deleteTransaction(id);
+              }
+              exitSelectionMode();
+            } catch (error) {
+              console.error('Error deleting transactions:', error);
+            }
+          },
+        },
+      ]
+    );
+  }, [selectedIds, t, deleteTransaction, exitSelectionMode]);
 
   const handleEdit = useCallback(() => {
     setShowEditModal(true);
@@ -240,23 +339,88 @@ export const TransactionsScreen = () => {
 
   const renderHeader = useCallback(() => (
     <View>
-      <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
-        <Ionicons name="search" size={20} color={colors.textSecondary} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder={t('transactions.searchPlaceholder')}
-          placeholderTextColor={colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={clearSearch}>
-            <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+      <View style={styles.headerWrapper}>
+        <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder={t('transactions.searchPlaceholder')}
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch}>
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {!isSelectionMode ? (
+          <TouchableOpacity
+            style={[styles.deleteButton, { backgroundColor: colors.card }]}
+            onPress={enterSelectionMode}
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.text} />
           </TouchableOpacity>
+        ) : (
+          <View style={styles.selectionActions}>
+            <TouchableOpacity
+              style={[styles.selectionButton, { backgroundColor: colors.card }]}
+              onPress={exitSelectionMode}
+            >
+              <Ionicons name="close" size={20} color={colors.text} />
+            </TouchableOpacity>
+            {selectedIds.size > 0 && (
+              <TouchableOpacity
+                style={[styles.selectionButton, { backgroundColor: colors.danger || '#FF3B30' }]}
+                onPress={deleteSelectedTransactions}
+              >
+                <Ionicons name="trash" size={20} color="#fff" />
+                <Text style={styles.deleteCount}>{selectedIds.size}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
       </View>
+      
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterContainer}
+        contentContainerStyle={styles.filterContent}
+      >
+        {[
+          { key: 'all', label: t('transactions.allTransactions') },
+          { key: 'today', label: t('transactions.todayTransactions') },
+          { key: 'yesterday', label: t('transactions.yesterdayTransactions') },
+          { key: 'week', label: t('transactions.weekTransactions') },
+          { key: 'month', label: t('transactions.monthTransactions') },
+        ].map(filter => (
+          <TouchableOpacity
+            key={filter.key}
+            style={[
+              styles.filterButton,
+              { 
+                backgroundColor: dateFilter === filter.key ? colors.primary : colors.card,
+                borderColor: dateFilter === filter.key ? colors.primary : colors.border,
+              }
+            ]}
+            onPress={() => setDateFilter(filter.key as any)}
+          >
+            <Text
+              style={[
+                styles.filterText,
+                { color: dateFilter === filter.key ? '#fff' : colors.text }
+              ]}
+            >
+              {filter.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </View>
-  ), [colors, t, searchQuery, clearSearch]);
+  ), [colors, t, searchQuery, clearSearch, isSelectionMode, enterSelectionMode, exitSelectionMode, selectedIds.size, deleteSelectedTransactions, dateFilter]);
 
   const renderSectionHeader = useCallback(({ section }: { section: any }) => {
     return <SectionHeader title={section.title} data={section.data} />;
@@ -272,9 +436,12 @@ export const TransactionsScreen = () => {
         category={category}
         account={account}
         onLongPress={() => handleLongPress(item)}
+        onPress={() => handleTransactionPress(item)}
+        isSelected={selectedIds.has(item.id)}
+        isSelectionMode={isSelectionMode}
       />
     );
-  }, [categories, accounts, handleLongPress]);
+  }, [categories, accounts, handleLongPress, handleTransactionPress, selectedIds, isSelectionMode]);
 
   const ListEmptyComponent = useMemo(() => (
     <View style={styles.emptyContainer}>
@@ -327,12 +494,14 @@ export const TransactionsScreen = () => {
         }, [])}
       />
 
-      <FABMenu
-        onIncomePress={handleQuickIncome}
-        onExpensePress={handleQuickExpense}
-        onDebtPress={handleQuickDebt}
-        onTransferPress={handleQuickTransfer}
-      />
+      {!isSelectionMode && (
+        <FABMenu
+          onIncomePress={handleQuickIncome}
+          onExpensePress={handleQuickExpense}
+          onDebtPress={handleQuickDebt}
+          onTransferPress={handleQuickTransfer}
+        />
+      )}
 
       {showAddModal && (
         <AddTransactionModal
@@ -403,10 +572,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 8,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 16,
+    flex: 1,
+    marginVertical: 8,
     padding: 12,
     borderRadius: 12,
   },
@@ -414,6 +590,52 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 16,
+  },
+  deleteButton: {
+    padding: 12,
+    borderRadius: 12,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectionActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  selectionButton: {
+    padding: 12,
+    borderRadius: 12,
+    minWidth: 44,
+    height: 44,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  deleteCount: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  filterContent: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  filterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  filterText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   emptyContainer: {
     alignItems: 'center',

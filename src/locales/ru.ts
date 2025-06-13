@@ -166,6 +166,14 @@ export default {
     changeSearchQuery: 'Попробуйте изменить поисковый запрос',
     addFirstTransaction: 'Добавьте первую транзакцию',
     noExchangeRate: 'Не найден курс обмена между {{from}} и {{to}}. Пожалуйста, настройте курсы валют в Настройках.',
+    // Date filters
+    allTransactions: 'Все',
+    todayTransactions: 'Сегодня',
+    yesterdayTransactions: 'Вчера', 
+    weekTransactions: 'Неделя',
+    monthTransactions: 'Месяц',
+    deleteSelectedConfirm: 'Удалить выбранные транзакции',
+    selectedCount: 'Выбрано',
   },
   categories: {
     // Income categories
