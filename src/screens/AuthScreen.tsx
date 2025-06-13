@@ -22,6 +22,7 @@ import { useLocalization } from '../context/LocalizationContext';
 import { ForgotPasswordModal } from '../components/ForgotPasswordModal';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FirebaseAuthService } from '../services/firebaseAuth';
 
 export const AuthScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
@@ -367,7 +368,22 @@ export const AuthScreen: React.FC = () => {
               </View>
 
               <GoogleSignInButton
+                onSuccess={async (idToken) => {
+                  try {
+                    console.log('Google OAuth success, idToken received:', idToken ? 'YES' : 'NO');
+                    console.log('Calling FirebaseAuthService.loginWithGoogle...');
+                    
+                    const user = await FirebaseAuthService.loginWithGoogle(idToken);
+                    console.log('Firebase login successful:', user.uid);
+                    
+                    // Успешный вход будет обработан в AuthContext
+                  } catch (error) {
+                    console.error('Firebase login error:', error);
+                    Alert.alert(t('common.error'), (error as Error).message || t('auth.loginError'));
+                  }
+                }}
                 onError={(error) => {
+                  console.error('Google OAuth error:', error);
                   Alert.alert(t('common.error'), error.message || t('auth.loginError'));
                 }}
               />

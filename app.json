@@ -20,8 +20,15 @@
     "ios": {
       "supportsTablet": true,
       "usesAppleSignIn": true,
-      "bundleIdentifier": "com.cashcraft.app",
+      "bundleIdentifier": "com.pontipilat.cashcraft",
       "buildNumber": "1",
+      "scheme": "cashcraft",
+      "googleServicesFile": "./client_475144195261-346cm50h6alcj4fpberfl041eno4v9tv.apps.googleusercontent.com.plist",
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "com.googleusercontent.apps.475144195261-346cm50h6alcj4fpberfl041eno4v9tv"
+        }
+      },
       "splash": {
         "image": "./assets/splash-icon.png",
         "resizeMode": "contain",
@@ -33,9 +40,25 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.cashcraft.app",
+      "package": "com.pontipilat.cashcraft",
       "versionCode": 1,
       "edgeToEdgeEnabled": true,
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "cashcraft"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "splash": {
         "image": "./assets/splash-icon.png",
         "resizeMode": "contain",
@@ -44,6 +67,18 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "@react-native-google-signin/google-signin"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "993876aa-d5bf-411d-b069-94f585de32af"
+      },
+      "googleWebClientId": "475144195261-1q3uevggnhrpjqrs1ie0ks0knsvggrqt.apps.googleusercontent.com",
+      "googleAndroidClientId": "475144195261-upfj9sfdrba6gm972tc26eg9dp8s4419.apps.googleusercontent.com",
+      "googleIosClientId": "475144195261-346cm50h6alcj4fpberfl041eno4v9tv.apps.googleusercontent.com",
+      "scheme": "cashcraft"
     }
   }
 }

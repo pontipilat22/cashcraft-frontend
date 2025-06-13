@@ -1,53 +1,80 @@
-import React, { useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import React from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { Platform, Pressable, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
-import { FirebaseAuthService } from '../services/firebaseAuth';
+import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { auth } from '../../firebase/firebaseConfig';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
-interface GoogleSignInButtonProps {
-  onSuccess?: () => void;
-  onError?: (error: Error) => void;
+// Получаем ID из environment переменных или expo config
+const ids = {
+  googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || Constants.expoConfig?.extra?.googleAndroidClientId || '',
+  googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || Constants.expoConfig?.extra?.googleIosClientId || '',
+  googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || Constants.expoConfig?.extra?.googleWebClientId || '',
+};
+
+export interface GoogleSignInButtonProps {
+  onSuccess?: (idToken: string) => void;
+  onError?: (error: { message?: string } | Error) => void;
 }
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
   const [loading, setLoading] = React.useState(false);
-  
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: '475144195261-2vh6s9mj56shkphsg7kdv76vr3ks132m.apps.googleusercontent.com',
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: Platform.select({
+      android: ids.googleAndroidClientId,
+      ios:     ids.googleIosClientId,
+      default: ids.googleWebClientId,
+    }),
+    scopes: ['openid', 'profile', 'email'],
   });
 
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      handleGoogleSignIn(id_token);
-    }
-  }, [response]);
+  // Логирование для отладки
+  console.log('Platform:', Platform.OS);
+  console.log('Client ID:', Platform.select({
+    android: ids.googleAndroidClientId,
+    ios: ids.googleIosClientId,
+    default: ids.googleWebClientId,
+  }));
+  console.log('App ownership →', Constants.appOwnership); // guest | standalone | expo
 
-  const handleGoogleSignIn = async (idToken: string) => {
-    setLoading(true);
-    try {
-      await FirebaseAuthService.loginWithGoogle(idToken);
-      onSuccess?.();
-    } catch (error) {
-      onError?.(error as Error);
-    } finally {
-      setLoading(false);
+  React.useEffect(() => {
+    if (response?.type === 'success') {
+      setLoading(true);
+      const { id_token, access_token } = response.params;
+      const cred = GoogleAuthProvider.credential(id_token, access_token);
+      signInWithCredential(auth, cred)
+        .then(() => {
+          onSuccess?.(id_token || '');
+        })
+        .catch((error) => {
+          console.error('Firebase auth error:', error);
+          onError?.(error);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } else if (response?.type === 'error') {
+      onError?.(response.error || new Error('Google authentication failed'));
     }
-  };
+  }, [response, onSuccess, onError]);
 
   return (
-    <TouchableOpacity
-      style={[styles.button, { backgroundColor: '#fff', borderColor: colors.border }]}
-      onPress={() => promptAsync()}
+    <Pressable
       disabled={!request || loading}
-      activeOpacity={0.8}
+      onPress={() => {
+        console.log('Google Sign In button pressed');
+        promptAsync();
+      }}
+      style={[styles.button, { backgroundColor: '#fff', borderColor: colors.border }]}
     >
       {loading ? (
         <ActivityIndicator size="small" color="#4285F4" />
@@ -57,7 +84,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
           <Text style={[styles.text, { color: '#000' }]}>{t('auth.loginWithGoogle')}</Text>
         </View>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
@@ -82,4 +109,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-}); 
+});
