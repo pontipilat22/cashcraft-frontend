@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 0,
+    paddingBottom: 8,
     gap: 8,
   },
   searchContainer: {

@@ -144,7 +144,10 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+            >
               {/* Основная информация */}
               <View style={styles.mainInfo}>
                 <View style={styles.amountSection}>
@@ -276,13 +279,13 @@ const styles = StyleSheet.create({
   },
   bottomSheet: {
     backgroundColor: 'transparent',
+    maxHeight: '95%',
   },
   container: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 8,
-    paddingBottom: 20,
-    maxHeight: '85%',
+    backgroundColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
@@ -367,6 +370,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     paddingHorizontal: 20,
+    paddingBottom: 30,
     gap: 12,
   },
   actionButton: {
