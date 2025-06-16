@@ -9,10 +9,10 @@ const getApiBaseUrl = () => {
     if (Platform.OS === 'android') {
       // Android - используем IP адрес компьютера
       // ВАЖНО: Замените на ваш IP адрес!
-      return 'http://192.168.2.100:3000/api/v1';
+      return 'http://192.168.2.100:3001/api';
     } else {
       // iOS - тоже используем IP адрес для физических устройств
-      return 'http://192.168.2.100:3000/api/v1';
+      return 'http://192.168.2.100:3001/api';
     }
   } else {
     // Production

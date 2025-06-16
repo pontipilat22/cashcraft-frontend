@@ -20,6 +20,7 @@ import { Transaction } from '../types';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 import { CURRENCIES } from '../config/currencies';
 import { LocalDatabaseService } from '../services/localDatabase';
+import { AddCategoryModal } from './AddCategoryModal';
 
 interface EditTransactionModalProps {
   visible: boolean;
@@ -46,6 +47,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   
   // Проверяем, является ли транзакция переводом
   const isTransfer = transaction && (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
@@ -577,6 +579,27 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                   </TouchableOpacity>
                 );
               })}
+              
+              {/* Кнопка добавления новой категории */}
+              <TouchableOpacity
+                style={[styles.categoryPickerItem, { 
+                  backgroundColor: colors.background,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.border,
+                  marginTop: 8,
+                }]}
+                onPress={() => {
+                  setShowCategoryPicker(false);
+                  setShowAddCategoryModal(true);
+                }}
+              >
+                <View style={[styles.categoryIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <Ionicons name="add" size={20} color={colors.primary} />
+                </View>
+                <Text style={[styles.pickerItemText, { color: colors.primary, fontWeight: '600' }]}>
+                  {t('categories.addCategory')}
+                </Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -670,6 +693,12 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <AddCategoryModal
+        visible={showAddCategoryModal}
+        type={isIncome ? 'income' : 'expense'}
+        onClose={() => setShowAddCategoryModal(false)}
+      />
     </Modal>
   );
 };

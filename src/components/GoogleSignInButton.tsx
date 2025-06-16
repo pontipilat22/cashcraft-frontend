@@ -42,6 +42,8 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     // Скоупы для получения данных пользователя
     scopes: ['profile', 'email'],
+    // Для build версии важно получить ID token
+    // responseType: 'id_token', // Раскомментируйте для build версии
     // Для веб-версии указываем redirect URI
     ...(Platform.OS === 'web' && {
       redirectUri: `${window.location.origin}/`,
@@ -59,22 +61,46 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     if (response?.type === 'success') {
       setLoading(true);
       try {
-        const { authentication } = response;
+        const { authentication, params } = response;
         
-        // Получаем информацию о пользователе
-        const userInfoResponse = await fetch(
-          `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${authentication?.accessToken}`
-        );
-        
-        const userInfo = await userInfoResponse.json();
-        
-        // Вызываем метод входа через Google
-        await loginWithGoogle({
-          idToken: authentication?.idToken || '',
-          email: userInfo.email,
-          name: userInfo.name,
-          googleId: userInfo.id,
-        });
+        // Для build версии с ID token
+        if (params?.id_token) {
+          // Декодируем JWT токен для получения информации о пользователе
+          const base64Url = params.id_token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split('')
+              .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+              .join('')
+          );
+          
+          const userInfo = JSON.parse(jsonPayload);
+          
+          await loginWithGoogle({
+            idToken: params.id_token,
+            email: userInfo.email,
+            name: userInfo.name,
+            googleId: userInfo.sub,
+          });
+        } 
+        // Для Expo Go с access token
+        else if (authentication?.accessToken) {
+          const userInfoResponse = await fetch(
+            `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${authentication.accessToken}`
+          );
+          
+          const userInfo = await userInfoResponse.json();
+          
+          await loginWithGoogle({
+            idToken: authentication.idToken || '',
+            email: userInfo.email,
+            name: userInfo.name,
+            googleId: userInfo.id,
+          });
+        } else {
+          throw new Error('No authentication data received');
+        }
         
         onSuccess?.();
       } catch (error) {
@@ -91,11 +117,21 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   const handlePress = () => {
     console.log('Google Sign-In button pressed');
     console.log('Request state:', request);
+    console.log('Web Client ID:', process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID);
+    console.log('Android Client ID:', process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID);
+    console.log('iOS Client ID:', process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
     
     if (!request) {
       console.error('Request is null - Google Sign-In not configured properly');
       onError?.(new Error('Google Sign-In is not configured properly'));
-      alert('Google Sign-In не настроен правильно.\n\nПроверьте:\n1. Redirect URI в Google Console\n2. Client ID в коде\n3. Owner в app.json');
+      alert(
+        'Google Sign-In не настроен правильно.\n\n' +
+        'Для build версии проверьте:\n' +
+        '1. SHA-1 fingerprint в Google Console\n' +
+        '2. Client ID в файле .env\n' +
+        '3. google-services.json актуален\n' +
+        '4. Package name: com.pontipilat.cashcraft'
+      );
       return;
     }
     

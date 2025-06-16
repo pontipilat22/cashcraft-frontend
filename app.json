@@ -75,8 +75,8 @@
       "eas": {
         "projectId": "993876aa-d5bf-411d-b069-94f585de32af"
       },
-      "googleWebClientId": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
-      "googleAndroidClientId": "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+      "googleWebClientId": "457720015497-gkarur46ep22kptgra8qm4v58r686jab.apps.googleusercontent.com",
+      "googleAndroidClientId": "457720015497-phj9gjn84anqsnoufvv6bro3ca9oud03.apps.googleusercontent.com",
       "googleIosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
       "scheme": "cashcraft"
     }

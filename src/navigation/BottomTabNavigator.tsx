@@ -114,6 +114,7 @@ const styles = StyleSheet.create({
   balanceHeader: {
     alignItems: 'flex-start',
     paddingHorizontal: 16,
+    paddingTop: 15,
   },
   balanceLabel: {
     fontSize: 12,
