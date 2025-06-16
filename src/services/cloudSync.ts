@@ -8,6 +8,7 @@ interface CloudData {
   transactions: Transaction[];
   categories: Category[];
   debts: Debt[];
+  exchangeRates: any[]; // Добавляем курсы валют
   lastSyncAt: string;
   userId: string;
 }
@@ -66,6 +67,7 @@ export class CloudSyncService {
             transactions: localData.transactions,
             categories: localData.categories,
             debts: localData.debts,
+            exchangeRates: localData.exchangeRates,
             lastSyncAt: new Date().toISOString(),
             userId,
           });
@@ -76,6 +78,7 @@ export class CloudSyncService {
             transactions: localData.transactions,
             categories: localData.categories,
             debts: localData.debts,
+            exchangeRates: localData.exchangeRates,
             lastSyncAt: new Date().toISOString(),
             userId,
           };
@@ -88,7 +91,7 @@ export class CloudSyncService {
         await this.markDataAsSynced(localData);
         
         // Обновляем время синхронизации
-        await LocalDatabaseService.updateSyncTime(cloudData.lastSyncAt);
+        await LocalDatabaseService.updateSyncTime(new Date().toISOString());
         
         return true;
       } else {
@@ -182,6 +185,7 @@ export class CloudSyncService {
       transactions: [],
       categories: [],
       debts: [],
+      exchangeRates: [],
       lastSyncAt: newData.lastSyncAt,
       userId: newData.userId,
     };
@@ -232,6 +236,9 @@ export class CloudSyncService {
     });
     merged.debts = Array.from(debtsMap.values());
 
+    // Мержим курсы валют
+    merged.exchangeRates = [...existing.exchangeRates, ...newData.exchangeRates];
+
     return merged;
   }
 
@@ -240,11 +247,13 @@ export class CloudSyncService {
     transactions: Transaction[];
     categories: Category[];
     debts: Debt[];
+    exchangeRates: any[];
   }): Promise<void> {
     await LocalDatabaseService.markAsSynced('accounts', data.accounts.map(a => a.id));
     await LocalDatabaseService.markAsSynced('transactions', data.transactions.map(t => t.id));
     await LocalDatabaseService.markAsSynced('categories', data.categories.map(c => c.id));
     await LocalDatabaseService.markAsSynced('debts', data.debts.map(d => d.id));
+    // Курсы валют не требуют пометки как синхронизированные
   }
 
   private static async applyCloudChanges(changes: any): Promise<void> {
@@ -289,6 +298,15 @@ export class CloudSyncService {
         await LocalDatabaseService.createDebt(debtData);
       } catch (error) {
         console.error('Error importing debt:', error);
+      }
+    }
+
+    // Импортируем курсы валют
+    if (cloudData.exchangeRates && cloudData.exchangeRates.length > 0) {
+      try {
+        await LocalDatabaseService.saveExchangeRatesFromSync(cloudData.exchangeRates);
+      } catch (error) {
+        console.error('Error importing exchange rates:', error);
       }
     }
   }

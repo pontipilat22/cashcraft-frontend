@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
   View,
@@ -50,6 +50,31 @@ export const SettingsScreen: React.FC = () => {
   const [showExchangeRatesManager, setShowExchangeRatesManager] = useState(false);
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({});
   const [newCurrency, setNewCurrency] = useState(defaultCurrency);
+  const [isAutoMode, setIsAutoMode] = useState(false);
+
+  // Загружаем режим курсов при монтировании
+  useEffect(() => {
+    const loadExchangeRatesMode = async () => {
+      try {
+        const mode = await LocalDatabaseService.getExchangeRatesMode();
+        setIsAutoMode(mode === 'auto');
+      } catch (error) {
+        console.error('Error loading exchange rates mode:', error);
+      }
+    };
+    
+    const preloadExchangeRates = async () => {
+      try {
+        // Предзагружаем курсы валют для мгновенного открытия модального окна
+        await LocalDatabaseService.getAllExchangeRates();
+      } catch (error) {
+        console.error('Error preloading exchange rates:', error);
+      }
+    };
+    
+    loadExchangeRatesMode();
+    preloadExchangeRates();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -72,36 +97,35 @@ export const SettingsScreen: React.FC = () => {
       setNewCurrency(currencyCode);
       const rates: ExchangeRates = {};
       
-      // Загружаем сохраненные курсы и рассчитываем предлагаемые
+      // Быстро загружаем текущие курсы без сложных вычислений
       for (const account of accountsInOtherCurrencies) {
         const accountCurrency = account.currency || defaultCurrency;
         
-        // Пытаемся найти сохраненный курс
-        let suggestedRate = await LocalDatabaseService.getExchangeRate(accountCurrency, currencyCode);
-        
-        // Если нет прямого курса, пытаемся найти через текущую валюту
-        if (!suggestedRate) {
-          suggestedRate = await LocalDatabaseService.calculateCrossRate(
-            accountCurrency, 
-            currencyCode, 
-            defaultCurrency
-          );
-        }
-        
-        // Если у счета есть текущий курс к основной валюте, используем его для расчета
-        if (!suggestedRate && 'exchangeRate' in account && (account as any).exchangeRate) {
-          const currentToDefault = (account as any).exchangeRate;
-          const defaultToNew = await LocalDatabaseService.getExchangeRate(defaultCurrency, currencyCode);
-          if (defaultToNew) {
-            suggestedRate = currentToDefault * defaultToNew;
+        // Используем существующий курс из счета
+        let currentRate = 1;
+        if ('exchangeRate' in account && (account as any).exchangeRate > 0) {
+          currentRate = (account as any).exchangeRate;
+          
+          // Если валюта по умолчанию меняется, пересчитываем курс
+          if (defaultCurrency !== currencyCode) {
+            const defaultToNew = await LocalDatabaseService.getLocalExchangeRate(defaultCurrency, currencyCode);
+            if (defaultToNew && defaultToNew > 0) {
+              currentRate = currentRate * defaultToNew;
+            }
+          }
+        } else {
+          // Если курса в счете нет, проверяем базу
+          const savedRate = await LocalDatabaseService.getLocalExchangeRate(accountCurrency, currencyCode);
+          if (savedRate && savedRate > 0) {
+            currentRate = savedRate;
           }
         }
         
         rates[account.id] = {
           name: account.name,
           currency: accountCurrency,
-          rate: suggestedRate || 1,
-          suggestedRate: suggestedRate || undefined,
+          rate: currentRate,
+          suggestedRate: undefined,
           isModified: false
         };
       }
@@ -278,7 +302,7 @@ export const SettingsScreen: React.FC = () => {
           {renderSettingItem(
             'calculator-outline',
             t('settings.exchangeRates'),
-            undefined,
+            isAutoMode ? t('settings.autoMode') : t('settings.manualMode'),
             () => setShowExchangeRatesManager(true)
           )}
           
@@ -572,7 +596,16 @@ export const SettingsScreen: React.FC = () => {
       {/* Exchange Rates Manager */}
       <ExchangeRatesManager
         visible={showExchangeRatesManager}
-        onClose={() => setShowExchangeRatesManager(false)}
+        onClose={async () => {
+          setShowExchangeRatesManager(false);
+          // Обновляем режим после закрытия
+          try {
+            const mode = await LocalDatabaseService.getExchangeRatesMode();
+            setIsAutoMode(mode === 'auto');
+          } catch (error) {
+            console.error('Error updating exchange rates mode:', error);
+          }
+        }}
       />
     </SafeAreaView>
   );

@@ -1,90 +1,127 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { 
+  TouchableOpacity, 
+  Text, 
+  StyleSheet, 
+  View, 
+  ActivityIndicator,
+  Image,
+  Platform 
+} from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { Platform, Pressable, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { auth } from '../../firebase/firebaseConfig';
-import Constants from 'expo-constants';
 
+// Завершаем браузерную сессию для корректной работы на iOS
 WebBrowser.maybeCompleteAuthSession();
 
-// Получаем ID из environment переменных или expo config
-const ids = {
-  googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || Constants.expoConfig?.extra?.googleAndroidClientId || '',
-  googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || Constants.expoConfig?.extra?.googleIosClientId || '',
-  googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || Constants.expoConfig?.extra?.googleWebClientId || '',
-};
-
-export interface GoogleSignInButtonProps {
-  onSuccess?: (idToken: string) => void;
-  onError?: (error: { message?: string } | Error) => void;
+interface GoogleSignInButtonProps {
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
 }
 
-export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) => {
+export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ 
+  onSuccess,
+  onError 
+}) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { loginWithGoogle } = useAuth();
   const [loading, setLoading] = React.useState(false);
 
+  // Настройка Google OAuth
+  // ВАЖНО: Замените эти ID на ваши из Google Cloud Console
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: Platform.select({
-      android: ids.googleAndroidClientId,
-      ios:     ids.googleIosClientId,
-      default: ids.googleWebClientId,
+    // Для Expo Go используйте Web Client ID
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '457720015497-gkarur46ep22kptgra8qm4v58r686jab.apps.googleusercontent.com',
+    // Для Android (только для standalone приложения)
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '457720015497-phj9gjn84anqsnoufvv6bro3ca9oud03.apps.googleusercontent.com',
+    // Для iOS (только для standalone приложения)
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    // Скоупы для получения данных пользователя
+    scopes: ['profile', 'email'],
+    // Для веб-версии указываем redirect URI
+    ...(Platform.OS === 'web' && {
+      redirectUri: `${window.location.origin}/`,
     }),
-    scopes: ['openid', 'profile', 'email'],
   });
 
-  // Логирование для отладки
-  console.log('Platform:', Platform.OS);
-  console.log('Client ID:', Platform.select({
-    android: ids.googleAndroidClientId,
-    ios: ids.googleIosClientId,
-    default: ids.googleWebClientId,
-  }));
-  console.log('App ownership →', Constants.appOwnership); // guest | standalone | expo
+  useEffect(() => {
+    if (response) {
+      console.log('Google Auth Response:', response);
+    }
+    handleResponse();
+  }, [response]);
 
-  React.useEffect(() => {
+  const handleResponse = async () => {
     if (response?.type === 'success') {
       setLoading(true);
-      const { id_token, access_token } = response.params;
-      const cred = GoogleAuthProvider.credential(id_token, access_token);
-      signInWithCredential(auth, cred)
-        .then(() => {
-          onSuccess?.(id_token || '');
-        })
-        .catch((error) => {
-          console.error('Firebase auth error:', error);
-          onError?.(error);
-        })
-        .finally(() => {
-          setLoading(false);
+      try {
+        const { authentication } = response;
+        
+        // Получаем информацию о пользователе
+        const userInfoResponse = await fetch(
+          `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${authentication?.accessToken}`
+        );
+        
+        const userInfo = await userInfoResponse.json();
+        
+        // Вызываем метод входа через Google
+        await loginWithGoogle({
+          idToken: authentication?.idToken || '',
+          email: userInfo.email,
+          name: userInfo.name,
+          googleId: userInfo.id,
         });
+        
+        onSuccess?.();
+      } catch (error) {
+        console.error('Google sign in error:', error);
+        onError?.(error as Error);
+      } finally {
+        setLoading(false);
+      }
     } else if (response?.type === 'error') {
-      onError?.(response.error || new Error('Google authentication failed'));
+      onError?.(new Error(response.error?.message || 'Google sign in failed'));
     }
-  }, [response, onSuccess, onError]);
+  };
+
+  const handlePress = () => {
+    console.log('Google Sign-In button pressed');
+    console.log('Request state:', request);
+    
+    if (!request) {
+      console.error('Request is null - Google Sign-In not configured properly');
+      onError?.(new Error('Google Sign-In is not configured properly'));
+      alert('Google Sign-In не настроен правильно.\n\nПроверьте:\n1. Redirect URI в Google Console\n2. Client ID в коде\n3. Owner в app.json');
+      return;
+    }
+    
+    console.log('Calling promptAsync...');
+    promptAsync();
+  };
 
   return (
-    <Pressable
-      disabled={!request || loading}
-      onPress={() => {
-        console.log('Google Sign In button pressed');
-        promptAsync();
-      }}
-      style={[styles.button, { backgroundColor: '#fff', borderColor: colors.border }]}
+    <TouchableOpacity 
+      style={[styles.button, { backgroundColor: '#FFFFFF', borderColor: '#DADCE0' }]}
+      onPress={handlePress}
+      disabled={loading || !request}
     >
       {loading ? (
-        <ActivityIndicator size="small" color="#4285F4" />
+        <ActivityIndicator size="small" color="#5F6368" />
       ) : (
-        <View style={styles.content}>
-          <Ionicons name="logo-google" size={20} color="#4285F4" style={styles.icon} />
-          <Text style={[styles.text, { color: '#000' }]}>{t('auth.loginWithGoogle')}</Text>
-        </View>
+        <>
+          <View style={styles.googleLogoContainer}>
+            <Text style={styles.googleG}>G</Text>
+          </View>
+          <Text style={[styles.buttonText, { color: '#3C4043' }]}>
+            {t('auth.continueWithGoogle') || 'Continue with Google'}
+          </Text>
+        </>
       )}
-    </Pressable>
+    </TouchableOpacity>
   );
 };
 
@@ -93,20 +130,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    height: 50,
+    borderRadius: 12,
     borderWidth: 1,
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  content: {
-    flexDirection: 'row',
+  googleLogoContainer: {
+    width: 20,
+    height: 20,
+    marginRight: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 2,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  icon: {
-    marginRight: 8,
-  },
-  text: {
+  googleG: {
+    color: '#4285F4',
     fontSize: 16,
     fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

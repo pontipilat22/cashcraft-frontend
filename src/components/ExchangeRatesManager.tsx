@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Modal,
   View,
@@ -11,12 +11,18 @@ import {
   KeyboardAvoidingView,
   Alert,
   ActivityIndicator,
+  Switch,
+  Animated,
+  FlatList,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useData } from '../context/DataContext';
 import { LocalDatabaseService } from '../services/localDatabase';
+import { ExchangeRateService } from '../services/exchangeRate';
 import { CURRENCIES } from '../config/currencies';
 
 interface ExchangeRatesManagerProps {
@@ -29,6 +35,7 @@ interface ExchangeRate {
   toCurrency: string;
   rate: number;
   isEditing?: boolean;
+  editValue?: string;
 }
 
 export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
@@ -38,380 +45,570 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { currencies, defaultCurrency } = useCurrency();
+  const { accounts, updateAccount } = useData();
   
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fromCurrency, setFromCurrency] = useState(defaultCurrency);
-  const [toCurrency, setToCurrency] = useState('USD');
-  const [fromAmount, setFromAmount] = useState('1');
-  const [toAmount, setToAmount] = useState('');
-  const [showFromPicker, setShowFromPicker] = useState(false);
-  const [showToPicker, setShowToPicker] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isAutoMode, setIsAutoMode] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  
+  // Анимация для плавного появления
+  const fadeAnim = useState(new Animated.Value(0))[0];
+  const slideAnim = useState(new Animated.Value(300))[0];
+  
+  // Ref для списка
+  const flatListRef = useRef<FlatList>(null);
 
+  // Получаем уникальные валюты из счетов пользователя
+  const userCurrencies = useMemo(() => {
+    const currenciesSet = new Set<string>();
+    currenciesSet.add(defaultCurrency);
+    
+    accounts.forEach(account => {
+      if (account.currency) {
+        currenciesSet.add(account.currency);
+      }
+    });
+    
+    return Array.from(currenciesSet);
+  }, [accounts, defaultCurrency]);
+
+  // Получаем только релевантные курсы для отображения
+  const relevantRates = useMemo(() => {
+    const rates: ExchangeRate[] = [];
+    const addedPairs = new Set<string>();
+    
+    // Показываем курсы относительно основной валюты для каждой валюты счетов
+    userCurrencies.forEach(currency => {
+      if (currency !== defaultCurrency) {
+        // Курс из валюты в основную
+        const key1 = `${currency}-${defaultCurrency}`;
+        const rate1 = exchangeRates.find(
+          rate => rate.fromCurrency === currency && rate.toCurrency === defaultCurrency
+        );
+        if (rate1 && !addedPairs.has(key1)) {
+          rates.push(rate1);
+          addedPairs.add(key1);
+        }
+        
+        // Курс из основной в валюту
+        const key2 = `${defaultCurrency}-${currency}`;
+        const rate2 = exchangeRates.find(
+          rate => rate.fromCurrency === defaultCurrency && rate.toCurrency === currency
+        );
+        if (rate2 && !addedPairs.has(key2)) {
+          rates.push(rate2);
+          addedPairs.add(key2);
+        }
+      }
+    });
+    
+    return rates;
+  }, [exchangeRates, userCurrencies, defaultCurrency]);
+
+  // Быстрое открытие модального окна
   useEffect(() => {
     if (visible) {
-      loadExchangeRates();
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 65,
+          friction: 11,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      
+      // Загружаем данные асинхронно
+      setTimeout(() => {
+        loadDataAsync();
+      }, 100);
+    } else {
+      // Быстрое закрытие
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 300,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      
+      // Сброс состояния редактирования при закрытии
+      setEditingIndex(null);
     }
   }, [visible]);
 
-  const loadExchangeRates = async () => {
+  // Загрузка только нужных курсов
+  const loadDataAsync = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
+      const [mode, updateTime] = await Promise.all([
+        LocalDatabaseService.getExchangeRatesMode(),
+        LocalDatabaseService.getLastRatesUpdate(),
+      ]);
       
-      // Получаем все уникальные пары валют
-      const allRates: ExchangeRate[] = [];
-      const processedPairs = new Set<string>();
+      // Загружаем только курсы между валютами, которые есть у пользователя
+      const rates: ExchangeRate[] = [];
       
-      // Загружаем курсы для основной валюты
-      const mainRates = await LocalDatabaseService.getStoredRates(defaultCurrency);
-      for (const [currency, rate] of Object.entries(mainRates)) {
-        const pairKey = `${defaultCurrency}-${currency}`;
-        if (!processedPairs.has(pairKey)) {
-          allRates.push({
-            fromCurrency: defaultCurrency,
-            toCurrency: currency,
-            rate: rate,
-          });
-          processedPairs.add(pairKey);
-        }
-      }
-      
-      // Загружаем остальные сохраненные курсы
-      const currencyCodes = Object.keys(currencies);
-      for (const from of currencyCodes) {
-        for (const to of currencyCodes) {
-          if (from !== to) {
-            const pairKey1 = `${from}-${to}`;
-            const pairKey2 = `${to}-${from}`;
-            
-            if (!processedPairs.has(pairKey1) && !processedPairs.has(pairKey2)) {
-              const rate = await LocalDatabaseService.getExchangeRate(from, to);
-              if (rate) {
-                allRates.push({
-                  fromCurrency: from,
-                  toCurrency: to,
-                  rate: rate,
-                });
-                processedPairs.add(pairKey1);
-              }
+      for (const fromCur of userCurrencies) {
+        for (const toCur of userCurrencies) {
+          if (fromCur !== toCur) {
+            const rate = await LocalDatabaseService.getLocalExchangeRate(fromCur, toCur);
+            if (rate && rate > 0) {
+              rates.push({
+                fromCurrency: fromCur,
+                toCurrency: toCur,
+                rate: rate,
+                isEditing: false,
+              });
+            } else if (fromCur === defaultCurrency || toCur === defaultCurrency) {
+              // Если курса нет, но одна из валют - основная, создаем с курсом 1
+              rates.push({
+                fromCurrency: fromCur,
+                toCurrency: toCur,
+                rate: 1,
+                isEditing: false,
+              });
             }
           }
         }
       }
       
-      setExchangeRates(allRates);
+      setExchangeRates(rates);
+      setIsAutoMode(mode === 'auto');
+      setLastUpdate(updateTime);
     } catch (error) {
-      console.error('Error loading exchange rates:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [userCurrencies, defaultCurrency]);
 
-  const handleAddRate = async () => {
-    const fromValue = parseFloat(fromAmount);
-    const toValue = parseFloat(toAmount);
-    
-    if (!fromAmount || fromValue <= 0 || !toAmount || toValue <= 0) {
-      Alert.alert(t('common.error'), t('settings.invalidExchangeRate'));
-      return;
-    }
-    
-    if (fromCurrency === toCurrency) {
-      Alert.alert(t('common.error'), t('settings.sameCurrencyError'));
-      return;
-    }
-    
+  // Оптимизированное обновление курсов
+  const handleModeChange = useCallback(async (value: boolean) => {
     try {
-      // Рассчитываем курс: сколько единиц toCurrency за 1 единицу fromCurrency
-      const rate = toValue / fromValue;
+      setIsAutoMode(value);
+      await LocalDatabaseService.setExchangeRatesMode(value ? 'auto' : 'manual');
       
-      // Сохраняем курс
-      await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, rate);
-      
-      // Очищаем поля сразу для лучшего UX
-      setFromAmount('1');
-      setToAmount('');
-      
-      // Обновляем список
-      await loadExchangeRates();
-      
-      // Убираем блокирующий Alert чтобы список обновился визуально
-      // Alert.alert(t('common.success'), t('settings.exchangeRateSaved'));
+      if (value) {
+        console.log('Auto mode enabled');
+      }
     } catch (error) {
-      Alert.alert(t('common.error'), t('settings.errorSavingRate'));
+      console.error('Error changing mode:', error);
     }
-  };
+  }, []);
 
-  const handleDeleteRate = async (from: string, to: string) => {
-    Alert.alert(
-      t('common.confirm'),
-      t('settings.deleteRateConfirm', { from, to }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Удаляем курс (установив его в null)
-              await LocalDatabaseService.saveExchangeRate(from, to, 0);
-              await loadExchangeRates();
-            } catch (error) {
-              Alert.alert(t('common.error'), t('settings.errorDeletingRate'));
-            }
-          },
-        },
-      ]
-    );
-  };
+  // Быстрое обновление курсов
+  const handleUpdateRates = useCallback(async () => {
+    try {
+      setUpdating(true);
+      
+      await LocalDatabaseService.updateRatesFromBackend();
+      await loadDataAsync();
+      
+      const updateTime = await LocalDatabaseService.getLastRatesUpdate();
+      setLastUpdate(updateTime);
+      
+      // Обновляем счета в фоне
+      updateAccountExchangeRates();
+    } catch (error) {
+      console.error('Error updating rates:', error);
+      Alert.alert(t('common.error'), t('settings.errorUpdatingRates'));
+    } finally {
+      setUpdating(false);
+    }
+  }, [loadDataAsync, t]);
 
-  const handleUpdateRate = async (from: string, to: string, newRateValue: string) => {
-    const rate = parseFloat(newRateValue);
-    if (isNaN(rate) || rate <= 0) {
+  // Обновление курсов в счетах (в фоне)
+  const updateAccountExchangeRates = useCallback(async () => {
+    try {
+      const updatePromises = accounts
+        .filter(account => account.currency && account.currency !== defaultCurrency)
+        .map(async account => {
+          if (!account.currency) return;
+          const rate = await LocalDatabaseService.getLocalExchangeRate(account.currency, defaultCurrency);
+          if (rate && (!('exchangeRate' in account) || (account as any).exchangeRate !== rate)) {
+            return updateAccount(account.id, { exchangeRate: rate } as any);
+          }
+        });
+      
+      await Promise.all(updatePromises.filter(Boolean));
+    } catch (error) {
+      console.error('Error updating account exchange rates:', error);
+    }
+  }, [accounts, defaultCurrency, updateAccount]);
+
+  // Начать редактирование курса
+  const startEditRate = useCallback((index: number) => {
+    setEditingIndex(index);
+    setExchangeRates(prev => prev.map((rate, i) => 
+      i === index 
+        ? { ...rate, isEditing: true, editValue: rate.rate.toString() }
+        : { ...rate, isEditing: false }
+    ));
+    
+    // Прокручиваем к редактируемому элементу
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index, animated: true });
+    }, 100);
+  }, []);
+
+  // Отменить редактирование
+  const cancelEditRate = useCallback((index: number) => {
+    setEditingIndex(null);
+    setExchangeRates(prev => prev.map((rate, i) => 
+      i === index 
+        ? { ...rate, isEditing: false, editValue: undefined }
+        : rate
+    ));
+    Keyboard.dismiss();
+  }, []);
+
+  // Сохранить изменение курса
+  const saveEditRate = useCallback(async (index: number) => {
+    const rate = exchangeRates[index];
+    if (!rate.editValue) return;
+    
+    const newRate = parseFloat(rate.editValue);
+    if (isNaN(newRate) || newRate <= 0) {
       Alert.alert(t('common.error'), t('settings.invalidExchangeRate'));
       return;
     }
     
     try {
-      await LocalDatabaseService.saveExchangeRate(from, to, rate);
-      await loadExchangeRates();
-      Alert.alert(t('common.success'), t('settings.exchangeRateUpdated'));
+      // Сохраняем на backend и локально
+      const success = await ExchangeRateService.saveUserRate(rate.fromCurrency, rate.toCurrency, newRate);
+      
+      if (success) {
+        // Также обновляем обратный курс
+        await ExchangeRateService.saveUserRate(rate.toCurrency, rate.fromCurrency, 1 / newRate);
+        
+        // Если режим был auto, переключаем на manual
+        if (isAutoMode) {
+          await LocalDatabaseService.setExchangeRatesMode('manual');
+          await setIsAutoMode(false);
+        }
+      } else {
+        // Если не удалось сохранить на backend, сохраняем только локально
+        await LocalDatabaseService.saveExchangeRate(rate.fromCurrency, rate.toCurrency, newRate);
+        await LocalDatabaseService.saveExchangeRate(rate.toCurrency, rate.fromCurrency, 1 / newRate);
+      }
+      
+      // Обновляем UI
+      setEditingIndex(null);
+      setExchangeRates(prev => prev.map((r, i) => 
+        i === index 
+          ? { ...r, rate: newRate, isEditing: false, editValue: undefined }
+          : rate.fromCurrency === r.toCurrency && rate.toCurrency === r.fromCurrency
+            ? { ...r, rate: 1 / newRate }
+            : r
+      ));
+      
+      Keyboard.dismiss();
+      
+      // Обновляем счета в фоне
+      updateAccountExchangeRates();
     } catch (error) {
       Alert.alert(t('common.error'), t('settings.errorUpdatingRate'));
     }
-  };
+  }, [exchangeRates, t, updateAccountExchangeRates, isAutoMode]);
 
-  const renderCurrencyPicker = (
-    visible: boolean,
-    onClose: () => void,
-    onSelect: (currency: string) => void,
-    selectedCurrency: string,
-    excludeCurrency?: string
-  ) => (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+  // Оптимизированный рендер списка курсов
+  const renderRateItem = useCallback(({ item: rate, index }: { item: ExchangeRate, index: number }) => (
+    <TouchableOpacity
+      style={[styles.rateItem, { backgroundColor: colors.background }]}
+      activeOpacity={0.7}
+      onPress={() => !rate.isEditing && startEditRate(index)}
     >
-      <TouchableOpacity
-        style={styles.pickerOverlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-          <View style={styles.pickerHeader}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              {t('settings.selectCurrency')}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {Object.entries(currencies)
-              .filter(([code]) => code !== excludeCurrency)
-              .map(([code, currency]) => (
-                <TouchableOpacity
-                  key={code}
-                  style={[
-                    styles.currencyItem,
-                    selectedCurrency === code && { backgroundColor: colors.background }
-                  ]}
-                  onPress={() => {
-                    onSelect(code);
-                    onClose();
-                  }}
-                >
-                  <Text style={[styles.currencyText, { color: colors.text }]}>
-                    {currency.symbol} {code} - {currency.name}
-                  </Text>
-                  {selectedCurrency === code && (
-                    <Ionicons name="checkmark" size={20} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
+      <View style={styles.rateInfo}>
+        <View style={styles.rateHeader}>
+          <Text style={[styles.currencyPair, { color: colors.text }]}>
+            {currencies[rate.fromCurrency]?.symbol} {rate.fromCurrency}
+          </Text>
+          <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
+          <Text style={[styles.currencyPair, { color: colors.text }]}>
+            {currencies[rate.toCurrency]?.symbol} {rate.toCurrency}
+          </Text>
         </View>
-      </TouchableOpacity>
-    </Modal>
+        
+        {rate.isEditing ? (
+          <View style={styles.editContainer}>
+            <Text style={[styles.editLabel, { color: colors.textSecondary }]}>
+              1 {currencies[rate.fromCurrency]?.symbol} =
+            </Text>
+            <TextInput
+              style={[styles.editInput, { 
+                color: colors.text,
+                backgroundColor: colors.card,
+                borderColor: colors.primary,
+              }]}
+              value={rate.editValue}
+              onChangeText={(text) => {
+                setExchangeRates(prev => prev.map((r, i) => 
+                  i === index ? { ...r, editValue: text } : r
+                ));
+              }}
+              keyboardType="decimal-pad"
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={[styles.editLabel, { color: colors.textSecondary }]}>
+              {currencies[rate.toCurrency]?.symbol}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.rateValue, { color: colors.primary }]}>
+            1 {currencies[rate.fromCurrency]?.symbol} = {rate.rate.toFixed(4)} {currencies[rate.toCurrency]?.symbol}
+          </Text>
+        )}
+      </View>
+      
+      {rate.isEditing ? (
+        <View style={styles.editActions}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => saveEditRate(index)}
+          >
+            <Ionicons name="checkmark" size={24} color={colors.success || '#4CAF50'} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => cancelEditRate(index)}
+          >
+            <Ionicons name="close" size={24} color={colors.danger} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.editIconButton}
+          onPress={() => startEditRate(index)}
+        >
+          <Ionicons name="pencil" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  ), [colors, currencies, startEditRate, saveEditRate, cancelEditRate]);
+
+  // Показываем информацию если нет счетов в разных валютах
+  const renderEmptyState = () => (
+    <View style={styles.emptyStateContainer}>
+      <Ionicons name="information-circle-outline" size={48} color={colors.textSecondary} />
+      <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
+        {t('settings.noMultiCurrencyAccounts')}
+      </Text>
+      <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+        {t('settings.addAccountsInDifferentCurrencies')}
+      </Text>
+    </View>
   );
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="none"
       transparent={true}
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        style={styles.container}
+        style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -500}
       >
-        <View style={[styles.content, { backgroundColor: colors.card }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {t('settings.manageExchangeRates')}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <>
-              {/* Форма добавления нового курса */}
-              <View style={[styles.addRateSection, { backgroundColor: colors.background }]}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  {t('settings.addNewRate')}
-                </Text>
-                
-                <View style={styles.addRateForm}>
-                  <View style={styles.currencyAmountGroup}>
-                    <TextInput
-                      style={[styles.amountInput, { 
-                        color: colors.text,
-                        borderColor: colors.border,
-                        backgroundColor: colors.card
-                      }]}
-                      value={fromAmount}
-                      onChangeText={setFromAmount}
-                      placeholder="1"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="numeric"
-                    />
-                    <TouchableOpacity
-                      style={[styles.currencySelector, { borderColor: colors.border }]}
-                      onPress={() => setShowFromPicker(true)}
-                    >
-                      <Text style={[styles.currencyCode, { color: colors.text }]}>
-                        {currencies[fromCurrency]?.symbol} {fromCurrency}
-                      </Text>
-                      <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <Text style={[styles.equals, { color: colors.textSecondary }]}>=</Text>
-                  
-                  <View style={styles.currencyAmountGroup}>
-                    <TextInput
-                      style={[styles.amountInput, { 
-                        color: colors.text,
-                        borderColor: colors.border,
-                        backgroundColor: colors.card
-                      }]}
-                      value={toAmount}
-                      onChangeText={setToAmount}
-                      placeholder="0.00"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="numeric"
-                    />
-                    <TouchableOpacity
-                      style={[styles.currencySelector, { borderColor: colors.border }]}
-                      onPress={() => setShowToPicker(true)}
-                    >
-                      <Text style={[styles.currencyCode, { color: colors.text }]}>
-                        {currencies[toCurrency]?.symbol} {toCurrency}
-                      </Text>
-                      <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <TouchableOpacity
-                    style={[styles.addButton, { backgroundColor: colors.primary }]}
-                    onPress={handleAddRate}
+        <Animated.View 
+          style={[
+            styles.container,
+            {
+              opacity: fadeAnim,
+            }
+          ]}
+        >
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={onClose}
+          />
+          
+          <Animated.View 
+            style={[
+              styles.content,
+              { 
+                backgroundColor: colors.card,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            {/* Заголовок */}
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {t('settings.manageExchangeRates')}
+              </Text>
+              <View style={styles.headerButtons}>
+                {userCurrencies.length > 1 && (
+                  <TouchableOpacity 
+                    style={styles.settingsButton}
+                    onPress={() => setShowSettings(!showSettings)}
                   >
-                    <Ionicons name="add" size={20} color="#fff" />
+                    <Ionicons 
+                      name={showSettings ? "settings" : "settings-outline"} 
+                      size={24} 
+                      color={colors.text} 
+                    />
                   </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Список существующих курсов */}
-              <ScrollView style={styles.ratesList} showsVerticalScrollIndicator={false}>
-                {exchangeRates.length === 0 ? (
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    {t('settings.noExchangeRates')}
-                  </Text>
-                ) : (
-                  exchangeRates.map((rate, index) => (
-                    <View
-                      key={`${rate.fromCurrency}-${rate.toCurrency}-${index}`}
-                      style={[styles.rateItem, { backgroundColor: colors.background }]}
-                    >
-                      <View style={styles.rateInfo}>
-                        <Text style={[styles.currencyPair, { color: colors.text }]}>
-                          {currencies[rate.fromCurrency]?.symbol} {rate.fromCurrency} → {currencies[rate.toCurrency]?.symbol} {rate.toCurrency}
-                        </Text>
-                        
-                        <View>
-                          <Text style={[styles.currencyPair, { color: colors.text, fontSize: 14 }]}>
-                            1 {currencies[rate.fromCurrency]?.symbol} = {rate.rate.toFixed(4)} {currencies[rate.toCurrency]?.symbol}
-                          </Text>
-                          <Text style={[styles.rateEquivalent, { color: colors.textSecondary }]}>
-                            100 {currencies[rate.fromCurrency]?.symbol} = {(100 * rate.rate).toFixed(2)} {currencies[rate.toCurrency]?.symbol}
-                          </Text>
-                        </View>
-                      </View>
-                      
-                      <View style={styles.rateActions}>
-                        <TouchableOpacity
-                          style={styles.actionButton}
-                          onPress={() => handleDeleteRate(rate.fromCurrency, rate.toCurrency)}
-                        >
-                          <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ))
                 )}
-              </ScrollView>
-            </>
-          )}
-        </View>
+                <TouchableOpacity onPress={onClose}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {userCurrencies.length <= 1 ? (
+              // Показываем заглушку если нет счетов в разных валютах
+              renderEmptyState()
+            ) : (
+              <>
+                {/* Настройки (скрыты по умолчанию) */}
+                {showSettings && (
+                  <Animated.View style={[styles.settingsSection, { backgroundColor: colors.background }]}>
+                    <View style={styles.settingRow}>
+                      <View style={styles.settingInfo}>
+                        <Text style={[styles.settingTitle, { color: colors.text }]}>
+                          {t('settings.autoUpdateRates')}
+                        </Text>
+                        <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                          {t('settings.autoUpdateRatesDescription')}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={isAutoMode}
+                        onValueChange={handleModeChange}
+                        trackColor={{ false: colors.border, true: colors.primary }}
+                        thumbColor={isAutoMode ? '#fff' : colors.textSecondary}
+                      />
+                    </View>
+
+                    {isAutoMode && (
+                      <TouchableOpacity
+                        style={[styles.updateButton, { backgroundColor: colors.primary }]}
+                        onPress={handleUpdateRates}
+                        disabled={updating}
+                      >
+                        {updating ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <>
+                            <Ionicons name="refresh" size={20} color="#fff" />
+                            <Text style={styles.updateButtonText}>
+                              {t('settings.updateNow')}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </Animated.View>
+                )}
+
+                {/* Информация о валютах */}
+                <View style={[styles.currencyInfo, { backgroundColor: colors.background }]}>
+                  <Text style={[styles.currencyInfoText, { color: colors.textSecondary }]}>
+                    {t('settings.currentlyUsedCurrencies')}: {userCurrencies.join(', ')}
+                  </Text>
+                  <Text style={[styles.hintText, { color: colors.textSecondary }]}>
+                    {t('settings.tapToEditRate')}
+                  </Text>
+                </View>
+
+                {/* Список курсов */}
+                {loading && relevantRates.length === 0 ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                  </View>
+                ) : (
+                  <View style={[
+                    styles.listContainer,
+                    editingIndex !== null && { paddingBottom: 200 }
+                  ]}>
+                    <FlatList
+                      ref={flatListRef}
+                      data={relevantRates}
+                      keyExtractor={(item, index) => `${item.fromCurrency}-${item.toCurrency}-${index}`}
+                      renderItem={renderRateItem}
+                      contentContainerStyle={[
+                        styles.ratesList,
+                        editingIndex !== null && { paddingBottom: 100 }
+                      ]}
+                      showsVerticalScrollIndicator={false}
+                      scrollEnabled={true}
+                      keyboardShouldPersistTaps="handled"
+                      getItemLayout={(data, index) => ({
+                        length: 84, // высота элемента + отступ
+                        offset: 84 * index,
+                        index,
+                      })}
+                      ListEmptyComponent={
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                          {t('settings.noExchangeRates')}
+                        </Text>
+                      }
+                    />
+                  </View>
+                )}
+              </>
+            )}
+          </Animated.View>
+        </Animated.View>
       </KeyboardAvoidingView>
-
-      {renderCurrencyPicker(
-        showFromPicker,
-        () => setShowFromPicker(false),
-        setFromCurrency,
-        fromCurrency,
-        toCurrency
-      )}
-
-      {renderCurrencyPicker(
-        showToPicker,
-        () => setShowToPicker(false),
-        setToCurrency,
-        toCurrency,
-        fromCurrency
-      )}
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
   },
   content: {
-    maxHeight: '80%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: '85%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingVertical: 16,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingsButton: {
+    marginRight: 12,
   },
   title: {
     fontSize: 20,
@@ -423,63 +620,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 200,
   },
-  addRateSection: {
+  settingsSection: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     padding: 16,
     borderRadius: 12,
   },
-  sectionTitle: {
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  settingTitle: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 4,
   },
-  addRateForm: {
+  settingDescription: {
+    fontSize: 12,
+  },
+  updateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  currencySelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  currencyCode: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginRight: 4,
-  },
-  equals: {
-    fontSize: 16,
-    marginHorizontal: 8,
-  },
-  rateInput: {
-    flex: 1,
-    minWidth: 80,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  updateButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  currencyInfo: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+  },
+  currencyInfoText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  hintText: {
+    fontSize: 11,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  listContainer: {
+    flex: 1,
   },
   ratesList: {
-    flex: 1,
     paddingHorizontal: 16,
+    paddingBottom: 20,
   },
   emptyText: {
     textAlign: 'center',
@@ -493,89 +692,71 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
     borderRadius: 12,
+    minHeight: 76,
   },
   rateInfo: {
     flex: 1,
   },
-  currencyPair: {
-    fontSize: 16,
-    fontWeight: '500',
+  rateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
+  currencyPair: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginHorizontal: 4,
+  },
   rateValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
-  editRateContainer: {
+  editContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  editRateInput: {
-    flex: 1,
+  editLabel: {
+    fontSize: 14,
+    marginHorizontal: 4,
+  },
+  editInput: {
+    fontSize: 16,
+    fontWeight: '600',
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    fontSize: 16,
-    marginRight: 8,
+    minWidth: 80,
+    textAlign: 'center',
   },
-  rateActions: {
+  editActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  actionButton: {
+  editButton: {
     padding: 8,
-    marginLeft: 8,
+    marginLeft: 4,
   },
-  pickerOverlay: {
+  editIconButton: {
+    padding: 8,
+  },
+  emptyStateContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  pickerContent: {
-    maxHeight: '70%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    padding: 32,
+    minHeight: 300,
   },
-  pickerTitle: {
+  emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
-  },
-  currencyItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  currencyText: {
-    fontSize: 16,
-  },
-  currencyAmountGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
+    marginTop: 16,
     marginBottom: 8,
+    textAlign: 'center',
   },
-  amountInput: {
-    minWidth: 60,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
-    marginRight: 8,
-  },
-  rateEquivalent: {
-    fontSize: 12,
-    marginTop: 2,
+  emptyStateText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 }); 

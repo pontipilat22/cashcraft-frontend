@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from 'firebase/auth';
-import { FirebaseAuthService } from '../services/firebaseAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthService, User as ApiUser } from '../services/auth';
+import { ApiService } from '../services/api';
 import { DatabaseService } from '../services/database';
 import { UserDataService } from '../services/userDataService';
 
@@ -10,111 +10,131 @@ interface AuthUser {
   email: string;
   displayName: string;
   isGuest: boolean;
+  isPremium?: boolean;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
-  firebaseUser: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
   loginAsGuest: () => Promise<void>;
-  loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithGoogle: (googleData: { idToken: string; email: string; name: string; googleId: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Проверка авторизации при запуске
   useEffect(() => {
-    const unsubscribe = FirebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
+    checkAuthState();
+  }, []);
+
+  const checkAuthState = async () => {
+    try {
+      setIsLoading(true);
       
+      // Сначала проверяем локально сохраненного пользователя
+      const savedUser = await AsyncStorage.getItem('currentUser');
+      if (savedUser) {
+        try {
+          const parsedUser: AuthUser = JSON.parse(savedUser);
+          
+          // Если это гость, используем только локальные данные
+          if (parsedUser.isGuest) {
+            setUser(parsedUser);
+            DatabaseService.setUserId(parsedUser.id);
+            await DatabaseService.initDatabase();
+            UserDataService.setUserId(parsedUser.id);
+            await UserDataService.initializeUserData();
+            return; // Выходим рано, не пытаемся подключиться к API
+          }
+        } catch (error) {
+          await AsyncStorage.removeItem('currentUser');
+        }
+      }
+      
+      // Для не-гостей пытаемся подключиться к API
       try {
-        setIsLoading(true);
+        await ApiService.initialize();
+        const isAuthenticated = await AuthService.isAuthenticated();
         
-        if (firebaseUser) {
-          // Пользователь авторизован в Firebase
-          const authUser: AuthUser = {
-            id: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-            isGuest: false
-          };
+        if (isAuthenticated) {
+          // Получаем данные пользователя с сервера
+          const apiUser = await AuthService.getCurrentUser();
           
-          setUser(authUser);
-          setFirebaseUser(firebaseUser);
-          
-          // Сохраняем локально
-          await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
-          
-          // Инициализируем базу данных для пользователя
-          DatabaseService.setUserId(firebaseUser.uid);
-          await DatabaseService.initDatabase();
-          
-          // Загружаем данные пользователя
-          UserDataService.setUserId(firebaseUser.uid);
-          await UserDataService.initializeUserData();
-        } else {
-          // Проверяем, есть ли гостевой пользователь
-          try {
-            const savedUser = await AsyncStorage.getItem('currentUser');
+          if (apiUser) {
+            const authUser: AuthUser = {
+              id: apiUser.id,
+              email: apiUser.email,
+              displayName: apiUser.name || apiUser.email.split('@')[0],
+              isGuest: apiUser.isGuest,
+              isPremium: apiUser.isPremium
+            };
             
-            if (savedUser && savedUser !== 'null' && savedUser !== 'undefined') {
-              // Проверяем, что это валидный JSON
-              const parsedUser: AuthUser = JSON.parse(savedUser);
-              
-              if (parsedUser && typeof parsedUser === 'object' && parsedUser.id) {
-                if (parsedUser.isGuest) {
-                  setUser(parsedUser);
-                  DatabaseService.setUserId(parsedUser.id);
-                  await DatabaseService.initDatabase();
-                  UserDataService.setUserId(parsedUser.id);
-                  await UserDataService.initializeUserData();
-                } else {
-                  // Сохраненный пользователь не гость, но Firebase не авторизован
-                  await AsyncStorage.removeItem('currentUser');
-                  setUser(null);
-                  setFirebaseUser(null);
-                }
-              } else {
-                await AsyncStorage.removeItem('currentUser');
-                setUser(null);
-                setFirebaseUser(null);
-              }
-            } else {
-              setUser(null);
-              setFirebaseUser(null);
-            }
-          } catch (parseError) {
-            // Очищаем невалидные данные
-            await AsyncStorage.removeItem('currentUser');
+            setUser(authUser);
+            await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
+            
+            // Инициализируем базу данных для пользователя
+            DatabaseService.setUserId(apiUser.id);
+            await DatabaseService.initDatabase();
+            
+            // Загружаем данные пользователя
+            UserDataService.setUserId(apiUser.id);
+            await UserDataService.initializeUserData();
+          } else {
+            // Токен есть, но пользователь не найден
+            await AuthService.logout();
             setUser(null);
-            setFirebaseUser(null);
           }
         }
-      } catch (error) {
-        setUser(null);
-        setFirebaseUser(null);
-      } finally {
-        setIsLoading(false);
+      } catch (networkError) {
+        // Если нет интернета, но есть сохраненный пользователь - используем его
+        if (savedUser) {
+          try {
+            const parsedUser: AuthUser = JSON.parse(savedUser);
+            setUser(parsedUser);
+            DatabaseService.setUserId(parsedUser.id);
+            await DatabaseService.initDatabase();
+            UserDataService.setUserId(parsedUser.id);
+            await UserDataService.initializeUserData();
+          } catch (error) {
+            console.error('Failed to restore user:', error);
+          }
+        }
       }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+    } catch (error) {
+      console.error('Auth state check error:', error);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string) => {
     try {
-      await FirebaseAuthService.login(email, password);
-      // onAuthStateChanged обработает остальное
+      const response = await AuthService.login({ email, password });
+      
+      const authUser: AuthUser = {
+        id: response.user.id,
+        email: response.user.email,
+        displayName: response.user.name || response.user.email.split('@')[0],
+        isGuest: false,
+        isPremium: response.user.isPremium
+      };
+      
+      setUser(authUser);
+      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
+      
+      // Инициализируем базу данных
+      DatabaseService.setUserId(response.user.id);
+      await DatabaseService.initDatabase();
+      UserDataService.setUserId(response.user.id);
+      await UserDataService.initializeUserData();
     } catch (error) {
       throw error;
     }
@@ -122,8 +142,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (email: string, password: string, displayName?: string) => {
     try {
-      await FirebaseAuthService.register(email, password, displayName);
-      // onAuthStateChanged обработает остальное
+      const response = await AuthService.register({ 
+        email, 
+        password, 
+        name: displayName || email.split('@')[0] 
+      });
+      
+      const authUser: AuthUser = {
+        id: response.user.id,
+        email: response.user.email,
+        displayName: response.user.name,
+        isGuest: false,
+        isPremium: response.user.isPremium
+      };
+      
+      setUser(authUser);
+      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
+      
+      // Инициализируем базу данных
+      DatabaseService.setUserId(response.user.id);
+      await DatabaseService.initDatabase();
+      UserDataService.setUserId(response.user.id);
+      await UserDataService.initializeUserData();
     } catch (error) {
       throw error;
     }
@@ -135,49 +175,78 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       UserDataService.setUserId(null);
       DatabaseService.setUserId(null);
       
-      // Выходим из Firebase если это не гость
+      // Выходим из API только если это не гость и есть интернет
       if (!user?.isGuest) {
-        await FirebaseAuthService.logout();
+        try {
+          await AuthService.logout();
+        } catch (error) {
+          // Игнорируем ошибки сети при выходе
+          console.log('Logout network error (ignored):', error);
+        }
       }
       
       // Очищаем локальное состояние
       await AsyncStorage.removeItem('currentUser');
       setUser(null);
-      setFirebaseUser(null);
     } catch (error) {
-      throw error;
-    }
-  };
-
-  const resetPassword = async (email: string) => {
-    try {
-      await FirebaseAuthService.resetPassword(email);
-    } catch (error) {
-      throw error;
+      console.error('Logout error:', error);
+      // Все равно очищаем локальное состояние
+      await AsyncStorage.removeItem('currentUser');
+      setUser(null);
     }
   };
 
   const loginAsGuest = async () => {
-    const guestUser: AuthUser = {
-      id: `guest_${Date.now()}`,
-      email: 'guest@cashcraft.app',
-      displayName: 'Guest',
-      isGuest: true
-    };
-    
-    await AsyncStorage.setItem('currentUser', JSON.stringify(guestUser));
-    setUser(guestUser);
-    
-    DatabaseService.setUserId(guestUser.id);
-    await DatabaseService.initDatabase();
-    UserDataService.setUserId(guestUser.id);
-    await UserDataService.initializeUserData();
+    try {
+      // Генерируем локальный ID для гостя
+      const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const authUser: AuthUser = {
+        id: guestId,
+        email: `${guestId}@local`,
+        displayName: 'Гость',
+        isGuest: true,
+        isPremium: false
+      };
+      
+      setUser(authUser);
+      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
+      
+      // Инициализируем локальную базу данных
+      DatabaseService.setUserId(guestId);
+      await DatabaseService.initDatabase();
+      UserDataService.setUserId(guestId);
+      await UserDataService.initializeUserData();
+    } catch (error) {
+      console.error('Guest login error:', error);
+      throw new Error('Не удалось войти как гость');
+    }
   };
 
-  const loginWithGoogle = async (idToken: string) => {
+  const loginWithGoogle = async (googleData: { idToken: string; email: string; name: string; googleId: string }) => {
     try {
-      await FirebaseAuthService.loginWithGoogle(idToken);
-      // onAuthStateChanged обработает остальное
+      const response = await ApiService.post<any>('/auth/google', googleData);
+      
+      const authUser: AuthUser = {
+        id: response.user.id,
+        email: response.user.email,
+        displayName: response.user.displayName,
+        isGuest: false,
+        isPremium: response.user.isPremium
+      };
+      
+      setUser(authUser);
+      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
+      
+      // Сохраняем токены
+      await ApiService.setAccessToken(response.accessToken);
+      await ApiService.setRefreshToken(response.refreshToken);
+      
+      // Инициализируем базу данных
+      DatabaseService.setUserId(response.user.id);
+      await DatabaseService.initDatabase();
+      UserDataService.setUserId(response.user.id);
+      await UserDataService.initializeUserData();
     } catch (error) {
       throw error;
     }
@@ -185,12 +254,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const value: AuthContextType = {
     user,
-    firebaseUser,
     isLoading,
     login,
     register,
     logout,
-    resetPassword,
     loginAsGuest,
     loginWithGoogle
   };

@@ -23,10 +23,10 @@
       "bundleIdentifier": "com.pontipilat.cashcraft",
       "buildNumber": "1",
       "scheme": "cashcraft",
-      "googleServicesFile": "./client_475144195261-346cm50h6alcj4fpberfl041eno4v9tv.apps.googleusercontent.com.plist",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
         "googleSignIn": {
-          "reservedClientId": "com.googleusercontent.apps.475144195261-346cm50h6alcj4fpberfl041eno4v9tv"
+          "reservedClientId": "com.googleusercontent.apps.YOUR_IOS_CLIENT_ID"
         }
       },
       "splash": {
@@ -69,15 +69,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@react-native-google-signin/google-signin"
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {
         "projectId": "993876aa-d5bf-411d-b069-94f585de32af"
       },
-      "googleWebClientId": "475144195261-1q3uevggnhrpjqrs1ie0ks0knsvggrqt.apps.googleusercontent.com",
-      "googleAndroidClientId": "475144195261-upfj9sfdrba6gm972tc26eg9dp8s4419.apps.googleusercontent.com",
-      "googleIosClientId": "475144195261-346cm50h6alcj4fpberfl041eno4v9tv.apps.googleusercontent.com",
+      "googleWebClientId": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+      "googleAndroidClientId": "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+      "googleIosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
       "scheme": "cashcraft"
     }
   }

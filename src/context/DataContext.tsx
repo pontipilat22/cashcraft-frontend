@@ -23,6 +23,10 @@ interface DataContextType {
   updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   
+  // Метод для пополнения накоплений
+  addToSavings: (savingsId: string, amount: number) => Promise<void>;
+  withdrawFromSavings: (savingsId: string, amount: number) => Promise<void>;
+  
   // Методы для работы с категориями
   createCategory: (category: Omit<Category, 'id'>) => Promise<void>;
   updateCategory: (id: string, updates: Partial<Category>) => Promise<void>;
@@ -38,7 +42,7 @@ interface DataContextType {
   syncData: () => Promise<void>;
   
   // Статистика
-  getStatistics: () => {
+  getStatistics: (startDate?: Date, endDate?: Date) => {
     income: number;
     expense: number;
   };
@@ -404,14 +408,91 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
+  // Пополнение накоплений
+  const addToSavings = async (savingsId: string, amount: number) => {
+    try {
+      const savings = accounts.find(acc => acc.id === savingsId && acc.type === 'savings');
+      if (!savings || !savings.linkedAccountId) {
+        throw new Error('Накопление не найдено или не связано со счетом');
+      }
+      
+      const linkedAccount = accounts.find(acc => acc.id === savings.linkedAccountId);
+      if (!linkedAccount) {
+        throw new Error('Связанный счет не найден');
+      }
+      
+      // Создаем транзакцию на связанном счете
+      await createTransaction({
+        accountId: savings.linkedAccountId,
+        amount,
+        type: 'expense',
+        categoryId: 'other_expense',
+        description: `Пополнение накопления: ${savings.name}`,
+        date: new Date().toISOString(),
+      });
+      
+      // Обновляем savedAmount у накопления
+      const newSavedAmount = (savings.savedAmount || 0) + amount;
+      await updateAccount(savingsId, { savedAmount: newSavedAmount });
+    } catch (error) {
+      console.error('Error adding to savings:', error);
+      throw error;
+    }
+  };
+  
+  // Снятие с накоплений
+  const withdrawFromSavings = async (savingsId: string, amount: number) => {
+    try {
+      const savings = accounts.find(acc => acc.id === savingsId && acc.type === 'savings');
+      if (!savings || !savings.linkedAccountId) {
+        throw new Error('Накопление не найдено или не связано со счетом');
+      }
+      
+      const currentSaved = savings.savedAmount || 0;
+      if (currentSaved < amount) {
+        throw new Error('Недостаточно средств в накоплении');
+      }
+      
+      // Создаем транзакцию на связанном счете
+      await createTransaction({
+        accountId: savings.linkedAccountId,
+        amount,
+        type: 'income',
+        categoryId: 'other_income',
+        description: `Снятие с накопления: ${savings.name}`,
+        date: new Date().toISOString(),
+      });
+      
+      // Обновляем savedAmount у накопления
+      const newSavedAmount = currentSaved - amount;
+      await updateAccount(savingsId, { savedAmount: newSavedAmount });
+    } catch (error) {
+      console.error('Error withdrawing from savings:', error);
+      throw error;
+    }
+  };
+
   // Получение статистики
-  const getStatistics = () => {
-    const income = transactions
-      .filter(t => t.type === 'income')
+  const getStatistics = (startDate?: Date, endDate?: Date) => {
+    let filteredTransactions = transactions;
+    
+    // Фильтруем по датам если указаны
+    if (startDate || endDate) {
+      filteredTransactions = transactions.filter(t => {
+        const transDate = new Date(t.date);
+        if (startDate && transDate < startDate) return false;
+        if (endDate && transDate > endDate) return false;
+        return true;
+      });
+    }
+    
+    // Исключаем транзакции связанные с накоплениями
+    const income = filteredTransactions
+      .filter(t => t.type === 'income' && !t.description?.includes('Снятие с накопления:'))
       .reduce((sum, t) => sum + t.amount, 0);
     
-    const expense = transactions
-      .filter(t => t.type === 'expense')
+    const expense = filteredTransactions
+      .filter(t => t.type === 'expense' && !t.description?.includes('Пополнение накопления:'))
       .reduce((sum, t) => sum + t.amount, 0);
     
     return { income, expense };
@@ -457,6 +538,8 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         createTransaction,
         updateTransaction,
         deleteTransaction,
+        addToSavings,
+        withdrawFromSavings,
         createCategory,
         updateCategory,
         deleteCategory,

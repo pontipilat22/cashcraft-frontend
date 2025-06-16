@@ -51,6 +51,8 @@ export class LocalDatabaseService {
           isDefault INTEGER DEFAULT 0,
           isIncludedInTotal INTEGER DEFAULT 1,
           targetAmount REAL,
+          linkedAccountId TEXT,
+          savedAmount REAL DEFAULT 0,
           creditStartDate TEXT,
           creditTerm INTEGER,
           creditRate REAL,
@@ -65,6 +67,20 @@ export class LocalDatabaseService {
       // Миграция: добавляем колонку exchangeRate если её нет
       try {
         db.execSync(`ALTER TABLE accounts ADD COLUMN exchangeRate REAL DEFAULT 1`);
+      } catch (error) {
+        // Колонка уже существует, игнорируем ошибку
+      }
+      
+      // Миграция: добавляем колонку linkedAccountId если её нет
+      try {
+        db.execSync(`ALTER TABLE accounts ADD COLUMN linkedAccountId TEXT`);
+      } catch (error) {
+        // Колонка уже существует, игнорируем ошибку
+      }
+      
+      // Миграция: добавляем колонку savedAmount если её нет
+      try {
+        db.execSync(`ALTER TABLE accounts ADD COLUMN savedAmount REAL DEFAULT 0`);
       } catch (error) {
         // Колонка уже существует, игнорируем ошибку
       }
@@ -130,6 +146,27 @@ export class LocalDatabaseService {
           UNIQUE(fromCurrency, toCurrency)
         );
       `);
+
+      // Создаем таблицу для настроек
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+      `);
+
+      // Инициализируем настройки по умолчанию
+      const existingRatesMode = db.getFirstSync<{ value: string }>(
+        'SELECT value FROM settings WHERE key = ?',
+        'exchangeRatesMode'
+      );
+      
+      if (!existingRatesMode) {
+        db.runSync(
+          'INSERT INTO settings (key, value) VALUES (?, ?)',
+          'exchangeRatesMode', 'auto' // По умолчанию автоматический режим
+        );
+      }
 
       // Инициализируем базовые данные если это первый запуск
       const accountsCount = db.getFirstSync<{ count: number }>(
@@ -206,13 +243,13 @@ export class LocalDatabaseService {
 
     db.runSync(
       `INSERT INTO accounts (id, name, type, balance, currency, exchangeRate, cardNumber, icon, isDefault, isIncludedInTotal, 
-       targetAmount, creditStartDate, creditTerm, creditRate, creditPaymentType, creditInitialAmount, 
+       targetAmount, linkedAccountId, savedAmount, creditStartDate, creditTerm, creditRate, creditPaymentType, creditInitialAmount, 
        createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       id, account.name, account.type, account.balance || 0, account.currency || 'USD', 
       (account as any).exchangeRate || 1, account.cardNumber || null,
       account.icon || null, account.isDefault ? 1 : 0, account.isIncludedInTotal !== false ? 1 : 0,
-      account.targetAmount || null, account.creditStartDate || null, account.creditTerm || null,
+      account.targetAmount || null, account.linkedAccountId || null, account.savedAmount || 0, account.creditStartDate || null, account.creditTerm || null,
       account.creditRate || null, account.creditPaymentType || null, account.creditInitialAmount || null,
       now, now
     );
@@ -496,6 +533,7 @@ export class LocalDatabaseService {
     transactions: Transaction[];
     categories: Category[];
     debts: Debt[];
+    exchangeRates: any[];
   }> {
     const db = this.getDb();
     const lastSync = await this.getLastSyncTime();
@@ -504,11 +542,15 @@ export class LocalDatabaseService {
       ? `WHERE syncedAt IS NULL OR updatedAt > '${lastSync}'`
       : '';
 
+    // Получаем курсы валют для синхронизации
+    const exchangeRates = await this.getAllExchangeRatesForSync();
+
     return {
       accounts: db.getAllSync(`SELECT * FROM accounts ${syncCondition}`) as Account[],
       transactions: db.getAllSync(`SELECT * FROM transactions ${syncCondition}`) as Transaction[],
       categories: db.getAllSync(`SELECT * FROM categories ${syncCondition}`) as Category[],
       debts: db.getAllSync(`SELECT * FROM debts ${syncCondition}`) as Debt[],
+      exchangeRates,
     };
   }
 
@@ -526,24 +568,94 @@ export class LocalDatabaseService {
 
   // Методы для работы с курсами валют
   static async getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number | null> {
+    if (!this.db || !this.currentUserId) {
+      return null;
+    }
     const db = this.getDb();
-    const result = db.getFirstSync<{ rate: number }>(
-      'SELECT rate FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
-      fromCurrency, toCurrency
-    );
-    return result?.rate || null;
+    
+    try {
+      // Сначала проверяем локальную базу
+      const result = db.getFirstSync<{ rate: number }>(
+        'SELECT rate FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
+        fromCurrency, toCurrency
+      );
+      
+      if (result?.rate) {
+        return result.rate;
+      }
+      
+      // Если курса нет и включен автоматический режим, пытаемся загрузить из backend
+      const mode = await this.getExchangeRatesMode();
+      if (mode === 'auto') {
+        try {
+          const { ExchangeRateService } = await import('./exchangeRate');
+          console.log(`Auto-fetching rate for ${fromCurrency} -> ${toCurrency}`);
+          const rate = await ExchangeRateService.getRate(fromCurrency, toCurrency);
+          if (rate && rate !== 1) {
+            // Сохраняем полученный курс
+            await this.saveExchangeRate(fromCurrency, toCurrency, rate);
+            // Сохраняем обратный курс
+            await this.saveExchangeRate(toCurrency, fromCurrency, 1 / rate);
+            return rate;
+          }
+        } catch (error) {
+          console.error('Error fetching rate from backend:', error);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting exchange rate:', error);
+      return null;
+    }
+  }
+
+  // Метод для получения курса только из локальной базы (без автозагрузки)
+  static async getLocalExchangeRate(fromCurrency: string, toCurrency: string): Promise<number | null> {
+    if (!this.db || !this.currentUserId) {
+      return null;
+    }
+    const db = this.getDb();
+    
+    try {
+      const result = db.getFirstSync<{ rate: number }>(
+        'SELECT rate FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
+        fromCurrency, toCurrency
+      );
+      
+      return result?.rate || null;
+    } catch (error) {
+      console.error('Error getting local exchange rate:', error);
+      return null;
+    }
   }
 
   static async saveExchangeRate(fromCurrency: string, toCurrency: string, rate: number): Promise<void> {
+    if (!this.db || !this.currentUserId) {
+      return;
+    }
     const db = this.getDb();
-    const id = `${fromCurrency}_${toCurrency}`;
-    const now = new Date().toISOString();
     
-    db.runSync(
-      `INSERT OR REPLACE INTO exchange_rates (id, fromCurrency, toCurrency, rate, updatedAt) 
-       VALUES (?, ?, ?, ?, ?)`,
-      id, fromCurrency, toCurrency, rate, now
-    );
+    try {
+      if (rate <= 0) {
+        // Удаляем курс если rate <= 0
+        db.runSync(
+          'DELETE FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
+          fromCurrency, toCurrency
+        );
+      } else {
+        const id = `${fromCurrency}_${toCurrency}`;
+        const now = new Date().toISOString();
+        
+        db.runSync(
+          `INSERT OR REPLACE INTO exchange_rates (id, fromCurrency, toCurrency, rate, updatedAt) 
+           VALUES (?, ?, ?, ?, ?)`,
+          id, fromCurrency, toCurrency, rate, now
+        );
+      }
+    } catch (error) {
+      console.error('Error saving exchange rate:', error);
+    }
   }
 
   static async getStoredRates(currency: string): Promise<{ [key: string]: number }> {
@@ -570,29 +682,215 @@ export class LocalDatabaseService {
     const db = this.getDb();
     
     // Пытаемся найти прямой курс
-    let directRate = await this.getExchangeRate(fromCurrency, toCurrency);
+    let directRate = await this.getLocalExchangeRate(fromCurrency, toCurrency);
     if (directRate) return directRate;
     
     // Пытаемся найти обратный курс
-    const reverseRate = await this.getExchangeRate(toCurrency, fromCurrency);
+    const reverseRate = await this.getLocalExchangeRate(toCurrency, fromCurrency);
     if (reverseRate) return 1 / reverseRate;
     
     // Пытаемся найти через базовую валюту
-    const fromToBase = await this.getExchangeRate(fromCurrency, baseCurrency);
-    const baseToTo = await this.getExchangeRate(baseCurrency, toCurrency);
+    const fromToBase = await this.getLocalExchangeRate(fromCurrency, baseCurrency);
+    const baseToTo = await this.getLocalExchangeRate(baseCurrency, toCurrency);
     
     if (fromToBase && baseToTo) {
       return fromToBase * baseToTo;
     }
     
     // Пытаемся найти обратные курсы через базовую валюту
-    const baseToFrom = await this.getExchangeRate(baseCurrency, fromCurrency);
-    const toToBase = await this.getExchangeRate(toCurrency, baseCurrency);
+    const baseToFrom = await this.getLocalExchangeRate(baseCurrency, fromCurrency);
+    const toToBase = await this.getLocalExchangeRate(toCurrency, baseCurrency);
     
     if (baseToFrom && toToBase) {
       return (1 / baseToFrom) * (1 / toToBase);
     }
     
     return null;
+  }
+
+  // Методы для управления источником курсов
+  static async getExchangeRatesMode(): Promise<'auto' | 'manual'> {
+    if (!this.db || !this.currentUserId) {
+      return 'auto';
+    }
+    
+    try {
+      const result = this.db.getFirstSync<{ value: string }>(
+        'SELECT value FROM settings WHERE key = ?',
+        'exchangeRatesMode'
+      );
+      return (result?.value as 'auto' | 'manual') || 'auto';
+    } catch (error) {
+      console.error('Error getting exchange rates mode:', error);
+      return 'auto';
+    }
+  }
+
+  static async setExchangeRatesMode(mode: 'auto' | 'manual'): Promise<void> {
+    if (!this.db || !this.currentUserId) {
+      return;
+    }
+    
+    try {
+      this.db.runSync(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        'exchangeRatesMode', mode
+      );
+    } catch (error) {
+      console.error('Error setting exchange rates mode:', error);
+    }
+  }
+
+  // Метод для массового обновления курсов из backend
+  static async updateRatesFromBackend(allCurrencies?: string[]): Promise<void> {
+    try {
+      const { ExchangeRateService } = await import('./exchangeRate');
+      
+      // Получаем список валют, которые реально используются
+      const accounts = await this.getAccounts();
+      const usedCurrencies = new Set<string>();
+      
+      // Добавляем валюты из счетов
+      accounts.forEach(account => {
+        if (account.currency) {
+          usedCurrencies.add(account.currency);
+        }
+      });
+      
+      // Если нет счетов с валютами, выходим
+      if (usedCurrencies.size === 0) {
+        console.log('No currencies to update');
+        return;
+      }
+      
+      // Создаем уникальные пары валют
+      const currencyPairs: Array<{ from: string; to: string }> = [];
+      const usedCurrenciesArray = Array.from(usedCurrencies);
+      
+      for (let i = 0; i < usedCurrenciesArray.length; i++) {
+        for (let j = i + 1; j < usedCurrenciesArray.length; j++) {
+          currencyPairs.push({
+            from: usedCurrenciesArray[i],
+            to: usedCurrenciesArray[j]
+          });
+        }
+      }
+      
+      console.log(`Updating rates for ${currencyPairs.length} currency pairs`);
+      
+      // Загружаем курсы только для нужных пар
+      for (const pair of currencyPairs) {
+        try {
+          const rate = await ExchangeRateService.getRate(pair.from, pair.to);
+          if (rate) {
+            await this.saveExchangeRate(pair.from, pair.to, rate);
+            // Сохраняем и обратный курс
+            await this.saveExchangeRate(pair.to, pair.from, 1 / rate);
+          }
+        } catch (error) {
+          console.error(`Error fetching rate for ${pair.from}-${pair.to}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating rates from backend:', error);
+    }
+  }
+
+  // Получить время последнего обновления курсов
+  static async getLastRatesUpdate(): Promise<Date | null> {
+    try {
+      const result = this.db?.getFirstSync(
+        'SELECT MAX(updatedAt) as lastUpdate FROM exchange_rates'
+      );
+      
+      if ((result as any)?.lastUpdate) {
+        return new Date((result as any).lastUpdate);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting last rates update:', error);
+      return null;
+    }
+  }
+
+  // Получить все сохраненные курсы
+  static async getAllExchangeRates(): Promise<Array<{ fromCurrency: string; toCurrency: string; rate: number }>> {
+    if (!this.db || !this.currentUserId) {
+      return [];
+    }
+    const db = this.getDb();
+    
+    try {
+      const rates = db.getAllSync<{ fromCurrency: string; toCurrency: string; rate: number }>(
+        'SELECT fromCurrency, toCurrency, rate FROM exchange_rates ORDER BY fromCurrency, toCurrency'
+      );
+      return rates || [];
+    } catch (error) {
+      console.error('Error getting all exchange rates:', error);
+      return [];
+    }
+  }
+
+  // Получить все курсы валют для синхронизации
+  static async getAllExchangeRatesForSync(): Promise<any[]> {
+    if (!this.db || !this.currentUserId) {
+      return [];
+    }
+    const db = this.getDb();
+    
+    try {
+      const rates = db.getAllSync<{ 
+        fromCurrency: string; 
+        toCurrency: string; 
+        rate: number;
+        updatedAt: string;
+      }>(
+        'SELECT fromCurrency as from_currency, toCurrency as to_currency, rate, updatedAt as updated_at FROM exchange_rates'
+      );
+      
+      // Получаем режим курсов
+      const mode = await this.getExchangeRatesMode();
+      
+      // Добавляем режим ко всем курсам
+      return rates.map(rate => ({ ...rate, mode })) || [];
+    } catch (error) {
+      console.error('Error getting exchange rates for sync:', error);
+      return [];
+    }
+  }
+
+  // Сохранить курсы валют из синхронизации
+  static async saveExchangeRatesFromSync(rates: any[]): Promise<void> {
+    if (!this.db || !this.currentUserId) {
+      return;
+    }
+    const db = this.getDb();
+    
+    try {
+      // Очищаем существующие курсы
+      db.runSync('DELETE FROM exchange_rates');
+      
+      // Вставляем новые курсы
+      rates.forEach(rate => {
+        const id = `${rate.from_currency}_${rate.to_currency}`;
+        db.runSync(
+          `INSERT INTO exchange_rates (id, fromCurrency, toCurrency, rate, updatedAt) 
+           VALUES (?, ?, ?, ?, ?)`,
+          id, 
+          rate.from_currency, 
+          rate.to_currency, 
+          rate.rate, 
+          rate.updated_at || new Date().toISOString()
+        );
+      });
+      
+      // Обновляем режим если он есть
+      if (rates.length > 0 && rates[0].mode) {
+        await this.setExchangeRatesMode(rates[0].mode);
+      }
+    } catch (error) {
+      console.error('Error saving exchange rates from sync:', error);
+    }
   }
 } 

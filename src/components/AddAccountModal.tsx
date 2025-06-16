@@ -18,6 +18,7 @@ import { AccountType, AccountTypeLabels } from '../types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useData } from '../context/DataContext';
 import { LocalDatabaseService } from '../services/localDatabase';
 
 interface AddAccountModalProps {
@@ -34,6 +35,7 @@ interface AddAccountModalProps {
     isIncludedInTotal?: boolean;
     icon?: string;
     targetAmount?: number;
+    linkedAccountId?: string;
     interestRate?: number;
     openDate?: string;
     interestDay?: number;
@@ -80,7 +82,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
-  const { defaultCurrency, currencies } = useCurrency();
+  const { defaultCurrency, currencies, formatAmount } = useCurrency();
+  const { accounts } = useData();
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState(defaultCurrency);
@@ -103,6 +106,10 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const [creditRate, setCreditRate] = useState('');
   const [creditPaymentType, setCreditPaymentType] = useState<'annuity' | 'differentiated'>('annuity');
   const [suggestedRate, setSuggestedRate] = useState<number | null>(null);
+  
+  // Для накоплений - связанный счет
+  const [linkedAccountId, setLinkedAccountId] = useState<string>('');
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
 
   // Загружаем предложенный курс при изменении валюты
   useEffect(() => {
@@ -149,18 +156,22 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     
     const accountData: any = {
       name: name.trim(),
-      balance: parseFloat(balance) || 0,
+      balance: accountType === 'savings' ? 0 : (parseFloat(balance) || 0),
       currency: selectedCurrency,
       exchangeRate: selectedCurrency !== defaultCurrency ? parseFloat(exchangeRate) || 1 : undefined,
       cardNumber: cardNumber.trim() ? cardNumber.trim() : undefined,
       isDefault: accountType !== 'savings' ? isDefault : false,
-      isIncludedInTotal,
+      isIncludedInTotal: accountType === 'savings' ? false : isIncludedInTotal,
     };
 
     if (accountType === 'savings') {
       accountData.icon = selectedIcon;
+      accountData.savedAmount = 0; // Начальная сумма накоплений всегда 0
       if (targetAmount) {
         accountData.targetAmount = parseFloat(targetAmount);
+      }
+      if (linkedAccountId) {
+        accountData.linkedAccountId = linkedAccountId;
       }
     }
 
@@ -190,6 +201,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     setIsIncludedInTotal(true);
     setSelectedIcon(SAVINGS_ICONS[0]);
     setTargetAmount('');
+    setLinkedAccountId('');
     setInterestRate('');
     setOpenDate('');
     setInterestDay('');
@@ -276,21 +288,23 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.initialBalance')}</Text>
-              <TextInput
-                style={[styles.input, { 
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderColor: colors.border,
-                }]}
-                value={balance}
-                onChangeText={setBalance}
-                placeholder="0"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-              />
-            </View>
+            {accountType !== 'savings' && (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.initialBalance')}</Text>
+                <TextInput
+                  style={[styles.input, { 
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderColor: colors.border,
+                  }]}
+                  value={balance}
+                  onChangeText={setBalance}
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
 
             {/* Выбор валюты */}
             <View style={styles.inputContainer}>
@@ -345,21 +359,45 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
             )}
 
             {accountType === 'savings' && (
-              <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.targetAmount')}</Text>
-                <TextInput
-                  style={[styles.input, { 
-                    backgroundColor: colors.background,
-                    color: colors.text,
-                    borderColor: colors.border,
-                  }]}
-                  value={targetAmount}
-                  onChangeText={setTargetAmount}
-                  placeholder="0"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                />
-              </View>
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.targetAmount')}</Text>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.background,
+                      color: colors.text,
+                      borderColor: colors.border,
+                    }]}
+                    value={targetAmount}
+                    onChangeText={setTargetAmount}
+                    placeholder="0"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="numeric"
+                  />
+                </View>
+                
+                {/* Выбор связанного счета */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.linkedAccount')}</Text>
+                  <TouchableOpacity
+                    style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                    onPress={() => setShowAccountPicker(true)}
+                  >
+                    <View style={styles.selectorContent}>
+                      <Text style={[styles.selectorText, { color: linkedAccountId ? colors.text : colors.textSecondary }]}>
+                        {linkedAccountId 
+                          ? accounts.find(acc => acc.id === linkedAccountId)?.name || t('accounts.selectLinkedAccount')
+                          : t('accounts.selectLinkedAccount')
+                        }
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <Text style={[styles.helperText, { color: colors.textSecondary, marginTop: 4 }]}>
+                    {t('accounts.linkedAccountDescription')}
+                  </Text>
+                </View>
+              </>
             )}
 
             {accountType === 'card' && (
@@ -703,6 +741,74 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                   </View>
                 </TouchableOpacity>
               ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Account Picker for Savings */}
+      <Modal
+        visible={showAccountPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAccountPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.datePickerModal}
+          activeOpacity={1}
+          onPress={() => setShowAccountPicker(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.datePickerContent, { backgroundColor: colors.card }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.datePickerHeader}>
+              <Text style={[styles.datePickerTitle, { color: colors.text }]}>
+                {t('accounts.selectLinkedAccount')}
+              </Text>
+              <TouchableOpacity onPress={() => setShowAccountPicker(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }}>
+              {accounts
+                .filter(acc => acc.type !== 'savings' && acc.type !== 'debt' && acc.type !== 'credit')
+                .map((account) => (
+                  <TouchableOpacity
+                    key={account.id}
+                    style={[
+                      styles.currencyItem,
+                      { backgroundColor: colors.background },
+                      linkedAccountId === account.id && { borderColor: colors.primary, borderWidth: 2 }
+                    ]}
+                    onPress={() => {
+                      setLinkedAccountId(account.id);
+                      setShowAccountPicker(false);
+                    }}
+                  >
+                    <View style={styles.currencyItemContent}>
+                      <View style={[styles.iconCircle, { width: 40, height: 40, backgroundColor: colors.primary }]}>
+                        <Ionicons 
+                          name={account.type === 'cash' ? 'cash-outline' : 'card-outline'} 
+                          size={20} 
+                          color="#fff" 
+                        />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={[styles.currencyCode, { color: colors.text }]}>
+                          {account.name}
+                        </Text>
+                        <Text style={[styles.currencyName, { color: colors.textSecondary }]}>
+                          Баланс: {formatAmount(account.balance, account.currency || defaultCurrency)}
+                        </Text>
+                      </View>
+                      {linkedAccountId === account.id && (
+                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
             </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>

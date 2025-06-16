@@ -24,7 +24,7 @@ interface ForgotPasswordModalProps {
 export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ visible, onClose }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { resetPassword } = useAuth();
+  // const { resetPassword } = useAuth(); // TODO: Implement resetPassword in AuthContext
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -47,19 +47,12 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ visibl
     setLoading(true);
 
     try {
-      await resetPassword(email);
+      // await resetPassword(email); // TODO: Implement resetPassword
+      // Temporary implementation
       Alert.alert(
-        t('common.success'),
-        t('auth.resetPasswordSuccess'),
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setEmail('');
-              onClose();
-            },
-          },
-        ]
+        t('common.info'),
+        'Password reset functionality is not yet implemented',
+        [{ text: 'OK', onPress: handleClose }]
       );
     } catch (error: any) {
       console.error('Password reset error:', error);

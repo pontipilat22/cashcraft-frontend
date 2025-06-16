@@ -6,23 +6,34 @@ import { Account } from '../types';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useData } from '../context/DataContext';
 
 interface AccountCardProps {
   account: Account;
   onPress: () => void;
   onLongPress?: () => void;
+  onAddToSavings?: () => void;
+  onWithdrawFromSavings?: () => void;
 }
 
 export const AccountCard: React.FC<AccountCardProps> = ({
   account,
   onPress,
   onLongPress,
+  onAddToSavings,
+  onWithdrawFromSavings,
 }) => {
   const { colors, isDark } = useTheme();
   const { defaultCurrency, formatAmount, getCurrencyInfo } = useCurrency();
   const { t } = useLocalization();
+  const { accounts } = useData();
   const [isPressed, setIsPressed] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  
+  // Получаем связанный счет для накоплений
+  const linkedAccount = account.linkedAccountId 
+    ? accounts.find(acc => acc.id === account.linkedAccountId) 
+    : null;
 
   const handlePressIn = () => {
     setIsPressed(true);
@@ -122,7 +133,18 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   
   const getProgress = () => {
     if (account.type !== 'savings' || !account.targetAmount) return 0;
-    return Math.min((account.balance / account.targetAmount) * 100, 100);
+    // Для накоплений используем savedAmount вместо balance
+    const saved = account.savedAmount || 0;
+    return Math.min((saved / account.targetAmount) * 100, 100);
+  };
+  
+  // Получаем сумму зарезервированную в накоплениях для данного счета
+  const getReservedAmount = () => {
+    if (account.type === 'savings') return 0;
+    const linkedSavings = accounts.filter(acc => 
+      acc.type === 'savings' && acc.linkedAccountId === account.id
+    );
+    return linkedSavings.reduce((sum, saving) => sum + (saving.savedAmount || 0), 0);
   };
 
   const calculateMonthlyPayment = () => {
@@ -228,7 +250,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 },
               ]}
             />
-            <View style={styles.content}>
+            <View style={[styles.content, { paddingBottom: 12 }]}>
               <View style={styles.row}>
                 <View style={[
                   styles.iconCircle,
@@ -279,24 +301,61 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                       color: isDark ? '#fff' : '#232323',
                       fontWeight: '500',
                       marginTop: 2,
+                      fontSize: 14,
                     }}
                   >
-                    {formatBalance(account.balance)} / {formatBalance(account.targetAmount || 0)}
+                    {formatBalance(account.savedAmount || 0)} / {formatBalance(account.targetAmount || 0)}
                   </Text>
+                  {linkedAccount && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <Ionicons 
+                        name={linkedAccount.type === 'cash' ? 'cash-outline' : 'card-outline'} 
+                        size={10} 
+                        color={colors.textSecondary} 
+                      />
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginLeft: 3 }}>
+                        {linkedAccount.name}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-                <Text
-                  style={{
-                    color: isDark ? '#fff' : '#232323',
-                    fontWeight: '700',
-                    fontSize: 18,
-                    marginLeft: 8,
-                    textShadowColor: isDark ? 'rgba(0,0,0,0.15)' : 'transparent',
-                    textShadowOffset: { width: 0, height: 1 },
-                    textShadowRadius: 2,
-                  }}
-                >
-                  {Math.floor(getProgress())}%
-                </Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text
+                    style={{
+                      color: isDark ? '#fff' : '#232323',
+                      fontWeight: '700',
+                      fontSize: 20,
+                      textShadowColor: isDark ? 'rgba(0,0,0,0.15)' : 'transparent',
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 2,
+                    }}
+                  >
+                    {Math.floor(getProgress())}%
+                  </Text>
+                  {/* Компактные кнопки */}
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+                    <TouchableOpacity 
+                      style={[styles.compactButton, { 
+                        backgroundColor: isDark ? colors.card : '#f0f0f0',
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                      }]}
+                      onPress={onAddToSavings}
+                    >
+                      <Ionicons name="add" size={16} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.compactButton, { 
+                        backgroundColor: isDark ? colors.card : '#f0f0f0',
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                      }]}
+                      onPress={onWithdrawFromSavings}
+                    >
+                      <Ionicons name="remove" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
             </View>
           </>
@@ -348,7 +407,14 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     {getBalanceDisplay(Math.abs(account.balance), true)}
                   </>
                 ) : (
-                  getBalanceDisplay(account.balance, true)
+                  <>
+                    {getBalanceDisplay(account.balance, true)}
+                    {getReservedAmount() > 0 && (
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                        {formatBalance(getReservedAmount())} в накоплениях
+                      </Text>
+                    )}
+                  </>
                 )}
               </View>
             </View>
@@ -505,5 +571,31 @@ const styles = StyleSheet.create({
     bottom: 2,
     borderRadius: 16,
     opacity: 0.5,
+  },
+  savingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flex: 1,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  savingsButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  savingsDivider: {
+    height: 1,
+    marginVertical: 10,
+    marginHorizontal: -12,
+  },
+  compactButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

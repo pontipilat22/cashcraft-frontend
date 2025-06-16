@@ -22,7 +22,6 @@ import { useLocalization } from '../context/LocalizationContext';
 import { ForgotPasswordModal } from '../components/ForgotPasswordModal';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FirebaseAuthService } from '../services/firebaseAuth';
 
 export const AuthScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
@@ -123,10 +122,20 @@ export const AuthScreen: React.FC = () => {
         await register(email, password, name);
       }
     } catch (error: any) {
-      Alert.alert(
-        t('common.error'),
-        error.message || (isLogin ? t('auth.loginError') : t('auth.registerError'))
-      );
+      let errorMessage = error.message || (isLogin ? t('auth.loginError') : t('auth.registerError'));
+      
+      // Обработка специфичных ошибок
+      if (error.message?.includes('Network request failed')) {
+        errorMessage = t('auth.networkError') || 'Нет соединения с сервером. Проверьте подключение к интернету.';
+      } else if (error.message?.includes('401')) {
+        errorMessage = t('auth.invalidCredentials') || 'Неверный email или пароль';
+      } else if (error.message?.includes('400')) {
+        errorMessage = t('auth.invalidData') || 'Проверьте введенные данные';
+      } else if (error.message?.includes('409')) {
+        errorMessage = t('auth.emailExists') || 'Пользователь с таким email уже существует';
+      }
+      
+      Alert.alert(t('common.error'), errorMessage);
     } finally {
       setLoading(false);
     }
@@ -137,7 +146,8 @@ export const AuthScreen: React.FC = () => {
     try {
       await loginAsGuest();
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || t('auth.guestLoginError'));
+      const errorMessage = error.message || t('auth.guestLoginError') || 'Не удалось войти как гость';
+      Alert.alert(t('common.error'), errorMessage);
     } finally {
       setLoading(false);
     }
@@ -151,8 +161,6 @@ export const AuthScreen: React.FC = () => {
     setConfirmPassword('');
     setName('');
   };
-
-
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -368,28 +376,16 @@ export const AuthScreen: React.FC = () => {
               </View>
 
               <GoogleSignInButton
-                onSuccess={async (idToken) => {
-                  try {
-                    console.log('Google OAuth success, idToken received:', idToken ? 'YES' : 'NO');
-                    console.log('Calling FirebaseAuthService.loginWithGoogle...');
-                    
-                    const user = await FirebaseAuthService.loginWithGoogle(idToken);
-                    console.log('Firebase login successful:', user.uid);
-                    
-                    // Успешный вход будет обработан в AuthContext
-                  } catch (error) {
-                    console.error('Firebase login error:', error);
-                    Alert.alert(t('common.error'), (error as Error).message || t('auth.loginError'));
-                  }
+                onSuccess={() => {
+                  // Авторизация прошла успешно, AuthContext обработает навигацию
                 }}
                 onError={(error) => {
-                  console.error('Google OAuth error:', error);
-                  Alert.alert(t('common.error'), error.message || t('auth.loginError'));
+                  Alert.alert(t('common.error'), error.message || t('auth.googleSignInError'));
                 }}
               />
 
               <TouchableOpacity
-                style={[styles.guestButton, { borderColor: colors.border, marginTop: 12 }]}
+                style={[styles.guestButton, { borderColor: colors.border }]}
                 onPress={handleGuestLogin}
                 disabled={loading}
               >

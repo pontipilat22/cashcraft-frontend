@@ -11,6 +11,8 @@ export interface Account {
   isDefault?: boolean;
   isIncludedInTotal?: boolean;
   targetAmount?: number;
+  linkedAccountId?: string; // ID счета, на котором физически находятся деньги накопления
+  savedAmount?: number; // Сумма накопленная для цели (только для накоплений)
   // Поля для кредитов
   creditStartDate?: string; // Дата получения кредита
   creditTerm?: number; // Срок кредита в месяцах

@@ -23,6 +23,8 @@ import { AccountsStackParamList } from '../navigation/AccountsNavigator';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { useFocusEffect } from '@react-navigation/native';
 import { TransferModal } from '../components/TransferModal';
+import { SavingsActionModal } from '../components/SavingsActionModal';
+import { StatisticsCard } from '../components/StatisticsCard';
 
 type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
 
@@ -32,7 +34,7 @@ interface AccountsScreenProps {
 
 export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
-  const { accounts, isLoading, createAccount, updateAccount, deleteAccount, getStatistics } = useData();
+  const { accounts, isLoading, createAccount, updateAccount, deleteAccount, addToSavings, withdrawFromSavings } = useData();
   const { isPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
@@ -51,8 +53,9 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [sectionToAdd, setSectionToAdd] = useState<'cards' | 'savings' | 'debts' | 'credits'>('cards');
   const [debts, setDebts] = useState<Debt[]>([]);
-
-  const stats = getStatistics();
+  const [showSavingsActionModal, setShowSavingsActionModal] = useState(false);
+  const [savingsAction, setSavingsAction] = useState<'add' | 'withdraw'>('add');
+  const [selectedSavings, setSelectedSavings] = useState<Account | null>(null);
 
   // Загружаем долги при фокусе экрана
   useFocusEffect(
@@ -359,6 +362,27 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     setShowTransferModal(true);
   };
 
+  const handleSavingsAction = (savings: Account, action: 'add' | 'withdraw') => {
+    setSelectedSavings(savings);
+    setSavingsAction(action);
+    setShowSavingsActionModal(true);
+  };
+
+  const handleSavingsActionConfirm = async (amount: number) => {
+    if (!selectedSavings) return;
+    
+    try {
+      if (savingsAction === 'add') {
+        await addToSavings(selectedSavings.id, amount);
+      } else {
+        await withdrawFromSavings(selectedSavings.id, amount);
+      }
+      setShowSavingsActionModal(false);
+    } catch (error) {
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : 'Произошла ошибка');
+    }
+  };
+
   const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
     setDebtOperationType(type);
     setShowDebtOperationModal(true);
@@ -379,29 +403,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         backgroundColor={colors.background}
       />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={[styles.statsCard, { 
-          backgroundColor: colors.statsBg,
-          shadowColor: isDark ? '#000' : '#b0b0b0',
-          shadowOffset: { width: 10, height: 10 },
-          shadowOpacity: isDark ? 0.7 : 0.4,
-          shadowRadius: 20,
-          elevation: 15,
-        }]}>
-          <Text style={styles.statsTitle}>{t('accounts.statsForPeriod')}</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Ionicons name="arrow-down" size={24} color="#fff" />
-              <Text style={styles.statLabel}>{t('accounts.expenses')}</Text>
-              <Text style={styles.statAmount}>{formatAmount(stats.expense)}</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons name="arrow-up" size={24} color="#fff" />
-              <Text style={styles.statLabel}>{t('accounts.income')}</Text>
-              <Text style={styles.statAmount}>{formatAmount(stats.income)}</Text>
-            </View>
-          </View>
-        </View>
+        <StatisticsCard />
 
         <AccountSection 
           title={t('accounts.cardsAndAccounts')}
@@ -432,6 +434,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   account={account}
                   onPress={() => {}}
                   onLongPress={() => handleAccountLongPress(account)}
+                  onAddToSavings={() => handleSavingsAction(account, 'add')}
+                  onWithdrawFromSavings={() => handleSavingsAction(account, 'withdraw')}
                 />
               ))
             : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noSavings')}</Text>}
@@ -591,6 +595,17 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
           loadDebts();
         }}
       />
+
+      {selectedSavings && selectedSavings.linkedAccountId && (
+        <SavingsActionModal
+          visible={showSavingsActionModal}
+          onClose={() => setShowSavingsActionModal(false)}
+          onConfirm={handleSavingsActionConfirm}
+          action={savingsAction}
+          savings={selectedSavings}
+          linkedAccount={accounts.find(acc => acc.id === selectedSavings.linkedAccountId)}
+        />
+      )}
     </View>
   );
 };
@@ -602,44 +617,6 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  statsCard: {
-    marginTop: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 16,
-  },
-  statsTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statLabel: {
-    color: '#fff',
-    fontSize: 14,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statAmount: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  statDivider: {
-    width: 1,
-    height: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginHorizontal: 20,
   },
   debtCard: {
     flexDirection: 'row',
