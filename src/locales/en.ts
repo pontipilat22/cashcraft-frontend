@@ -172,6 +172,18 @@ export default {
     changeSearchQuery: 'Try changing the search query',
     addFirstTransaction: 'Add your first transaction',
     noExchangeRate: 'No exchange rate found between {{from}} and {{to}}. Please set up exchange rates in Settings.',
+    // Date filters
+    allTransactions: 'All',
+    todayTransactions: 'Today',
+    yesterdayTransactions: 'Yesterday',
+    weekTransactions: 'Week',
+    monthTransactions: 'Month',
+    customPeriod: 'Custom',
+    selectPeriod: 'Select period',
+    startDate: 'Start date',
+    endDate: 'End date',
+    deleteSelectedConfirm: 'Delete selected transactions',
+    selectedCount: 'Selected',
   },
   categories: {
     // Income categories

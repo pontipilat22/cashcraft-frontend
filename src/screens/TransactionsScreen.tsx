@@ -28,6 +28,7 @@ import { useLocalization } from '../context/LocalizationContext';
 import { getCurrentLanguage } from '../services/i18n';
 import { CURRENCIES } from '../config/currencies';
 import { SectionHeader } from '../components/SectionHeader';
+import { DateRangePicker } from '../components/DateRangePicker';
 
 // Хук для debounce
 const useDebounce = (value: string, delay: number) => {
@@ -45,6 +46,77 @@ const useDebounce = (value: string, delay: number) => {
 
   return debouncedValue;
 };
+
+// Отдельный компонент для заголовка списка
+const ListHeader = React.memo(({ 
+  dateFilter,
+  customStartDate,
+  customEndDate,
+  onDateFilterChange,
+  onShowDateRangePicker
+}: {
+  dateFilter: string;
+  customStartDate: Date;
+  customEndDate: Date;
+  onDateFilterChange: (filter: string) => void;
+  onShowDateRangePicker: () => void;
+}) => {
+  const { colors } = useTheme();
+  const { t } = useLocalization();
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.filterContainer}
+      contentContainerStyle={styles.filterContent}
+    >
+      {[
+        { key: 'all', label: t('transactions.allTransactions'), icon: 'time-outline' },
+        { key: 'today', label: t('transactions.todayTransactions'), icon: 'today' },
+        { key: 'yesterday', label: t('transactions.yesterdayTransactions'), icon: 'arrow-back' },
+        { key: 'week', label: t('transactions.weekTransactions'), icon: 'calendar' },
+        { key: 'month', label: t('transactions.monthTransactions'), icon: 'calendar-outline' },
+        { key: 'custom', label: dateFilter === 'custom' ? 
+          `${customStartDate.getDate()}.${customStartDate.getMonth() + 1} - ${customEndDate.getDate()}.${customEndDate.getMonth() + 1}` : 
+          t('transactions.customPeriod'), icon: 'options-outline' },
+      ].map(filter => (
+        <TouchableOpacity
+          key={filter.key}
+          style={[
+            styles.filterButton,
+            { 
+              backgroundColor: dateFilter === filter.key ? colors.primary : colors.card,
+              borderColor: dateFilter === filter.key ? colors.primary : colors.border,
+            }
+          ]}
+          onPress={() => {
+            if (filter.key === 'custom') {
+              onShowDateRangePicker();
+            } else {
+              onDateFilterChange(filter.key);
+            }
+          }}
+        >
+          <Ionicons 
+            name={filter.icon as any} 
+            size={16} 
+            color={dateFilter === filter.key ? '#fff' : colors.text} 
+          />
+          <Text
+            style={[
+              styles.filterText,
+              { color: dateFilter === filter.key ? '#fff' : colors.text }
+            ]}
+            numberOfLines={1}
+          >
+            {filter.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+});
 
 export const TransactionsScreen = () => {
   const { colors } = useTheme();
@@ -68,7 +140,10 @@ export const TransactionsScreen = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
   // Состояния для фильтра по дням
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'>('all');
+  const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
+  const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
+  const [showDateRangePicker, setShowDateRangePicker] = useState(false);
 
   // Используем debounce для поиска
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -112,6 +187,11 @@ export const TransactionsScreen = () => {
             return transactionDate >= weekAgo;
           case 'month':
             return transactionDate >= monthAgo;
+          case 'custom':
+            const startDateOnly = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), customStartDate.getDate());
+            const endDateOnly = new Date(customEndDate.getFullYear(), customEndDate.getMonth(), customEndDate.getDate());
+            endDateOnly.setHours(23, 59, 59, 999); // Включаем весь последний день
+            return transactionDate >= startDateOnly && transactionDate <= endDateOnly;
           default:
             return true;
         }
@@ -177,7 +257,7 @@ export const TransactionsScreen = () => {
     }
     
     return result;
-  }, [transactions, debouncedSearchQuery, categories, accounts, dateFilter]);
+  }, [transactions, debouncedSearchQuery, categories, accounts, dateFilter, customStartDate, customEndDate]);
 
   // Группировка транзакций по дням
   const groupedTransactions = useMemo(() => {
@@ -341,89 +421,14 @@ export const TransactionsScreen = () => {
   }, []);
 
   const renderHeader = useCallback(() => (
-    <View>
-      <View style={styles.headerWrapper}>
-        <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
-          <Ionicons name="search" size={20} color={colors.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder={t('transactions.searchPlaceholder')}
-            placeholderTextColor={colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch}>
-              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-        
-        {!isSelectionMode ? (
-          <TouchableOpacity
-            style={[styles.deleteButton, { backgroundColor: colors.card }]}
-            onPress={enterSelectionMode}
-          >
-            <Ionicons name="trash-outline" size={20} color={colors.text} />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.selectionActions}>
-            <TouchableOpacity
-              style={[styles.selectionButton, { backgroundColor: colors.card }]}
-              onPress={exitSelectionMode}
-            >
-              <Ionicons name="close" size={20} color={colors.text} />
-            </TouchableOpacity>
-            {selectedIds.size > 0 && (
-              <TouchableOpacity
-                style={[styles.selectionButton, { backgroundColor: colors.danger || '#FF3B30' }]}
-                onPress={deleteSelectedTransactions}
-              >
-                <Ionicons name="trash" size={20} color="#fff" />
-                <Text style={styles.deleteCount}>{selectedIds.size}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
-      
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContent}
-      >
-        {[
-          { key: 'all', label: t('transactions.allTransactions') },
-          { key: 'today', label: t('transactions.todayTransactions') },
-          { key: 'yesterday', label: t('transactions.yesterdayTransactions') },
-          { key: 'week', label: t('transactions.weekTransactions') },
-          { key: 'month', label: t('transactions.monthTransactions') },
-        ].map(filter => (
-          <TouchableOpacity
-            key={filter.key}
-            style={[
-              styles.filterButton,
-              { 
-                backgroundColor: dateFilter === filter.key ? colors.primary : colors.card,
-                borderColor: dateFilter === filter.key ? colors.primary : colors.border,
-              }
-            ]}
-            onPress={() => setDateFilter(filter.key as any)}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                { color: dateFilter === filter.key ? '#fff' : colors.text }
-              ]}
-            >
-              {filter.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  ), [colors, t, searchQuery, clearSearch, isSelectionMode, enterSelectionMode, exitSelectionMode, selectedIds.size, deleteSelectedTransactions, dateFilter]);
+    <ListHeader
+      dateFilter={dateFilter}
+      customStartDate={customStartDate}
+      customEndDate={customEndDate}
+      onDateFilterChange={(filter) => setDateFilter(filter as any)}
+      onShowDateRangePicker={() => setShowDateRangePicker(true)}
+    />
+  ), [dateFilter, customStartDate, customEndDate]);
 
   const renderSectionHeader = useCallback(({ section }: { section: any }) => {
     return <SectionHeader title={section.title} data={section.data} />;
@@ -471,6 +476,55 @@ export const TransactionsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Поиск и кнопка удаления в одной строке */}
+      <View style={styles.searchWrapper}>
+        <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder={t('transactions.searchPlaceholder')}
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch}>
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {!isSelectionMode ? (
+          <TouchableOpacity
+            style={[styles.deleteButton, { backgroundColor: colors.card }]}
+            onPress={enterSelectionMode}
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.selectionActions}>
+            <TouchableOpacity
+              style={[styles.selectionButton, { backgroundColor: colors.card }]}
+              onPress={exitSelectionMode}
+            >
+              <Ionicons name="close" size={20} color={colors.text} />
+            </TouchableOpacity>
+            {selectedIds.size > 0 && (
+              <TouchableOpacity
+                style={[styles.selectionButton, { backgroundColor: colors.danger || '#FF3B30' }]}
+                onPress={deleteSelectedTransactions}
+              >
+                <Ionicons name="trash" size={20} color="#fff" />
+                <Text style={styles.deleteCount}>{selectedIds.size}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+
       <SectionList
         ListHeaderComponent={renderHeader}
         sections={groupedTransactions}
@@ -483,18 +537,16 @@ export const TransactionsScreen = () => {
         initialNumToRender={20}
         maxToRenderPerBatch={15}
         windowSize={10}
-        removeClippedSubviews={true}
+        removeClippedSubviews={false}
         updateCellsBatchingPeriod={50}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
         keyboardDismissMode="none"
         getItemLayout={useCallback((data: any, index: number) => ({
-          length: 80, // Уменьшенная высота элемента для более точного расчета
-          offset: 80 * index + 44 * Math.floor(index / 10), // Учитываем высоту заголовков секций
+          length: 80,
+          offset: 80 * index + 44 * Math.floor(index / 10),
           index,
         }), [])}
-        onScrollToIndexFailed={useCallback(() => {
-          // Обработка ошибок при прокрутке к элементу
-        }, [])}
+        onScrollToIndexFailed={useCallback(() => {}, [])}
       />
 
       {!isSelectionMode && (
@@ -562,6 +614,21 @@ export const TransactionsScreen = () => {
           }}
         />
       )}
+
+      {showDateRangePicker && (
+        <DateRangePicker
+          visible={showDateRangePicker}
+          onClose={() => setShowDateRangePicker(false)}
+          onConfirm={(startDate, endDate) => {
+            setCustomStartDate(startDate);
+            setCustomEndDate(endDate);
+            setDateFilter('custom');
+            setShowDateRangePicker(false);
+          }}
+          initialStartDate={customStartDate}
+          initialEndDate={customEndDate}
+        />
+      )}
     </View>
   );
 };
@@ -575,17 +642,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerWrapper: {
+  searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 0,
     gap: 8,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginVertical: 8,
     padding: 12,
     borderRadius: 12,
   },
@@ -626,19 +694,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   filterContent: {
-    gap: 8,
+    gap: 6,
     paddingVertical: 4,
   },
   filterButton: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    marginRight: 8,
+    marginRight: 6,
+    gap: 4,
+    minHeight: 36,
   },
   filterText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
+    maxWidth: 100,
   },
   emptyContainer: {
     alignItems: 'center',

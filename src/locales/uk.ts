@@ -165,6 +165,18 @@ export default {
     notFound: 'Транзакції не знайдено',
     changeSearchQuery: 'Спробуйте змінити пошуковий запит',
     addFirstTransaction: 'Додайте першу транзакцію',
+    // Date filters
+    allTransactions: 'Всі',
+    todayTransactions: 'Сьогодні',
+    yesterdayTransactions: 'Вчора',
+    weekTransactions: 'Тиждень',
+    monthTransactions: 'Місяць',
+    customPeriod: 'Період',
+    selectPeriod: 'Виберіть період',
+    startDate: 'Початкова дата',
+    endDate: 'Кінцева дата',
+    deleteSelectedConfirm: 'Видалити вибрані транзакції',
+    selectedCount: 'Вибрано',
   },
   categories: {
     // Income categories
