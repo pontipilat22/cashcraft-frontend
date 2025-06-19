@@ -229,6 +229,13 @@ export class LocalDatabaseService {
     }
     const db = this.getDb();
     const accounts = db.getAllSync('SELECT * FROM accounts ORDER BY createdAt DESC');
+    // Логируем для отладки
+    console.log('Loaded accounts from DB:', accounts.map((acc: any) => ({
+      id: acc.id,
+      name: acc.name,
+      currency: acc.currency,
+      exchangeRate: acc.exchangeRate
+    })));
     return accounts as Account[];
   }
 

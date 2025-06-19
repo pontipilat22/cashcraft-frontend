@@ -158,19 +158,18 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   };
 
   const refreshData = async () => {
-    const [accounts, transactions, categories] = await Promise.all([
+    console.log('RefreshData called...');
+    const [accountsFromDb, transactions, categories] = await Promise.all([
       LocalDatabaseService.getAccounts(),
       LocalDatabaseService.getTransactions(),
       LocalDatabaseService.getCategories()
     ]);
     
-    setAccounts(accounts);
-    setTransactions(transactions);
-    setCategories(categories);
+    console.log('Accounts from DB before rate update:', accountsFromDb);
     
     // Обновляем курсы валют для счетов с другой валютой
     const accountsWithRates = await Promise.all(
-      accounts.map(async (account: Account) => {
+      accountsFromDb.map(async (account: Account) => {
         if (account.currency && account.currency !== defaultCurrency) {
           try {
             // Пробуем получить прямой курс
@@ -198,6 +197,13 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         return account;
       })
     );
+    
+    console.log('Accounts with updated rates:', accountsWithRates);
+    
+    // Обновляем состояние счетов с новыми курсами
+    setAccounts(accountsWithRates);
+    setTransactions(transactions);
+    setCategories(categories);
     
     // Считаем общий баланс только по счетам с учетом курса обмена
     const accountsTotal = accountsWithRates
@@ -241,13 +247,15 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       const oldAccount = accounts.find(acc => acc.id === id);
       if (!oldAccount) return;
       
+      console.log(`Updating account ${id} with:`, updates);
+      
       await LocalDatabaseService.updateAccount(id, updates);
       setAccounts(prev => prev.map(acc => 
         acc.id === id ? { ...acc, ...updates } : acc
       ));
       
-      // Обновляем общий баланс если изменился баланс или включение в общий баланс
-      if (updates.balance !== undefined || updates.isIncludedInTotal !== undefined) {
+      // Обновляем общий баланс если изменился баланс, курс обмена или включение в общий баланс
+      if (updates.balance !== undefined || updates.isIncludedInTotal !== undefined || 'exchangeRate' in updates) {
         const newAccount = { ...oldAccount, ...updates };
         
         // Убираем старый баланс из общего

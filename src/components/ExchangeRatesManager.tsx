@@ -45,7 +45,7 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { currencies, defaultCurrency } = useCurrency();
-  const { accounts, updateAccount } = useData();
+  const { accounts, updateAccount, refreshData } = useData();
   
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -230,7 +230,12 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
       setLastUpdate(updateTime);
       
       // Обновляем счета в фоне
-      updateAccountExchangeRates();
+      await updateAccountExchangeRates();
+      
+      // Обновляем все данные для пересчета общего баланса
+      if (refreshData) {
+        await refreshData();
+      }
       
       Alert.alert(
         t('common.success'),
@@ -242,22 +247,27 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
     } finally {
       setUpdating(false);
     }
-  }, [loadDataAsync, t]);
+  }, [loadDataAsync, t, refreshData]);
 
   // Обновление курсов в счетах (в фоне)
   const updateAccountExchangeRates = useCallback(async () => {
     try {
+      console.log('Updating exchange rates for accounts...');
       const updatePromises = accounts
         .filter(account => account.currency && account.currency !== defaultCurrency)
         .map(async account => {
           if (!account.currency) return;
           const rate = await LocalDatabaseService.getLocalExchangeRate(account.currency, defaultCurrency);
-          if (rate && (!('exchangeRate' in account) || (account as any).exchangeRate !== rate)) {
+          console.log(`Account ${account.name} (${account.currency}): current rate = ${(account as any).exchangeRate}, new rate = ${rate}`);
+          
+          // Всегда обновляем курс, даже если он не изменился, чтобы триггернуть пересчет
+          if (rate) {
             return updateAccount(account.id, { exchangeRate: rate } as any);
           }
         });
       
       await Promise.all(updatePromises.filter(Boolean));
+      console.log('All account exchange rates updated');
     } catch (error) {
       console.error('Error updating account exchange rates:', error);
     }
@@ -331,12 +341,15 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
       
       Keyboard.dismiss();
       
-      // Обновляем счета в фоне
-      updateAccountExchangeRates();
+      // Обновляем счета и пересчитываем балансы
+      await updateAccountExchangeRates();
+      if (refreshData) {
+        await refreshData();
+      }
     } catch (error) {
       Alert.alert(t('common.error'), t('settings.errorUpdatingRate'));
     }
-  }, [exchangeRates, t, updateAccountExchangeRates, isAutoMode]);
+  }, [exchangeRates, t, updateAccountExchangeRates, isAutoMode, refreshData]);
 
   // Оптимизированный рендер списка курсов
   const renderRateItem = useCallback(({ item: rate, index }: { item: ExchangeRate, index: number }) => (

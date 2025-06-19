@@ -30,6 +30,13 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const [isPressed, setIsPressed] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   
+  // Логируем для отладки
+  React.useEffect(() => {
+    if (account.currency && account.currency !== defaultCurrency) {
+      console.log(`AccountCard ${account.name}: currency=${account.currency}, exchangeRate=${(account as any).exchangeRate}`);
+    }
+  }, [account]);
+  
   // Получаем связанный счет для накоплений
   const linkedAccount = account.linkedAccountId 
     ? accounts.find(acc => acc.id === account.linkedAccountId) 
