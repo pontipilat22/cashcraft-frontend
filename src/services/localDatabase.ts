@@ -192,18 +192,18 @@ export class LocalDatabaseService {
         // Добавляем базовые категории
         const categories = [
           // Доходы
-          { id: 'salary', name: 'Зарплата', type: 'income', icon: 'cash-outline', color: '#4CAF50' },
-          { id: 'business', name: 'Бизнес', type: 'income', icon: 'briefcase-outline', color: '#2196F3' },
-          { id: 'investments', name: 'Инвестиции', type: 'income', icon: 'trending-up-outline', color: '#FF9800' },
-          { id: 'other_income', name: 'Другое', type: 'income', icon: 'add-circle-outline', color: '#9C27B0' },
+          { id: 'salary', name: 'salary', type: 'income', icon: 'cash-outline', color: '#4CAF50' },
+          { id: 'business', name: 'business', type: 'income', icon: 'briefcase-outline', color: '#2196F3' },
+          { id: 'investments', name: 'investments', type: 'income', icon: 'trending-up-outline', color: '#FF9800' },
+          { id: 'other_income', name: 'other_income', type: 'income', icon: 'add-circle-outline', color: '#9C27B0' },
           // Расходы
-          { id: 'food', name: 'Продукты', type: 'expense', icon: 'cart-outline', color: '#F44336' },
-          { id: 'transport', name: 'Транспорт', type: 'expense', icon: 'car-outline', color: '#3F51B5' },
-          { id: 'housing', name: 'Жилье', type: 'expense', icon: 'home-outline', color: '#009688' },
-          { id: 'entertainment', name: 'Развлечения', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
-          { id: 'health', name: 'Здоровье', type: 'expense', icon: 'fitness-outline', color: '#4CAF50' },
-          { id: 'shopping', name: 'Покупки', type: 'expense', icon: 'bag-outline', color: '#9C27B0' },
-          { id: 'other_expense', name: 'Другое', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B' },
+          { id: 'food', name: 'food', type: 'expense', icon: 'cart-outline', color: '#F44336' },
+          { id: 'transport', name: 'transport', type: 'expense', icon: 'car-outline', color: '#3F51B5' },
+          { id: 'housing', name: 'housing', type: 'expense', icon: 'home-outline', color: '#009688' },
+          { id: 'entertainment', name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
+          { id: 'health', name: 'health', type: 'expense', icon: 'fitness-outline', color: '#4CAF50' },
+          { id: 'shopping', name: 'shopping', type: 'expense', icon: 'bag-outline', color: '#9C27B0' },
+          { id: 'other_expense', name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B' },
         ];
 
         categories.forEach(cat => {

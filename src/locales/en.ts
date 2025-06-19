@@ -138,6 +138,18 @@ export default {
     savedRate: 'Saved rate',
     needTwoAccountsForTransfer: 'You need at least two accounts to make a transfer',
     openAccount: 'Open Account',
+    // Account card
+    months: 'months',
+    monthsShort: 'mo',
+    perMonth: '/mo',
+    remainingPayment: 'Remaining payment:',
+    inSavings: 'in savings',
+    // Savings modal
+    addToSavings: 'Add to savings',
+    withdrawFromSavings: 'Withdraw from savings',
+    availableOnAccount: 'Available on account "{{account}}": {{amount}}',
+    savedAmount: 'Saved: {{amount}}',
+    balance: 'Balance',
   },
   transactions: {
     title: 'Transactions',
@@ -184,6 +196,15 @@ export default {
     endDate: 'End date',
     deleteSelectedConfirm: 'Delete selected transactions',
     selectedCount: 'Selected',
+    // Transaction details
+    transactionDetails: 'Transaction Details',
+    time: 'Time',
+    unknownAccount: 'Unknown Account',
+    // Debt operations
+    gaveLoan: 'Gave loan',
+    receivedLoan: 'Received loan repayment',
+    borrowedMoney: 'Borrowed money',
+    paidBackDebt: 'Paid back debt',
   },
   categories: {
     // Income categories
@@ -317,6 +338,12 @@ export default {
     owedByMeDescription: 'List of people you owe money to',
     owedToMeEmpty: 'Nobody owes you money',
     owedByMeEmpty: 'You don\'t owe anyone money',
+    allDebts: 'All debts',
+    deleteTitle: 'Delete debt',
+    deleteConfirm: 'Are you sure you want to delete debt "{{name}}"?',
+    deleteError: 'Failed to delete debt',
+    emptyState: 'You have no debts yet',
+    addFirstDebt: 'Add first debt',
   },
   privacy: {
     title: 'Privacy Policy',
@@ -330,7 +357,7 @@ export default {
     },
     section2: {
       title: 'Where data is stored',
-      content: 'User data is stored:\n\n• Locally on the device (in SQLite database)\n• In Firebase cloud database (for authorization and synchronization)',
+      content: 'User data is stored:\n\n• Locally on the device (in SQLite database)\n• On secure server (for authorization and synchronization)',
     },
     section3: {
       title: 'Data transfer to third parties',
@@ -342,7 +369,7 @@ export default {
     },
     section5: {
       title: 'Data security',
-      content: 'Data is protected by standard Firebase and SQLite tools. Additional data encryption is not yet implemented.',
+      content: 'Data is protected by standard encryption and SQLite tools. HTTPS is used for data transmission.',
     },
     section6: {
       title: 'Advertising and analytics',

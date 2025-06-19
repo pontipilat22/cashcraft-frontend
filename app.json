@@ -23,12 +23,8 @@
       "bundleIdentifier": "com.pontipilat.cashcraft",
       "buildNumber": "1",
       "scheme": "cashcraft",
-      "googleServicesFile": "./GoogleService-Info.plist",
-      "config": {
-        "googleSignIn": {
-          "reservedClientId": "com.googleusercontent.apps.YOUR_IOS_CLIENT_ID"
-        }
-      },
+
+
       "splash": {
         "image": "./assets/splash-icon.png",
         "resizeMode": "contain",
@@ -43,7 +39,7 @@
       "package": "com.pontipilat.cashcraft",
       "versionCode": 1,
       "edgeToEdgeEnabled": true,
-      "googleServicesFile": "./google-services.json",
+
       "intentFilters": [
         {
           "action": "VIEW",
@@ -77,7 +73,7 @@
       },
       "googleWebClientId": "457720015497-gkarur46ep22kptgra8qm4v58r686jab.apps.googleusercontent.com",
       "googleAndroidClientId": "457720015497-phj9gjn84anqsnoufvv6bro3ca9oud03.apps.googleusercontent.com",
-      "googleIosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+
       "scheme": "cashcraft"
     }
   }

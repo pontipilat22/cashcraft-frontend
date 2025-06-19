@@ -390,10 +390,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 {account.type === 'credit' && account.creditTerm && account.creditRate !== undefined && account.creditPaymentType && (
                   <View style={{ marginTop: 4 }}>
                     <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12 }]}>
-                      {account.creditTerm} мес • {account.creditRate}% • {account.creditPaymentType === 'annuity' ? 'Аннуитет' : 'Дифференц.'}
+                      {account.creditTerm} {t('accounts.monthsShort')} • {account.creditRate}% • {account.creditPaymentType === 'annuity' ? t('accounts.annuity') : t('accounts.differentiated')}
                     </Text>
                     <Text style={[styles.creditPayment, { color: colors.primary }]}>
-                      {formatBalance(calculateMonthlyPayment())}/мес
+                      {formatBalance(calculateMonthlyPayment())}{t('accounts.perMonth')}
                     </Text>
                   </View>
                 )}
@@ -402,7 +402,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 {account.type === 'credit' ? (
                   <>
                     <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12, marginBottom: 2 }]}>
-                      Осталось выплатить:
+                      {t('accounts.remainingPayment')}
                     </Text>
                     {getBalanceDisplay(Math.abs(account.balance), true)}
                   </>
@@ -411,7 +411,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     {getBalanceDisplay(account.balance, true)}
                     {getReservedAmount() > 0 && (
                       <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                        {formatBalance(getReservedAmount())} в накоплениях
+                        {formatBalance(getReservedAmount())} {t('accounts.inSavings')}
                       </Text>
                     )}
                   </>

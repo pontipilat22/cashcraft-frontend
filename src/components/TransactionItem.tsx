@@ -13,6 +13,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { Transaction, Category, Account } from '../types';
 import { CURRENCIES } from '../config/currencies';
+import { getLocalizedCategory } from '../utils/categoryUtils';
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -180,7 +181,7 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
                 debtType === 'return' ? 'Получил долг' :
                 debtType === 'borrow' ? 'Взял в долг' :
                 'Вернул долг'
-              ) : (category?.name || (isIncome ? t('transactions.income') : t('transactions.expense')))}
+              ) : (category ? getLocalizedCategory(category, t).name : (isIncome ? t('transactions.income') : t('transactions.expense')))}
             </Text>
             {Boolean(displayDescription) && (
               <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={1}>

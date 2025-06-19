@@ -11,12 +11,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { Debt } from '../types';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { AddDebtModal } from '../components/AddDebtModal';
 
 export const DebtsScreen: React.FC = () => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const { formatAmount } = useCurrency();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,12 +72,12 @@ export const DebtsScreen: React.FC = () => {
 
   const handleDeleteDebt = (debt: Debt) => {
     Alert.alert(
-      'Удалить долг?',
-      `Удалить долг "${debt.name}"?`,
+      t('debts.deleteTitle'),
+      t('debts.deleteConfirm', { name: debt.name }),
       [
-        { text: 'Отмена', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Удалить',
+          text: t('debts.deleteTitle'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -83,7 +85,7 @@ export const DebtsScreen: React.FC = () => {
               await loadDebts();
             } catch (error) {
               console.error('Error deleting debt:', error);
-              Alert.alert('Ошибка', 'Не удалось удалить долг');
+              Alert.alert(t('debts.deleteError'));
             }
           },
         },
@@ -157,7 +159,7 @@ export const DebtsScreen: React.FC = () => {
       <View style={[styles.summary, { backgroundColor: colors.card }]}>
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
-            Мне должны
+            {t('accounts.owedToMe')}
           </Text>
           <Text style={[styles.summaryAmount, { color: colors.success }]}>
             +{formatAmount(totalOwedToMe)}
@@ -166,7 +168,7 @@ export const DebtsScreen: React.FC = () => {
         <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
-            Я должен
+           {t('accounts.owedByMe')}
           </Text>
           <Text style={[styles.summaryAmount, { color: colors.danger }]}>
             -{formatAmount(totalOwedByMe)}
@@ -176,7 +178,7 @@ export const DebtsScreen: React.FC = () => {
 
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Все долги
+         {t('debts.allDebts')}
         </Text>
       </View>
     </View>
@@ -186,13 +188,13 @@ export const DebtsScreen: React.FC = () => {
     <View style={styles.emptyState}>
       <Ionicons name="wallet-outline" size={64} color={colors.textSecondary} />
       <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-        У вас пока нет долгов
+        {t('debts.emptyState')}
       </Text>
       <TouchableOpacity
         style={[styles.addFirstButton, { backgroundColor: colors.primary }]}
         onPress={() => setShowAddModal(true)}
       >
-        <Text style={styles.addFirstButtonText}>Добавить первый долг</Text>
+        <Text style={styles.addFirstButtonText}>{t('debts.addFirstDebt')}</Text>
       </TouchableOpacity>
     </View>
   );

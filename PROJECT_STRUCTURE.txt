@@ -82,11 +82,7 @@
 - index.ts - основные типы данных
 - Account.ts - типы для счетов
 
-/services/ - ВНЕШНИЕ СЕРВИСЫ:
-- authService.ts - сервис авторизации
 
-/contexts/ - ГЛОБАЛЬНЫЕ КОНТЕКСТЫ:
-- AuthContext.tsx - контекст авторизации (дубликат)
 
 /firebase/ - FIREBASE:
 - firebaseConfig.ts - конфигурация Firebase

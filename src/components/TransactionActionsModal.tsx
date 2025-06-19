@@ -13,6 +13,7 @@ import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { Transaction, Category } from '../types';
 import { CURRENCIES } from '../config/currencies';
+import { getLocalizedCategory } from '../utils/categoryUtils';
 
 interface TransactionActionsModalProps {
   visible: boolean;
@@ -138,7 +139,7 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
             
             {/* Заголовок */}
             <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]}>Детали операции</Text>
+              <Text style={[styles.title, { color: colors.text }]}>{t('transactions.transactionDetails')}</Text>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                 <Ionicons name="close-circle" size={28} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -180,11 +181,11 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
                       {isTransfer ? (
                         t('transactions.transfer')
                       ) : debtType ? (
-                        debtType === 'give' ? 'Дал в долг' :
-                        debtType === 'return' ? 'Получил долг' :
-                        debtType === 'borrow' ? 'Взял в долг' :
-                        'Вернул долг'
-                      ) : (category?.name || (isIncome ? t('transactions.income') : t('transactions.expense')))}
+                        debtType === 'give' ? t('transactions.gaveLoan') :
+                        debtType === 'return' ? t('transactions.receivedLoan') :
+                        debtType === 'borrow' ? t('transactions.borrowedMoney') :
+                        t('transactions.paidBackDebt')
+                      ) : (category ? getLocalizedCategory(category, t).name : (isIncome ? t('transactions.income') : t('transactions.expense')))}
                     </Text>
                   </View>
                 </View>
@@ -199,7 +200,7 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
                       <Ionicons name="document-text-outline" size={20} color={colors.textSecondary} />
                     </View>
                     <View style={styles.detailContent}>
-                      <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Описание</Text>
+                      <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('transactions.description')}</Text>
                       <Text style={[styles.detailValue, { color: colors.text }]}>{displayDescription}</Text>
                     </View>
                   </View>
@@ -211,9 +212,9 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
                     <Ionicons name="wallet-outline" size={20} color={colors.textSecondary} />
                   </View>
                   <View style={styles.detailContent}>
-                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Счёт</Text>
+                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('transactions.account')}</Text>
                     <Text style={[styles.detailValue, { color: colors.text }]}>
-                      {account?.name || 'Неизвестный счёт'}
+                      {account?.name || t('transactions.unknownAccount')}
                     </Text>
                   </View>
                 </View>
@@ -224,7 +225,7 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
                     <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
                   </View>
                   <View style={styles.detailContent}>
-                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Дата</Text>
+                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('transactions.date')}</Text>
                     <Text style={[styles.detailValue, { color: colors.text }]}>
                       {formatDate(transactionDate)}
                     </Text>
@@ -237,7 +238,7 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
                     <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
                   </View>
                   <View style={styles.detailContent}>
-                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Время</Text>
+                    <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('transactions.time')}</Text>
                     <Text style={[styles.detailValue, { color: colors.text }]}>
                       {formatTime(transactionDate)}
                     </Text>
@@ -252,7 +253,7 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
                   onPress={handleEdit}
                 >
                   <Ionicons name="pencil" size={20} color="#fff" />
-                  <Text style={styles.actionButtonText}>Редактировать</Text>
+                  <Text style={styles.actionButtonText}>{t('common.edit')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -260,7 +261,7 @@ export const TransactionActionsModal: React.FC<TransactionActionsModalProps> = (
                   onPress={handleDelete}
                 >
                   <Ionicons name="trash" size={20} color="#fff" />
-                  <Text style={styles.actionButtonText}>Удалить</Text>
+                  <Text style={styles.actionButtonText}>{t('common.delete')}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

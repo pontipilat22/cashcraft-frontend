@@ -63,7 +63,7 @@ export const SavingsActionModal: React.FC<SavingsActionModalProps> = ({
           <View style={[styles.container, { backgroundColor: colors.card }]}>
             <View style={styles.header}>
               <Text style={[styles.title, { color: colors.text }]}>
-                {action === 'add' ? 'Пополнение накопления' : 'Снятие с накопления'}
+                {action === 'add' ? t('accounts.addToSavings') : t('accounts.withdrawFromSavings')}
               </Text>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close" size={24} color={colors.text} />
@@ -78,8 +78,13 @@ export const SavingsActionModal: React.FC<SavingsActionModalProps> = ({
               <View style={[styles.infoBox, { backgroundColor: colors.background }]}>
                 <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {action === 'add' 
-                    ? `Доступно на счете "${linkedAccount.name}": ${formatAmount(linkedAccount.balance, linkedAccount.currency)}`
-                    : `Накоплено: ${formatAmount(savings.savedAmount || 0, savings.currency)}`
+                    ? t('accounts.availableOnAccount', { 
+                        account: linkedAccount.name, 
+                        amount: formatAmount(linkedAccount.balance, linkedAccount.currency) 
+                      })
+                    : t('accounts.savedAmount', { 
+                        amount: formatAmount(savings.savedAmount || 0, savings.currency) 
+                      })
                   }
                 </Text>
               </View>

@@ -138,6 +138,18 @@ export default {
     savedRate: 'Сохраненный курс',
     needTwoAccountsForTransfer: 'Для перевода необходимо иметь минимум два счета',
     openAccount: 'Открыть счет',
+    // Карточка счета
+    months: 'месяцев',
+    monthsShort: 'мес',
+    perMonth: '/мес',
+    remainingPayment: 'Осталось выплатить:',
+    inSavings: 'в накоплениях',
+    // Модальное окно накоплений
+    addToSavings: 'Пополнение накопления',
+    withdrawFromSavings: 'Снятие с накопления',
+    availableOnAccount: 'Доступно на счете "{{account}}": {{amount}}',
+    savedAmount: 'Накоплено: {{amount}}',
+    balance: 'Баланс',
   },
   transactions: {
     title: 'Операции',
@@ -184,6 +196,15 @@ export default {
     endDate: 'Конечная дата',
     deleteSelectedConfirm: 'Удалить выбранные транзакции',
     selectedCount: 'Выбрано',
+    // Детали транзакции
+    transactionDetails: 'Детали операции',
+    time: 'Время',
+    unknownAccount: 'Неизвестный счёт',
+    // Долговые операции
+    gaveLoan: 'Дал в долг',
+    receivedLoan: 'Получил долг',
+    borrowedMoney: 'Взял в долг',
+    paidBackDebt: 'Вернул долг',
   },
   categories: {
     // Income categories
@@ -330,7 +351,7 @@ export default {
     },
     section2: {
       title: 'Где хранятся данные',
-      content: 'Данные пользователя хранятся:\n\n• Локально на устройстве (в базе данных SQLite)\n• В облачной базе Firebase (для авторизации и синхронизации)',
+      content: 'Данные пользователя хранятся:\n\n• Локально на устройстве (в базе данных SQLite)\n• На защищенном сервере (для авторизации и синхронизации)',
     },
     section3: {
       title: 'Передача данных третьим лицам',
@@ -342,7 +363,7 @@ export default {
     },
     section5: {
       title: 'Безопасность данных',
-      content: 'Данные защищены стандартными средствами Firebase и SQLite. Дополнительное шифрование данных пока не реализовано.',
+      content: 'Данные защищены стандартными средствами шифрования и SQLite. Используется HTTPS для передачи данных.',
     },
     section6: {
       title: 'Реклама и аналитика',

@@ -656,11 +656,11 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
             <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
               <View style={styles.datePickerHeader}>
                 <TouchableOpacity onPress={() => setShowCreditDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Отмена</Text>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
-                <Text style={[styles.datePickerTitle, { color: colors.text }]}>Дата получения кредита</Text>
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>{t('accounts.creditDate')}</Text>
                 <TouchableOpacity onPress={() => setShowCreditDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Готово</Text>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -800,7 +800,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                           {account.name}
                         </Text>
                         <Text style={[styles.currencyName, { color: colors.textSecondary }]}>
-                          Баланс: {formatAmount(account.balance, account.currency || defaultCurrency)}
+                          {t('accounts.balance')}: {formatAmount(account.balance, account.currency || defaultCurrency)}
                         </Text>
                       </View>
                       {linkedAccountId === account.id && (

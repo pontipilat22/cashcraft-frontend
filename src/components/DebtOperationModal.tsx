@@ -17,6 +17,7 @@ import DateTimePickerModal from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt, Account } from '../types';
 import { CURRENCIES } from '../config/currencies';

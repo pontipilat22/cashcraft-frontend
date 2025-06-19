@@ -104,7 +104,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         type: isIncome ? 'income' : 'expense',
         accountId: selectedAccountId,
         categoryId: selectedCategoryId,
-        description: description.trim() || selectedCategory?.name || (isIncome ? t('transactions.income') : t('transactions.expense')),
+        description: description.trim() || undefined,
         date: selectedDate.toISOString(),
       });
       
