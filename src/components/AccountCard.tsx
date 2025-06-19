@@ -45,7 +45,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const handlePressIn = () => {
     setIsPressed(true);
     Animated.spring(scaleAnim, {
-      toValue: 0.98,
+      toValue: 0.95,
       useNativeDriver: true,
     }).start();
   };
@@ -71,14 +71,13 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   };
 
   const getHighlightColor = () => {
-    if (!isPressed) return colors.card;
-    
-    // Для светлой темы делаем карточку темнее, для темной - светлее
-    if (isDark) {
-      return colors.primary + '30'; // Добавляем прозрачность к основному цвету
-    } else {
-      return colors.primary + '20'; // Более прозрачный для светлой темы
+    if (!isPressed) {
+      // Используем тот же базовый цвет, что и в TransactionItem
+      return isDark ? '#232323' : '#f5f5f5';
     }
+    
+    // Более яркий неоновый эффект при нажатии
+    return isDark ? colors.primary + '20' : colors.primary + '15';
   };
 
   const getIcon = () => {
@@ -208,226 +207,228 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity
-        style={[
-          styles.container,
-          {
-            backgroundColor: isDark ? '#232323' : '#f5f5f5',
-            borderWidth: isPressed ? 1 : 0,
-            borderColor: isPressed ? colors.primary : 'transparent',
-            // Неоморфные тени - усиленные
-            shadowColor: isDark ? '#000' : '#c0c0c0',
-            shadowOffset: { width: 8, height: 8 },
-            shadowOpacity: isDark ? 0.7 : 0.4,
-            shadowRadius: 15,
-            elevation: isPressed ? 5 : 12,
-          },
-        ]}
-        activeOpacity={0.7}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onLongPress={handleLongPress}
-        delayLongPress={500}
-      >
-        {/* Верхняя светлая тень для неоморфизма */}
-        <View style={[
-          styles.neumorphicLight,
-          {
-            backgroundColor: isDark ? '#505050' : '#ffffff',
-            opacity: isPressed ? 0 : (isDark ? 0.4 : 0.9),
-            shadowColor: isDark ? '#505050' : '#ffffff',
-            shadowOffset: { width: -6, height: -6 },
-            shadowOpacity: isDark ? 0.4 : 0.8,
-            shadowRadius: 12,
-            elevation: 2,
-          }
-        ]} />
-        
-        {account.type === 'savings' && account.targetAmount ? (
-          <>
-            <LinearGradient
-              colors={isDark ? ['#FF9800', '#FFD600'] : ['#3B82F6', '#00E0FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.progressFill,
-                {
-                  width: `${getProgress()}%`,
-                },
-              ]}
-            />
-            <View style={[styles.content, { paddingBottom: 12 }]}>
+      <View style={isPressed ? [styles.glowContainer, { shadowColor: isDark ? colors.primary : '#3B82F6' }] : {}}>
+        <TouchableOpacity
+          style={[
+            styles.container,
+            {
+              backgroundColor: isDark ? '#232323' : '#f5f5f5',
+              borderWidth: isPressed ? 2 : 0,
+              borderColor: isPressed ? (isDark ? colors.primary : '#3B82F6') : 'transparent',
+              // Неоморфные тени - оставляем как есть
+              shadowColor: isDark ? '#000' : '#c0c0c0',
+              shadowOffset: { width: 8, height: 8 },
+              shadowOpacity: isDark ? 0.7 : 0.4,
+              shadowRadius: 15,
+              elevation: 12,
+            },
+          ]}
+          activeOpacity={1}
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          onLongPress={handleLongPress}
+          delayLongPress={500}
+        >
+          {/* Верхняя светлая тень для неоморфизма */}
+          <View style={[
+            styles.neumorphicLight,
+            {
+              backgroundColor: isDark ? '#505050' : '#ffffff',
+              opacity: isPressed ? 0 : (isDark ? 0.4 : 0.9),
+              shadowColor: isDark ? '#505050' : '#ffffff',
+              shadowOffset: { width: -6, height: -6 },
+              shadowOpacity: isDark ? 0.4 : 0.8,
+              shadowRadius: 12,
+              elevation: 2,
+            }
+          ]} />
+          
+          {account.type === 'savings' && account.targetAmount ? (
+            <>
+              <LinearGradient
+                colors={isDark ? ['#FF9800', '#FFD600'] : ['#3B82F6', '#00E0FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${getProgress()}%`,
+                  },
+                ]}
+              />
+              <View style={[styles.content, { paddingBottom: 12 }]}>
+                <View style={styles.row}>
+                  <View style={[
+                    styles.iconCircle,
+                    {
+                      backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
+                      // Неоморфные тени для иконки - усиленные
+                      shadowColor: isDark ? '#000' : '#a0a0a0',
+                      shadowOffset: { width: 4, height: 4 },
+                      shadowOpacity: isDark ? 0.6 : 0.3,
+                      shadowRadius: 6,
+                      elevation: 5,
+                    },
+                  ]}>
+                    {/* Внутренняя светлая тень */}
+                    <View style={{
+                      position: 'absolute',
+                      top: -2,
+                      left: -2,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: isDark ? '#404040' : '#ffffff',
+                      opacity: isDark ? 0.3 : 0.6,
+                    }} />
+                    <Ionicons
+                      name={getIcon()}
+                      size={24}
+                      color={isDark ? '#fff' : '#232323'}
+                    />
+                  </View>
+                  <View style={styles.textBlock}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text
+                        style={[
+                          styles.title,
+                          {
+                            color: isDark ? '#fff' : '#232323',
+                            fontWeight: '700',
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {account.name}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color: isDark ? '#fff' : '#232323',
+                        fontWeight: '500',
+                        marginTop: 2,
+                        fontSize: 14,
+                      }}
+                    >
+                      {formatBalance(account.savedAmount || 0)} / {formatBalance(account.targetAmount || 0)}
+                    </Text>
+                    {linkedAccount && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                        <Ionicons 
+                          name={linkedAccount.type === 'cash' ? 'cash-outline' : 'card-outline'} 
+                          size={10} 
+                          color={colors.textSecondary} 
+                        />
+                        <Text style={{ fontSize: 11, color: colors.textSecondary, marginLeft: 3 }}>
+                          {linkedAccount.name}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text
+                      style={{
+                        color: isDark ? '#fff' : '#232323',
+                        fontWeight: '700',
+                        fontSize: 20,
+                        textShadowColor: isDark ? 'rgba(0,0,0,0.15)' : 'transparent',
+                        textShadowOffset: { width: 0, height: 1 },
+                        textShadowRadius: 2,
+                      }}
+                    >
+                      {Math.floor(getProgress())}%
+                    </Text>
+                    {/* Компактные кнопки */}
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+                      <TouchableOpacity 
+                        style={[styles.compactButton, { 
+                          backgroundColor: isDark ? colors.card : '#f0f0f0',
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                        }]}
+                        onPress={onAddToSavings}
+                      >
+                        <Ionicons name="add" size={16} color={colors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.compactButton, { 
+                          backgroundColor: isDark ? colors.card : '#f0f0f0',
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                        }]}
+                        onPress={onWithdrawFromSavings}
+                      >
+                        <Ionicons name="remove" size={16} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={styles.content}>
               <View style={styles.row}>
                 <View style={[
-                  styles.iconCircle,
-                  {
-                    backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
+                  styles.iconCircle, 
+                  { 
+                    backgroundColor: colors.primary,
                     // Неоморфные тени для иконки - усиленные
-                    shadowColor: isDark ? '#000' : '#a0a0a0',
-                    shadowOffset: { width: 4, height: 4 },
-                    shadowOpacity: isDark ? 0.6 : 0.3,
-                    shadowRadius: 6,
-                    elevation: 5,
-                  },
-                ]}>
-                  {/* Внутренняя светлая тень */}
-                  <View style={{
-                    position: 'absolute',
-                    top: -2,
-                    left: -2,
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: isDark ? '#404040' : '#ffffff',
-                    opacity: isDark ? 0.3 : 0.6,
-                  }} />
-                  <Ionicons
-                    name={getIcon()}
-                    size={24}
-                    color={isDark ? '#fff' : '#232323'}
-                  />
+                    shadowColor: colors.primary,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 8,
+                    elevation: 6,
+                  }
+                ]}> 
+                  <Ionicons name={getIcon()} size={24} color="#fff" />
                 </View>
                 <View style={styles.textBlock}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text
-                      style={[
-                        styles.title,
-                        {
-                          color: isDark ? '#fff' : '#232323',
-                          fontWeight: '700',
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
+                    <Text style={[styles.title, { color: isDark ? '#fff' : '#232323' }]} numberOfLines={1}>
                       {account.name}
                     </Text>
                   </View>
-                  <Text
-                    style={{
-                      color: isDark ? '#fff' : '#232323',
-                      fontWeight: '500',
-                      marginTop: 2,
-                      fontSize: 14,
-                    }}
-                  >
-                    {formatBalance(account.savedAmount || 0)} / {formatBalance(account.targetAmount || 0)}
-                  </Text>
-                  {linkedAccount && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                      <Ionicons 
-                        name={linkedAccount.type === 'cash' ? 'cash-outline' : 'card-outline'} 
-                        size={10} 
-                        color={colors.textSecondary} 
-                      />
-                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginLeft: 3 }}>
-                        {linkedAccount.name}
+                  {account.type === 'card' && account.cardNumber && (
+                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}> 
+                      {account.cardNumber}
+                    </Text>
+                  )}
+                  {account.type === 'credit' && account.creditTerm && account.creditRate !== undefined && account.creditPaymentType && (
+                    <View style={{ marginTop: 4 }}>
+                      <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12 }]}>
+                        {account.creditTerm} {t('accounts.monthsShort')} • {account.creditRate}% • {account.creditPaymentType === 'annuity' ? t('accounts.annuity') : t('accounts.differentiated')}
+                      </Text>
+                      <Text style={[styles.creditPayment, { color: colors.primary }]}>
+                        {formatBalance(calculateMonthlyPayment())}{t('accounts.perMonth')}
                       </Text>
                     </View>
                   )}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text
-                    style={{
-                      color: isDark ? '#fff' : '#232323',
-                      fontWeight: '700',
-                      fontSize: 20,
-                      textShadowColor: isDark ? 'rgba(0,0,0,0.15)' : 'transparent',
-                      textShadowOffset: { width: 0, height: 1 },
-                      textShadowRadius: 2,
-                    }}
-                  >
-                    {Math.floor(getProgress())}%
-                  </Text>
-                  {/* Компактные кнопки */}
-                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-                    <TouchableOpacity 
-                      style={[styles.compactButton, { 
-                        backgroundColor: isDark ? colors.card : '#f0f0f0',
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }]}
-                      onPress={onAddToSavings}
-                    >
-                      <Ionicons name="add" size={16} color={colors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[styles.compactButton, { 
-                        backgroundColor: isDark ? colors.card : '#f0f0f0',
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }]}
-                      onPress={onWithdrawFromSavings}
-                    >
-                      <Ionicons name="remove" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </>
-        ) : (
-          <View style={styles.content}>
-            <View style={styles.row}>
-              <View style={[
-                styles.iconCircle, 
-                { 
-                  backgroundColor: colors.primary,
-                  // Неоморфные тени для иконки - усиленные
-                  shadowColor: colors.primary,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.4,
-                  shadowRadius: 8,
-                  elevation: 6,
-                }
-              ]}> 
-                <Ionicons name={getIcon()} size={24} color="#fff" />
-              </View>
-              <View style={styles.textBlock}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={[styles.title, { color: isDark ? '#fff' : '#232323' }]} numberOfLines={1}>
-                    {account.name}
-                  </Text>
-                </View>
-                {account.type === 'card' && account.cardNumber && (
-                  <Text style={[styles.subtitle, { color: colors.textSecondary }]}> 
-                    {account.cardNumber}
-                  </Text>
-                )}
-                {account.type === 'credit' && account.creditTerm && account.creditRate !== undefined && account.creditPaymentType && (
-                  <View style={{ marginTop: 4 }}>
-                    <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12 }]}>
-                      {account.creditTerm} {t('accounts.monthsShort')} • {account.creditRate}% • {account.creditPaymentType === 'annuity' ? t('accounts.annuity') : t('accounts.differentiated')}
-                    </Text>
-                    <Text style={[styles.creditPayment, { color: colors.primary }]}>
-                      {formatBalance(calculateMonthlyPayment())}{t('accounts.perMonth')}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                {account.type === 'credit' ? (
-                  <>
-                    <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12, marginBottom: 2 }]}>
-                      {t('accounts.remainingPayment')}
-                    </Text>
-                    {getBalanceDisplay(Math.abs(account.balance), true)}
-                  </>
-                ) : (
-                  <>
-                    {getBalanceDisplay(account.balance, true)}
-                    {getReservedAmount() > 0 && (
-                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                        {formatBalance(getReservedAmount())} {t('accounts.inSavings')}
+                  {account.type === 'credit' ? (
+                    <>
+                      <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12, marginBottom: 2 }]}>
+                        {t('accounts.remainingPayment')}
                       </Text>
-                    )}
-                  </>
-                )}
+                      {getBalanceDisplay(Math.abs(account.balance), true)}
+                    </>
+                  ) : (
+                    <>
+                      {getBalanceDisplay(account.balance, true)}
+                      {getReservedAmount() > 0 && (
+                        <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                          {formatBalance(getReservedAmount())} {t('accounts.inSavings')}
+                        </Text>
+                      )}
+                    </>
+                  )}
+                </View>
               </View>
             </View>
-          </View>
-        )}
-      </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 };
@@ -604,5 +605,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  glowContainer: {
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
 }); 
