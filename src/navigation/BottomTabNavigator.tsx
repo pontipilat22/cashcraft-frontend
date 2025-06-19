@@ -113,8 +113,8 @@ export const BottomTabNavigator: React.FC = () => {
 const styles = StyleSheet.create({
   balanceHeader: {
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingTop: 15,
+    paddingHorizontal: 5,
+    paddingTop: 4,
   },
   balanceLabel: {
     fontSize: 12,
