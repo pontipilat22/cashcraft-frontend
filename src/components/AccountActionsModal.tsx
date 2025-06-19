@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface AccountActionsModalProps {
   visible: boolean;
@@ -27,6 +28,7 @@ export const AccountActionsModal: React.FC<AccountActionsModalProps> = ({
   onDelete,
 }) => {
   const { colors, isDark } = useTheme();
+  const { t } = useLocalization();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(50)).current;
 
@@ -62,13 +64,13 @@ export const AccountActionsModal: React.FC<AccountActionsModalProps> = ({
   const actions = [
     {
       icon: 'create-outline' as keyof typeof Ionicons.glyphMap,
-      title: 'Редактировать',
+      title: t('common.edit'),
       color: colors.primary,
       onPress: onEdit,
     },
     {
       icon: 'trash-outline' as keyof typeof Ionicons.glyphMap,
-      title: 'Удалить',
+      title: t('common.delete'),
       color: '#f44336',
       onPress: onDelete,
     },
@@ -109,6 +111,9 @@ export const AccountActionsModal: React.FC<AccountActionsModalProps> = ({
             <View style={styles.header}>
               <View style={[styles.handle, { backgroundColor: colors.border }]}></View>
               <Text style={[styles.title, { color: colors.text }]}>{accountName}</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                {t('accounts.selectAction')}
+              </Text>
             </View>
             
             <View style={styles.actions}>
@@ -140,7 +145,7 @@ export const AccountActionsModal: React.FC<AccountActionsModalProps> = ({
               style={[styles.cancelButton, { backgroundColor: colors.background }]}
               onPress={onClose}
             >
-              <Text style={[styles.cancelText, { color: colors.text }]}>Отмена</Text>
+              <Text style={[styles.cancelText, { color: colors.text }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -163,8 +168,8 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   content: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -173,7 +178,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   handle: {
     width: 40,
@@ -182,8 +187,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: 'center',
   },
   actions: {
     marginBottom: 16,
@@ -192,18 +202,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   actionButtonMargin: {
     marginBottom: 12,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   actionText: {
     flex: 1,
@@ -212,8 +227,13 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cancelText: {
     fontSize: 16,

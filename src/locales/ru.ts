@@ -160,6 +160,10 @@ export default {
     // Savings actions
     deposit: 'Пополнить',
     withdraw: 'Снять',
+    // Account descriptions
+    defaultAccountDescription: 'Этот счет будет выбран при добавлении транзакций',
+    includeInBalanceDescription: 'Баланс этого счета будет включен в общий баланс',
+    selectAction: 'Выберите действие',
   },
   transactions: {
     title: 'Операции',
@@ -400,6 +404,7 @@ export default {
     emptyState: 'У вас еще нет долгов',
     addFirstDebt: 'Добавить первый долг',
     editDebt: 'Редактировать долг',
+    newDebt: 'Новый долг',
     // Debt form fields
     enterName: 'Введите имя',
     enterCorrectAmount: 'Введите корректную сумму',
@@ -434,6 +439,17 @@ export default {
     updateError: 'Не удалось обновить долг',
     saveError: 'Не удалось сохранить долг',
     notInTotal: 'Не в итоге',
+    // Debt form sections
+    debtType: 'Тип долга',
+    amount: 'Сумма',
+    dueDate: 'Дата возврата',
+    selectDate: 'Выберите дату',
+    includeInBalance: 'Учитывать в общем балансе',
+    includeInBalanceDescription: 'Долг будет отображаться в общей статистике',
+    // Placeholders
+    debtorName: 'Имя должника',
+    creditorName: 'Имя кредитора',
+    creationDate: 'Дата создания',
   },
   privacy: {
     title: 'Политика конфиденциальности',

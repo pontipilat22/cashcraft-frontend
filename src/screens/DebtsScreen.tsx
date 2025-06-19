@@ -66,7 +66,7 @@ export const DebtsScreen: React.FC = () => {
       setEditingDebt(null);
     } catch (error) {
       console.error('Error saving debt:', error);
-      Alert.alert(t('common.error'), t('debts.saveError') || 'Не удалось сохранить долг');
+      Alert.alert(t('common.error'), t('debts.saveError'));
     }
   };
 

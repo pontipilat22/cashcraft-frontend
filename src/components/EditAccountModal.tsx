@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
-import { Account } from '../types';
+import { useLocalization } from '../context/LocalizationContext';
+import { Account, AccountType } from '../types';
 
 interface EditAccountModalProps {
   visible: boolean;
@@ -35,6 +36,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
   onSave,
 }) => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -52,7 +54,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
   }, [account]);
 
   const handleSave = () => {
-    if (!name.trim() || !account) return;
+    if (!account || !name.trim()) return;
 
     onSave(account.id, {
       name: name.trim(),
@@ -66,21 +68,29 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
   };
 
   const getIcon = () => {
-    if (!account) return 'wallet-outline';
+    if (!account) return 'wallet';
     
-    switch (account.type) {
+    const accountType: AccountType = account.type;
+    
+    switch (accountType) {
       case 'cash':
-        return 'cash-outline';
+        return 'cash';
       case 'card':
-        return 'card-outline';
+        return 'card';
+      case 'bank':
+        return 'business';
       case 'savings':
-        return 'trending-up-outline';
+        return 'trending-up';
       case 'debt':
-        return 'arrow-down-circle-outline';
+        return 'arrow-down';
       case 'credit':
-        return 'card-outline';
+        return 'arrow-up';
       default:
-        return 'wallet-outline';
+        // Handle investment and any other types
+        if (accountType === 'investment') {
+          return 'analytics';
+        }
+        return 'wallet';
     }
   };
 
@@ -100,7 +110,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Редактировать счет
+              {t('accounts.editAccount')}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -115,7 +125,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Название</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.accountName')}</Text>
               <TextInput
                 style={[styles.input, { 
                   backgroundColor: colors.background,
@@ -124,14 +134,14 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 }]}
                 value={name}
                 onChangeText={setName}
-                placeholder="Название счета"
+                placeholder={t('accounts.accountNamePlaceholder')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
 
             {Boolean(account.type === 'card' || account.type === 'credit') && (
               <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Последние 4 цифры карты</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.cardNumber')}</Text>
                 <TextInput
                   style={[styles.input, { 
                     backgroundColor: colors.background,
@@ -150,7 +160,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
 
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}> 
-                {Boolean(account.type === 'debt' || account.type === 'credit') ? 'Сумма долга' : 'Баланс'}
+                {Boolean(account.type === 'debt' || account.type === 'credit') ? t('accounts.debtAmount') : t('accounts.balance')}
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -169,7 +179,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
             <View style={styles.switchContainer}>
               <View style={styles.switchRow}>
                 <Text style={[styles.switchLabel, { color: colors.text }]}>
-                  Счет по умолчанию
+                  {t('accounts.defaultAccount')}
                 </Text>
                 <Switch
                   value={isDefault}
@@ -178,14 +188,14 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 />
               </View>
               <Text style={[styles.switchDescription, { color: colors.textSecondary }]}>
-                Этот счет будет выбран при добавлении транзакций
+                {t('accounts.defaultAccountDescription')}
               </Text>
             </View>
 
             <View style={styles.switchContainer}>
               <View style={styles.switchRow}>
                 <Text style={[styles.switchLabel, { color: colors.text }]}>
-                  Учитывать в общем балансе
+                  {t('accounts.includeInBalance')}
                 </Text>
                 <Switch
                   value={isIncludedInTotal}
@@ -194,7 +204,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 />
               </View>
               <Text style={[styles.switchDescription, { color: colors.textSecondary }]}>
-                Баланс этого счета будет включен в общий баланс
+                {t('accounts.includeInBalanceDescription')}
               </Text>
             </View>
           </ScrollView>
@@ -204,14 +214,14 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
               style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
               onPress={onClose}
             >
-              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+              <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
               onPress={handleSave}
               disabled={!name.trim()}
             >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+              <Text style={[styles.buttonText, { color: '#fff' }]}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>

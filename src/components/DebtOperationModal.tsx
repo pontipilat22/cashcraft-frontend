@@ -265,10 +265,10 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
             {/* Сумма */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Сумма
+                {t('debts.amount')}
                 {selectedDebt && (
                   <Text style={{ fontSize: 12 }}>
-                    {' '}(долг: {selectedDebt.amount.toLocaleString('ru-RU')} {currencySymbol})
+                    {' '}({t('debts.notInTotal')}: {selectedDebt.amount.toLocaleString('ru-RU')} {currencySymbol})
                   </Text>
                 )}
               </Text>
@@ -289,7 +289,10 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
               </View>
               {selectedDebt && amount && parseFloat(amount) > selectedDebt.amount && (
                 <Text style={{ color: '#FF5252', fontSize: 12, marginTop: 4 }}>
-                  Сумма больше долга
+                  {t('debts.amountExceedsDebt', { 
+                    amount: selectedDebt.amount.toLocaleString('ru-RU'), 
+                    currency: currencySymbol 
+                  })}
                 </Text>
               )}
             </View>
@@ -305,7 +308,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                   onPress={() => setShowPersonPicker(true)}
                 >
                   <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {selectedDebt ? selectedDebt.name : 'Выберите человека'}
+                    {selectedDebt ? selectedDebt.name : t('debts.selectPerson')}
                   </Text>
                   <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
@@ -318,7 +321,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                   }]}
                   value={person}
                   onChangeText={setPerson}
-                  placeholder="Имя человека"
+                  placeholder={t('debts.personPlaceholder')}
                   placeholderTextColor={colors.textSecondary}
                 />
               )}
@@ -327,7 +330,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
             {/* Описание */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Описание (необязательно)
+                {t('transactions.description')} ({t('common.optional')})
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -337,7 +340,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                 }]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="За что"
+                placeholder={t('debts.forWhat')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -345,7 +348,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
             {/* Дата */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Дата
+                {t('transactions.date')}
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
@@ -364,14 +367,14 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
             {/* Счет */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Счет
+                {t('transactions.account')}
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => setShowAccountPicker(true)}
               >
                 <Text style={[styles.selectorText, { color: colors.text }]}>
-                  {selectedAccount?.name || 'Выберите счет'}
+                  {selectedAccount?.name || t('transactions.selectAccount')}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -383,14 +386,14 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
               style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
               onPress={handleClose}
             >
-              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+              <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
               onPress={handleSave}
               disabled={!amount || parseFloat(amount) === 0 || (!person.trim() && !selectedDebt)}
             >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+              <Text style={[styles.buttonText, { color: '#fff' }]}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -408,11 +411,11 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
             <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
               <View style={styles.datePickerHeader}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Отмена</Text>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
-                <Text style={[styles.datePickerTitle, { color: colors.text }]}>Выберите дату</Text>
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>{t('debts.selectDate')}</Text>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Готово</Text>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -452,7 +455,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
             <View style={styles.pickerHeader}>
               <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                Выберите долг для погашения
+                {t('debts.selectDebtForPayment')}
               </Text>
               <TouchableOpacity onPress={() => setShowPersonPicker(false)} style={styles.pickerCloseButton}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -478,7 +481,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                       {debt.amount.toLocaleString('ru-RU')} {currencySymbol}
                     </Text>
                     <Text style={[styles.debtLabel, { color: colors.textSecondary }]}>
-                      осталось
+                      {t('debts.notInTotal')}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -503,7 +506,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
             <View style={styles.pickerHeader}>
               <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                Выберите счет
+                {t('transactions.selectAccount')}
               </Text>
               <TouchableOpacity onPress={() => setShowAccountPicker(false)} style={styles.pickerCloseButton}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />

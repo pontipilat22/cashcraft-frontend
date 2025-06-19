@@ -1,7 +1,7 @@
 export interface Account {
   id: string;
   name: string;
-  type: 'cash' | 'card' | 'bank' | 'savings' | 'debt' | 'credit';
+  type: 'cash' | 'card' | 'bank' | 'savings' | 'investment' | 'debt' | 'credit';
   balance: number;
   currency: string;
   exchangeRate?: number;
@@ -36,13 +36,14 @@ export interface Category {
   color: string;
 }
 
-export type AccountType = 'cash' | 'card' | 'bank' | 'savings' | 'debt' | 'credit';
+export type AccountType = 'cash' | 'card' | 'bank' | 'savings' | 'investment' | 'debt' | 'credit';
 
 export const AccountTypeLabels: Record<AccountType, string> = {
   cash: 'Наличные',
   card: 'Карта',
   bank: 'Банковский счет',
   savings: 'Накопления',
+  investment: 'Инвестиции',
   debt: 'Долг',
   credit: 'Кредит',
 }; 

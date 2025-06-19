@@ -105,7 +105,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              {t('debts.editDebt') || 'Редактировать долг'}
+              {t('debts.editDebt')}
             </Text>
             <TouchableOpacity onPress={handleClose}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -119,7 +119,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
                 <Ionicons 
                   name={debt.type === 'owed_to_me' ? 'arrow-up-circle' : 'arrow-down-circle'} 
                   size={24} 
-                                      color={debt.type === 'owed_to_me' ? '#4CAF50' : '#FF5252'} 
+                  color={debt.type === 'owed_to_me' ? '#4CAF50' : '#FF5252'} 
                 />
                 <Text style={[styles.typeInfoText, { color: colors.text }]}>
                   {debt.type === 'owed_to_me' ? t('debts.owedToMe') : t('debts.iOwe')}
@@ -130,7 +130,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
             {/* Сумма */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.amount')}
+                {t('debts.amount')}
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: colors.primary }]}>
@@ -169,7 +169,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
             {debt.createdAt && (
               <View style={styles.infoContainer}>
                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
-                  Дата создания
+                  {t('debts.creationDate')}
                 </Text>
                 <Text style={[styles.infoValue, { color: colors.text }]}>
                   {new Date(debt.createdAt).toLocaleDateString('ru-RU', {

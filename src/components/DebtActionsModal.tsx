@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt } from '../types';
 import { DebtOperationModal } from './DebtOperationModal';
@@ -24,6 +25,7 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
 }) => {
   const { colors } = useTheme();
   const { formatAmount } = useCurrency();
+  const { t } = useLocalization();
   const [showDebtOperationModal, setShowDebtOperationModal] = useState(false);
   const [debtOperationType, setDebtOperationType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -43,12 +45,12 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
 
   const handleDelete = () => {
     Alert.alert(
-      'Удалить долг',
-      `Вы уверены, что хотите удалить долг "${debt.name}"?`,
+      t('debts.deleteTitle'),
+      t('debts.deleteConfirm', { name: debt.name }),
       [
-        { text: 'Отмена', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Удалить',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -67,19 +69,19 @@ export const DebtActionsModal: React.FC<DebtActionsModalProps> = ({
   const actions = [
     {
       icon: 'checkmark-circle',
-      label: debt.type === 'owed_to_me' ? 'Получить долг' : 'Вернуть долг',
+      label: debt.type === 'owed_to_me' ? t('debts.collectDebt') : t('debts.paybackDebt'),
       onPress: handlePayOff,
       color: '#4CAF50',
     },
     {
       icon: 'pencil',
-      label: 'Редактировать',
+      label: t('common.edit'),
       onPress: handleEdit,
       color: colors.primary,
     },
     {
       icon: 'trash',
-      label: 'Удалить',
+      label: t('common.delete'),
       onPress: handleDelete,
       color: '#FF5252',
     },

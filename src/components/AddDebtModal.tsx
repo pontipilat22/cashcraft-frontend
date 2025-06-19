@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { Debt } from '../types';
 
 interface AddDebtModalProps {
@@ -31,6 +32,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   editingDebt,
 }) => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   
   const [type, setType] = useState<'owed_to_me' | 'owed_by_me'>('owed_to_me');
   const [name, setName] = useState('');
@@ -58,13 +60,13 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
 
   const handleSave = () => {
     if (!name.trim()) {
-      Alert.alert('Ошибка', 'Введите имя должника');
+      Alert.alert(t('common.error'), t('debts.nameError'));
       return;
     }
 
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      Alert.alert('Ошибка', 'Введите корректную сумму');
+      Alert.alert(t('common.error'), t('debts.amountError'));
       return;
     }
 
@@ -80,8 +82,6 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('ru-RU');
   };
-
-
 
   return (
     <Modal
@@ -100,11 +100,11 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.title, { color: colors.text }]}>
-              {editingDebt ? 'Редактировать долг' : 'Новый долг'}
+              {editingDebt ? t('debts.editDebt') : t('debts.newDebt')}
             </Text>
             <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
               <Text style={[styles.saveButtonText, { color: colors.primary }]}>
-                Сохранить
+                {t('common.save')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -113,7 +113,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             {/* Тип долга */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Тип долга
+                {t('debts.debtType')}
               </Text>
               <View style={[styles.segmentedControl, { backgroundColor: colors.card }]}>
                 <TouchableOpacity
@@ -133,7 +133,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                       },
                     ]}
                   >
-                    Мне должны
+                    {t('debts.owedToMe')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -153,7 +153,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                       },
                     ]}
                   >
-                    Я должен
+                    {t('debts.iOwe')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -162,14 +162,14 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             {/* Имя должника */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {type === 'owed_to_me' ? 'Кто должен' : 'Кому должен'}
+                {type === 'owed_to_me' ? t('debts.whoOwes') : t('debts.toWhomOwe')}
               </Text>
               <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
                   value={name}
                   onChangeText={setName}
-                  placeholder={type === 'owed_to_me' ? 'Имя должника' : 'Имя кредитора'}
+                  placeholder={type === 'owed_to_me' ? t('debts.debtorName') : t('debts.creditorName')}
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
@@ -178,7 +178,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             {/* Сумма */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Сумма
+                {t('debts.amount')}
               </Text>
               <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
                 <TextInput
@@ -196,7 +196,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             {/* Дата возврата */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Дата возврата
+                {t('debts.dueDate')}
               </Text>
               <TouchableOpacity
                 style={[styles.dateButton, { backgroundColor: colors.card }]}
@@ -209,7 +209,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                     { color: dueDate ? colors.text : colors.textSecondary },
                   ]}
                 >
-                  {dueDate ? formatDate(dueDate) : 'Выберите дату'}
+                  {dueDate ? formatDate(dueDate) : t('debts.selectDate')}
                 </Text>
                 {dueDate && (
                   <TouchableOpacity
@@ -226,10 +226,10 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             <View style={[styles.switchRow, { backgroundColor: colors.card }]}>
               <View style={styles.switchLeft}>
                 <Text style={[styles.switchTitle, { color: colors.text }]}>
-                  Учитывать в общем балансе
+                  {t('debts.includeInBalance')}
                 </Text>
                 <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>
-                  Долг будет отображаться в общей статистике
+                  {t('debts.includeInBalanceDescription')}
                 </Text>
               </View>
               <Switch

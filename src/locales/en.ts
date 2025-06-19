@@ -160,6 +160,10 @@ export default {
     // Savings actions
     deposit: 'Deposit',
     withdraw: 'Withdraw',
+    // Account descriptions
+    defaultAccountDescription: 'This account will be selected when adding transactions',
+    includeInBalanceDescription: 'This account balance will be included in total balance',
+    selectAction: 'Select an action',
   },
   transactions: {
     title: 'Transactions',
@@ -400,6 +404,7 @@ export default {
     emptyState: 'You have no debts yet',
     addFirstDebt: 'Add first debt',
     editDebt: 'Edit debt',
+    newDebt: 'New debt',
     // Debt form fields
     enterName: 'Enter name',
     enterCorrectAmount: 'Enter correct amount',
@@ -434,6 +439,17 @@ export default {
     updateError: 'Failed to update debt',
     saveError: 'Failed to save debt',
     notInTotal: 'Not in total',
+    // Debt form sections
+    debtType: 'Debt type',
+    amount: 'Amount',
+    dueDate: 'Due date',
+    selectDate: 'Select date',
+    includeInBalance: 'Include in total balance',
+    includeInBalanceDescription: 'Debt will be displayed in general statistics',
+    // Placeholders
+    debtorName: 'Debtor name',
+    creditorName: 'Creditor name',
+    creationDate: 'Creation date',
   },
   privacy: {
     title: 'Privacy Policy',
