@@ -264,6 +264,7 @@ export default {
     ratesUpdated: 'Exchange rates updated successfully',
     errorChangingMode: 'Error changing mode',
     errorUpdatingRates: 'Error updating rates',
+    exchangeRatesResetAndUpdated: 'Exchange rates reset and updated successfully',
     autoMode: 'Automatic',
     manualMode: 'Manual',
     noMultiCurrencyAccounts: 'No multi-currency accounts',

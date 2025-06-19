@@ -5,17 +5,12 @@ import { Platform } from 'react-native';
 // Базовый URL API - правильная конфигурация для разных платформ
 const getApiBaseUrl = () => {
   if (__DEV__) {
-    // Для разработки
     if (Platform.OS === 'android') {
-      // Android - используем IP адрес компьютера
-      // ВАЖНО: Замените на ваш IP адрес!
-      return 'http://192.168.2.100:3001/api';
+      return 'http://192.168.2.101:3000/api/v1';
     } else {
-      // iOS - тоже используем IP адрес для физических устройств
-      return 'http://192.168.2.100:3001/api';
+      return 'http://192.168.2.101:3000/api/v1';
     }
   } else {
-    // Production
     return 'https://your-production-api.com/api/v1';
   }
 };

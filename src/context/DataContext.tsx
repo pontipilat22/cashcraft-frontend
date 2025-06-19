@@ -3,6 +3,7 @@ import { Account, Transaction, Category, Debt } from '../types';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { CloudSyncService } from '../services/cloudSync';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ExchangeRateService } from '../services/exchangeRate';
 
 interface DataContextType {
   accounts: Account[];
@@ -167,8 +168,39 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     setTransactions(transactions);
     setCategories(categories);
     
+    // Обновляем курсы валют для счетов с другой валютой
+    const accountsWithRates = await Promise.all(
+      accounts.map(async (account: Account) => {
+        if (account.currency && account.currency !== defaultCurrency) {
+          try {
+            // Пробуем получить прямой курс
+            let rate = await ExchangeRateService.getRate(account.currency, defaultCurrency);
+            
+            // Если прямого курса нет, пробуем через USD
+            if (!rate && account.currency !== 'USD' && defaultCurrency !== 'USD') {
+              console.log(`No direct rate ${account.currency}->${defaultCurrency}, trying through USD`);
+              const toUsd = await ExchangeRateService.getRate(account.currency, 'USD');
+              const fromUsd = await ExchangeRateService.getRate('USD', defaultCurrency);
+              
+              if (toUsd && fromUsd) {
+                rate = toUsd * fromUsd;
+                console.log(`Cross rate ${account.currency}->${defaultCurrency} = ${rate} (via USD)`);
+              }
+            }
+            
+            if (rate) {
+              return { ...account, exchangeRate: rate };
+            }
+          } catch (error) {
+            console.error(`Failed to get rate for ${account.currency}:`, error);
+          }
+        }
+        return account;
+      })
+    );
+    
     // Считаем общий баланс только по счетам с учетом курса обмена
-    const accountsTotal = accounts
+    const accountsTotal = accountsWithRates
       .filter((acc: Account) => acc.isIncludedInTotal !== false)
       .reduce((sum: number, account: Account) => {
         // Если валюта счета отличается от основной и есть курс обмена

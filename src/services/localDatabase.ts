@@ -500,6 +500,8 @@ export class LocalDatabaseService {
       db.runSync('DELETE FROM accounts');
       db.runSync('DELETE FROM categories');
       db.runSync('DELETE FROM sync_metadata');
+      db.runSync('DELETE FROM exchange_rates');  // Очищаем курсы валют
+      db.runSync('DELETE FROM settings');  // Очищаем настройки
       
       // Пересоздаем базовые данные
       await this.initDatabase(defaultCurrency);
@@ -815,9 +817,9 @@ export class LocalDatabaseService {
   }
 
   // Получить все сохраненные курсы
-  static async getAllExchangeRates(): Promise<Array<{ fromCurrency: string; toCurrency: string; rate: number }>> {
+  static async getAllExchangeRates(): Promise<{ [key: string]: { [key: string]: number } }> {
     if (!this.db || !this.currentUserId) {
-      return [];
+      return {};
     }
     const db = this.getDb();
     
@@ -825,10 +827,17 @@ export class LocalDatabaseService {
       const rates = db.getAllSync<{ fromCurrency: string; toCurrency: string; rate: number }>(
         'SELECT fromCurrency, toCurrency, rate FROM exchange_rates ORDER BY fromCurrency, toCurrency'
       );
-      return rates || [];
+      const ratesMap: { [key: string]: { [key: string]: number } } = {};
+      rates.forEach(r => {
+        if (!ratesMap[r.fromCurrency]) {
+          ratesMap[r.fromCurrency] = {};
+        }
+        ratesMap[r.fromCurrency][r.toCurrency] = r.rate;
+      });
+      return ratesMap;
     } catch (error) {
       console.error('Error getting all exchange rates:', error);
-      return [];
+      return {};
     }
   }
 
@@ -891,6 +900,43 @@ export class LocalDatabaseService {
       }
     } catch (error) {
       console.error('Error saving exchange rates from sync:', error);
+    }
+  }
+
+  static async clearAllExchangeRates(): Promise<void> {
+    if (!this.db || !this.currentUserId) {
+      return;
+    }
+    const db = this.getDb();
+    
+    try {
+      // Очищаем все курсы из базы
+      db.runSync('DELETE FROM exchange_rates');
+      
+      // Сбрасываем последнее время обновления
+      await this.setLastRatesUpdate(null);
+      
+      console.log('All exchange rates cleared');
+    } catch (error) {
+      console.error('Error clearing exchange rates:', error);
+      throw error;
+    }
+  }
+
+  static async setLastRatesUpdate(lastUpdate: Date | null): Promise<void> {
+    if (!this.db || !this.currentUserId) {
+      return;
+    }
+    const db = this.getDb();
+    const now = new Date().toISOString();
+    
+    if (lastUpdate) {
+      db.runSync(
+        'INSERT INTO settings (key, value) VALUES (?, ?)',
+        'lastRatesUpdate', lastUpdate.toISOString()
+      );
+    } else {
+      db.runSync('DELETE FROM settings WHERE key = ?', 'lastRatesUpdate');
     }
   }
 } 

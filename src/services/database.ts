@@ -705,4 +705,38 @@ export class DatabaseService {
       throw error;
     }
   }
+
+  static async getAllExchangeRates(): Promise<{ [key: string]: { [key: string]: number } }> {
+    const database = this.getDb();
+    
+    try {
+      const rates = database.getAllSync<{ fromCurrency: string; toCurrency: string; rate: number }>(
+        'SELECT fromCurrency, toCurrency, rate FROM exchange_rates ORDER BY fromCurrency, toCurrency'
+      );
+      
+      const ratesMap: { [key: string]: { [key: string]: number } } = {};
+      rates.forEach(r => {
+        if (!ratesMap[r.fromCurrency]) {
+          ratesMap[r.fromCurrency] = {};
+        }
+        ratesMap[r.fromCurrency][r.toCurrency] = r.rate;
+      });
+      
+      return ratesMap;
+    } catch (error) {
+      console.error('Error getting all exchange rates:', error);
+      return {};
+    }
+  }
+
+  static async clearAllExchangeRates(): Promise<void> {
+    const database = this.getDb();
+    
+    try {
+      database.runSync('DELETE FROM exchange_rates');
+      console.log('All exchange rates cleared from database');
+    } catch (error) {
+      console.error('Error clearing exchange rates:', error);
+    }
+  }
 } 

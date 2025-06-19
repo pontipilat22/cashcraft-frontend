@@ -264,6 +264,7 @@ export default {
     ratesUpdated: 'Курсы валют успешно обновлены',
     errorChangingMode: 'Ошибка при изменении режима',
     errorUpdatingRates: 'Ошибка при обновлении курсов',
+    exchangeRatesResetAndUpdated: 'Курсы валют сброшены и обновлены',
     autoMode: 'Автоматический',
     manualMode: 'Ручной',
     noMultiCurrencyAccounts: 'Нет мультивалютных счетов',

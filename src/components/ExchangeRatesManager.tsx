@@ -215,6 +215,14 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
     try {
       setUpdating(true);
       
+      // Сначала очищаем все локальные курсы валют
+      await LocalDatabaseService.clearAllExchangeRates();
+      
+      // Сбрасываем режим на auto
+      await LocalDatabaseService.setExchangeRatesMode('auto');
+      setIsAutoMode(true);
+      
+      // Загружаем новые курсы с сервера
       await LocalDatabaseService.updateRatesFromBackend();
       await loadDataAsync();
       
@@ -223,6 +231,11 @@ export const ExchangeRatesManager: React.FC<ExchangeRatesManagerProps> = ({
       
       // Обновляем счета в фоне
       updateAccountExchangeRates();
+      
+      Alert.alert(
+        t('common.success'),
+        t('settings.exchangeRatesResetAndUpdated')
+      );
     } catch (error) {
       console.error('Error updating rates:', error);
       Alert.alert(t('common.error'), t('settings.errorUpdatingRates'));
