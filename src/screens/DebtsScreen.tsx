@@ -66,7 +66,7 @@ export const DebtsScreen: React.FC = () => {
       setEditingDebt(null);
     } catch (error) {
       console.error('Error saving debt:', error);
-      Alert.alert('Ошибка', 'Не удалось сохранить долг');
+      Alert.alert(t('common.error'), t('debts.saveError') || 'Не удалось сохранить долг');
     }
   };
 
@@ -132,7 +132,7 @@ export const DebtsScreen: React.FC = () => {
                 styles.debtDueDate,
                 { color: isOverdue ? colors.danger : colors.textSecondary }
               ]}>
-                {isOverdue ? 'Просрочено' : 'До'}: {formatDate(item.dueDate)}
+                {isOverdue ? t('debts.overdue') : t('debts.dueBy')}: {formatDate(item.dueDate)}
               </Text>
             )}
           </View>
@@ -146,7 +146,7 @@ export const DebtsScreen: React.FC = () => {
           </Text>
           {item.isIncludedInTotal === false && (
             <Text style={[styles.notIncludedText, { color: colors.textSecondary }]}>
-              Не в итоге
+              {t('debts.notInTotal')}
             </Text>
           )}
         </View>

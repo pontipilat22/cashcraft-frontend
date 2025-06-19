@@ -15,6 +15,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useLocalization } from '../context/LocalizationContext';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { Debt } from '../types';
 import { CURRENCIES } from '../config/currencies';
@@ -36,6 +37,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
 }) => {
   const { colors } = useTheme();
   const { defaultCurrency } = useCurrency();
+  const { t } = useLocalization();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,12 +56,12 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
     if (!debt) return;
     
     if (!name.trim()) {
-      Alert.alert('Ошибка', 'Введите имя');
+      Alert.alert(t('common.error'), t('debts.nameError'));
       return;
     }
     
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Ошибка', 'Введите корректную сумму');
+      Alert.alert(t('common.error'), t('debts.amountError'));
       return;
     }
     
@@ -75,7 +77,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
       handleClose();
     } catch (error) {
       console.error('Error updating debt:', error);
-      Alert.alert('Ошибка', 'Не удалось обновить долг');
+      Alert.alert(t('common.error'), t('debts.updateError'));
     } finally {
       setLoading(false);
     }
@@ -103,7 +105,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Редактировать долг
+              {t('debts.editDebt') || 'Редактировать долг'}
             </Text>
             <TouchableOpacity onPress={handleClose}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -120,7 +122,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
                                       color={debt.type === 'owed_to_me' ? '#4CAF50' : '#FF5252'} 
                 />
                 <Text style={[styles.typeInfoText, { color: colors.text }]}>
-                                      {debt.type === 'owed_to_me' ? 'Мне должны' : 'Я должен'}
+                  {debt.type === 'owed_to_me' ? t('debts.owedToMe') : t('debts.iOwe')}
                 </Text>
               </View>
             </View>
@@ -128,7 +130,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
             {/* Сумма */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Сумма
+                {t('transactions.amount')}
               </Text>
               <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.currencySymbol, { color: colors.primary }]}>
@@ -148,7 +150,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
             {/* Человек */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {debt.type === 'owed_to_me' ? 'Кто должен' : 'Кому должен'}
+                {debt.type === 'owed_to_me' ? t('debts.whoOwes') : t('debts.toWhomOwe')}
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -158,7 +160,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
                 }]}
                 value={name}
                 onChangeText={setName}
-                placeholder="Имя человека"
+                placeholder={t('debts.personPlaceholder')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -185,7 +187,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
               style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
               onPress={handleClose}
             >
-              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+              <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -196,7 +198,7 @@ export const EditDebtModal: React.FC<EditDebtModalProps> = ({
               onPress={handleSave}
               disabled={loading || !name.trim() || !amount || parseFloat(amount) === 0}
             >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+              <Text style={[styles.buttonText, { color: '#fff' }]}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>

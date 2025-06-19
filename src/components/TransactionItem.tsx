@@ -177,10 +177,10 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
               {isTransferTransaction ? (
                 t('transactions.transfer')
               ) : debtType ? (
-                debtType === 'give' ? 'Дал в долг' :
-                debtType === 'return' ? 'Получил долг' :
-                debtType === 'borrow' ? 'Взял в долг' :
-                'Вернул долг'
+                debtType === 'give' ? t('transactions.gaveLoan') :
+                debtType === 'return' ? t('transactions.receivedLoan') :
+                debtType === 'borrow' ? t('transactions.borrowedMoney') :
+                t('transactions.paidBackDebt')
               ) : (category ? getLocalizedCategory(category, t).name : (isIncome ? t('transactions.income') : t('transactions.expense')))}
             </Text>
             {Boolean(displayDescription) && (

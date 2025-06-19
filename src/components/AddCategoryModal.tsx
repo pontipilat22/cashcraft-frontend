@@ -14,6 +14,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface AddCategoryModalProps {
   visible: boolean;
@@ -137,6 +138,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 }) => {
   const { colors } = useTheme();
   const { createCategory } = useData();
+  const { t } = useLocalization();
   
   const [name, setName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('cash-outline');
@@ -223,7 +225,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Новая категория {type === 'income' ? 'доходов' : 'расходов'}
+              {t('categories.newCategory', { type: type === 'income' ? t('transactions.income').toLowerCase() : t('transactions.expense').toLowerCase() })}
             </Text>
             <TouchableOpacity onPress={handleClose}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -237,13 +239,13 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 <Ionicons name={selectedIcon as any} size={32} color={selectedColor} />
               </View>
               <Text style={[styles.previewName, { color: colors.text }]}>
-                {name || 'Название категории'}
+                {name || t('categories.categoryName')}
               </Text>
             </View>
 
             {/* Название */}
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Название</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('auth.name')}</Text>
               <TextInput
                 style={[styles.input, { 
                   backgroundColor: colors.background,
@@ -252,7 +254,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 }]}
                 value={name}
                 onChangeText={setName}
-                placeholder="Введите название"
+                placeholder={t('categories.enterName')}
                 placeholderTextColor={colors.textSecondary}
                 maxLength={30}
               />
@@ -260,7 +262,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 
             {/* Иконка */}
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Иконка</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.selectIcon')}</Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => setShowIconPicker(true)}
@@ -268,7 +270,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 <View style={styles.selectorContent}>
                   <Ionicons name={selectedIcon as any} size={24} color={colors.text} />
                   <Text style={[styles.selectorText, { color: colors.text }]}>
-                    Выбрать иконку
+                    {t('accounts.selectIcon')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />

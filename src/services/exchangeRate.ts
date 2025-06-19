@@ -41,17 +41,25 @@ export class ExchangeRateService {
    */
   static async getRate(from: string, to: string): Promise<number | null> {
     try {
-      console.log(`ExchangeRateService.getRate called: ${from} -> ${to}`);
+      if (__DEV__) {
+        console.log(`ExchangeRateService.getRate called: ${from} -> ${to}`);
+      }
       
       if (from === to) return 1;
       
-      const token = await AsyncStorage.getItem('@cashcraft_access_token');
-      console.log('Has token:', !!token);
-      
-      // Сначала пытаемся получить из локальной базы
+      // Сначала ВСЕГДА пытаемся получить из локальной базы
       const localRate = await LocalDatabaseService.getLocalExchangeRate(from, to);
-      console.log('Local rate:', localRate);
-      if (localRate) return localRate;
+      if (localRate) {
+        if (__DEV__) {
+          console.log('Using local rate:', localRate);
+        }
+        return localRate;
+      }
+      
+      const token = await AsyncStorage.getItem('@cashcraft_access_token');
+      if (__DEV__) {
+        console.log('Has token:', !!token);
+      }
       
       // Пробуем получить прямой курс с API
       let rate = null;
@@ -62,26 +70,35 @@ export class ExchangeRateService {
         rate = await this.getRateFromExternalAPI(from, to);
       } else {
         // Пытаемся получить с backend
-        console.log('Trying to get rate from backend with token');
+        if (__DEV__) {
+          console.log('Trying to get rate from backend with token');
+        }
         try {
           const response = await ApiService.get<{ success: boolean; data: { rate: number; from: string; to: string } }>(
             `/exchange-rates/rate?from=${from}&to=${to}`
           );
           
-          console.log('Backend response full:', response);
+          if (__DEV__) {
+            console.log('Backend response full:', response);
+          }
           
           // Backend возвращает { success: true, data: { rate, from, to } }
           if (response.success && response.data?.rate) {
-            console.log(`Saving rate ${from}->${to}: ${response.data.rate}`);
+            if (__DEV__) {
+              console.log(`Saving rate ${from}->${to}: ${response.data.rate}`);
+            }
             // Сохраняем локально
             await LocalDatabaseService.saveExchangeRate(from, to, response.data.rate);
             await LocalDatabaseService.saveExchangeRate(to, from, 1 / response.data.rate);
             return response.data.rate;
-          } else {
+          } else if (__DEV__) {
             console.log('No rate in response, success:', response.success);
           }
-        } catch (error) {
-          console.log('Backend request failed:', error);
+        } catch (error: any) {
+          // Не показываем ошибку пользователю если это таймаут или сеть недоступна
+          if (__DEV__ && !error.message?.includes('timed out') && !error.message?.includes('Network request failed')) {
+            console.log('Backend request failed:', error);
+          }
         }
         
         // Если не удалось получить с backend, используем внешний API

@@ -67,6 +67,10 @@ export default {
     resetPasswordSuccess: 'Password reset instructions have been sent to your email',
     userNotFound: 'User with this email not found',
     networkError: 'Network error. Check your internet connection',
+    invalidCredentials: 'Invalid email or password',
+    invalidData: 'Please check entered data',
+    emailExists: 'User with this email already exists',
+    guestLoginError: 'Failed to sign in as guest',
   },
   navigation: {
     transactions: 'Transactions',
@@ -150,6 +154,12 @@ export default {
     availableOnAccount: 'Available on account "{{account}}": {{amount}}',
     savedAmount: 'Saved: {{amount}}',
     balance: 'Balance',
+    // Account form placeholders
+    accountNamePlaceholder: 'Account name',
+    debtAmount: 'Debt amount',
+    // Savings actions
+    deposit: 'Deposit',
+    withdraw: 'Withdraw',
   },
   transactions: {
     title: 'Transactions',
@@ -205,6 +215,14 @@ export default {
     receivedLoan: 'Received loan repayment',
     borrowedMoney: 'Borrowed money',
     paidBackDebt: 'Paid back debt',
+    // Transfer labels
+    fromAccountLabel: 'From account',
+    toAccountLabel: 'To account',
+    selectDestinationAccount: 'Select destination account',
+    selectSourceAccount: 'Select source account',
+    // Placeholders
+    exampleIncome: 'E.g.: Salary',
+    exampleExpense: 'E.g.: Groceries',
   },
   categories: {
     // Income categories
@@ -220,6 +238,14 @@ export default {
     health: 'Health',
     shopping: 'Shopping',
     otherExpense: 'Other',
+    // Category management
+    newCategory: 'New {{type}} category',
+    categoryName: 'Category name',
+    enterName: 'Enter name',
+    cannotDeleteDefault: 'Default category "Other" cannot be deleted',
+    deleteCategory: 'Delete category?',
+    deleteError: 'Failed to delete category',
+    addCategory: 'Add category',
   },
   settings: {
     title: 'Settings',
@@ -322,6 +348,34 @@ export default {
     loginRequired: 'Login required',
     loginRequiredMessage: 'You need to login to subscribe',
     login: 'Login',
+    // Subscription plans
+    monthlySubscription: 'Monthly subscription',
+    yearlySubscription: 'Yearly subscription',
+    features: {
+      unlimitedAccounts: 'Unlimited accounts',
+      dataExport: 'Data export to Excel',
+      advancedAnalytics: 'Advanced analytics',
+      deviceSync: 'Sync between devices',
+      prioritySupport: 'Priority support',
+      yearlySavings: 'Save $9 per year',
+      exclusiveThemes: 'Exclusive themes',
+      earlyAccess: 'Early access to new features',
+      personalConsultations: 'Personal consultations',
+    },
+    savingsBadge: 'SAVE 38%',
+    subscribeSuccess: 'Success!',
+    subscribeError: 'Failed to subscribe. Please try again later.',
+    cancelSubscription: 'Cancel subscription?',
+    cancelConfirmation: 'Are you sure you want to cancel subscription? It will remain active until the end of the paid period.',
+    yes: 'Yes',
+    no: 'No',
+    cancelYes: 'Yes, cancel',
+    subscriptionCancelled: 'Subscription cancelled',
+    subscriptionCancelledMessage: 'Subscription will remain active until the end of the paid period.',
+    cancelError: 'Failed to cancel subscription.',
+    activeFor: 'Active for {{days}} {{dayWord}}',
+    day: 'day',
+    days: 'days',
   },
   debts: {
     selectOperation: 'Select operation',
@@ -345,6 +399,41 @@ export default {
     deleteError: 'Failed to delete debt',
     emptyState: 'You have no debts yet',
     addFirstDebt: 'Add first debt',
+    editDebt: 'Edit debt',
+    // Debt form fields
+    enterName: 'Enter name',
+    enterCorrectAmount: 'Enter correct amount',
+    enterPersonName: 'Enter person name',
+    nameError: 'Enter name',
+    amountError: 'Enter correct amount',
+    personNameError: 'Enter person name',
+    selectDebtForPayment: 'Select debt for payment',
+    amountExceedsDebt: 'Payment amount exceeds debt amount ({{amount}} {{currency}})',
+    operationSuccess: 'Operation completed successfully',
+    operationError: 'Failed to complete operation',
+    // Debt types
+    iOwe: 'I owe',
+    owedToMe: 'Owed to me',
+    whoOwes: 'Who owes',
+    toWhomOwe: 'To whom I owe',
+    personPlaceholder: 'Person name',
+    // Debt operation types
+    giveLoan: 'Give loan',
+    receiveLoan: 'Receive loan',
+    returnDebt: 'Return debt',
+    toWhomGive: 'To whom I give',
+    whoReturns: 'Who returns',
+    fromWhomBorrow: 'From whom I borrow',
+    toWhomReturn: 'To whom I return',
+    person: 'Person',
+    selectPerson: 'Select person',
+    forWhat: 'For what',
+    // Due date
+    overdue: 'Overdue',
+    dueBy: 'Due by',
+    updateError: 'Failed to update debt',
+    saveError: 'Failed to save debt',
+    notInTotal: 'Not in total',
   },
   privacy: {
     title: 'Privacy Policy',
@@ -387,5 +476,72 @@ export default {
     thisMonth: 'This Month',
     thisYear: 'This Year',
     selectPeriod: 'Select Period',
+  },
+  help: {
+    title: 'Help',
+    faqTitle: 'Frequently Asked Questions',
+    tipsTitle: 'Useful Tips',
+    tips: {
+      recordTransactions: 'Regularly record all transactions to have an accurate picture of your finances',
+      useCategories: 'Use categories to analyze where most of your money goes',
+      setGoals: 'Set financial goals and track progress with savings accounts',
+      backup: 'Sign in to your account for automatic data backup',
+    },
+    contactTitle: 'Support Contacts',
+    emailSupport: 'Support Email',
+    responseTime: 'We usually respond within 24-48 hours',
+    aboutTitle: 'About the App',
+    aboutText: 'Cashcraft is a simple and convenient app for personal finance tracking. We are constantly working on improving functionality and would love to hear your suggestions.',
+    version: 'App version:',
+    questions: {
+      addAccount: {
+        question: 'How to add a new account?',
+        answer: 'Go to "Accounts" tab and tap "+" button in the top right corner. Select account type, enter name and initial balance. You can choose account currency and configure other settings.',
+      },
+      addTransaction: {
+        question: 'How to add a transaction?',
+        answer: 'On the main screen tap "+" button at the bottom. Select transaction type (income/expense/transfer), enter amount, category and account. Add description if needed.',
+      },
+      categories: {
+        question: 'What are categories and how to manage them?',
+        answer: 'Categories help group your income and expenses. Go to "More" → "Categories" to see default categories. Custom categories feature will be added in future updates.',
+      },
+      transfers: {
+        question: 'How do transfers between accounts work?',
+        answer: 'When creating transaction select "Transfer" type. Choose source and destination accounts. If accounts have different currencies, the app will automatically apply exchange rate.',
+      },
+      defaultCurrency: {
+        question: 'How to change default currency?',
+        answer: 'Go to "More" → "Settings" → "Currency". Select desired currency from the list. If you have accounts in other currencies, the app will ask to specify exchange rates.',
+      },
+      exchangeRates: {
+        question: 'How to configure exchange rates?',
+        answer: 'In settings select "Exchange Rates". Here you can add, edit or delete exchange rates between different currencies. Rates are saved and used for automatic conversion.',
+      },
+      dataSync: {
+        question: 'How does data synchronization work?',
+        answer: 'If you sign in with Google account, your data automatically syncs with Firebase cloud. This allows using the app on multiple devices. In guest mode data is stored only locally.',
+      },
+      accountLimit: {
+        question: 'How many accounts can I create?',
+        answer: 'Free version and guest mode allow up to 2 accounts. For unlimited accounts you need to sign in and subscribe to Premium.',
+      },
+      deleteTransaction: {
+        question: 'How to delete a transaction?',
+        answer: 'Find the transaction in the list and swipe it left. Delete button will appear. Confirm deletion in the popup.',
+      },
+      changeLanguage: {
+        question: 'How to change app language?',
+        answer: 'Go to "More" → "Settings" → "Language". Select preferred language from the list. The app supports 13 languages.',
+      },
+      forgotPassword: {
+        question: 'What if I forgot my password?',
+        answer: 'On login screen tap "Forgot password?". Enter email used for registration. Password reset instructions will be sent to your email.',
+      },
+      exportData: {
+        question: 'How to export data?',
+        answer: 'Data export feature is under development and will be added in future app updates.',
+      },
+    },
   },
 }; 

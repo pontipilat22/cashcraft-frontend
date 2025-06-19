@@ -598,7 +598,9 @@ export class LocalDatabaseService {
       if (mode === 'auto') {
         try {
           const { ExchangeRateService } = await import('./exchangeRate');
-          console.log(`Auto-fetching rate for ${fromCurrency} -> ${toCurrency}`);
+          if (__DEV__) {
+            console.log(`Auto-fetching rate for ${fromCurrency} -> ${toCurrency}`);
+          }
           const rate = await ExchangeRateService.getRate(fromCurrency, toCurrency);
           if (rate && rate !== 1) {
             // Сохраняем полученный курс
@@ -607,8 +609,11 @@ export class LocalDatabaseService {
             await this.saveExchangeRate(toCurrency, fromCurrency, 1 / rate);
             return rate;
           }
-        } catch (error) {
-          console.error('Error fetching rate from backend:', error);
+        } catch (error: any) {
+          // Не показываем ошибку если это проблема с сетью
+          if (__DEV__ && !error.message?.includes('timed out') && !error.message?.includes('Network request failed')) {
+            console.error('Error fetching rate from backend:', error);
+          }
         }
       }
       
@@ -785,7 +790,9 @@ export class LocalDatabaseService {
         }
       }
       
-      console.log(`Updating rates for ${currencyPairs.length} currency pairs`);
+      if (__DEV__) {
+        console.log(`Updating rates for ${currencyPairs.length} currency pairs`);
+      }
       
       // Загружаем курсы только для нужных пар
       for (const pair of currencyPairs) {
@@ -796,8 +803,11 @@ export class LocalDatabaseService {
             // Сохраняем и обратный курс
             await this.saveExchangeRate(pair.to, pair.from, 1 / rate);
           }
-        } catch (error) {
-          console.error(`Error fetching rate for ${pair.from}-${pair.to}:`, error);
+        } catch (error: any) {
+          // Не показываем ошибки сети пользователю
+          if (__DEV__ && !error.message?.includes('timed out') && !error.message?.includes('Network')) {
+            console.error(`Error fetching rate for ${pair.from}-${pair.to}:`, error);
+          }
         }
       }
     } catch (error) {

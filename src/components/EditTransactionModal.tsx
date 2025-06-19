@@ -249,9 +249,9 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     yesterday.setDate(yesterday.getDate() - 1);
     
     if (date.toDateString() === today.toDateString()) {
-      return 'Сегодня';
+      return t('transactions.today');
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Вчера';
+      return t('transactions.yesterday');
     } else {
       return date.toLocaleDateString('ru-RU', {
         day: 'numeric',
@@ -378,7 +378,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Дата */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Дата
+                {t('transactions.date')}
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
@@ -397,9 +397,9 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Категория (скрываем для переводов) */}
             {!isTransfer && (
               <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
-                  Категория
-                </Text>
+                              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {t('transactions.category')}
+              </Text>
                 <TouchableOpacity
                   style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
                   onPress={() => setShowCategoryPicker(true)}
@@ -422,14 +422,14 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Счет */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {isTransfer && transaction?.type === 'expense' ? 'Со счета' : isTransfer && transaction?.type === 'income' ? 'На счет' : 'Счет'}
+                {isTransfer && transaction?.type === 'expense' ? t('transactions.fromAccountLabel') : isTransfer && transaction?.type === 'income' ? t('transactions.toAccountLabel') : t('transactions.account')}
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => setShowAccountPicker(true)}
               >
                 <Text style={[styles.selectorText, { color: colors.text }]}>
-                  {selectedAccount?.name || 'Выберите счет'}
+                  {selectedAccount?.name || t('transactions.selectAccount')}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -439,14 +439,14 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {isTransfer && (
               <View style={styles.inputContainer}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>
-                  {transaction?.type === 'expense' ? 'На счет' : 'Со счета'}
+                  {transaction?.type === 'expense' ? t('transactions.toAccountLabel') : t('transactions.fromAccountLabel')}
                 </Text>
                 <TouchableOpacity
                   style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
                   onPress={() => setShowTransferAccountPicker(true)}
                 >
                   <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {accounts.find(a => a.id === transferToAccountId)?.name || 'Выберите счет'}
+                    {accounts.find(a => a.id === transferToAccountId)?.name || t('transactions.selectAccount')}
                   </Text>
                   <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
@@ -456,7 +456,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Описание */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Описание (необязательно)
+                {t('transactions.description')} ({t('common.optional')})
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -466,7 +466,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                 }]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder={isIncome ? "Например: Зарплата" : "Например: Продукты"}
+                placeholder={isIncome ? t('transactions.exampleIncome') : t('transactions.exampleExpense')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -477,7 +477,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
               onPress={onClose}
             >
-              <Text style={[styles.buttonText, { color: colors.text }]}>Отмена</Text>
+              <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -488,7 +488,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               onPress={handleSave}
               disabled={!amount || parseFloat(amount) === 0}
             >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>Сохранить</Text>
+              <Text style={[styles.buttonText, { color: '#fff' }]}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -518,10 +518,10 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
               <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Отмена</Text>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>Готово</Text>
+                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -552,7 +552,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
             <View style={styles.pickerHeader}>
               <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                Выберите категорию
+                {t('transactions.selectCategory')}
               </Text>
               <TouchableOpacity onPress={() => setShowCategoryPicker(false)} style={styles.pickerCloseButton}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -619,7 +619,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
             <View style={styles.pickerHeader}>
               <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                Выберите счет
+                {t('transactions.selectAccount')}
               </Text>
               <TouchableOpacity onPress={() => setShowAccountPicker(false)} style={styles.pickerCloseButton}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -663,7 +663,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
             <View style={styles.pickerHeader}>
               <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                {transaction?.type === 'expense' ? 'Выберите счет назначения' : 'Выберите счет источник'}
+                {transaction?.type === 'expense' ? t('transactions.selectDestinationAccount') : t('transactions.selectSourceAccount')}
               </Text>
               <TouchableOpacity onPress={() => setShowTransferAccountPicker(false)} style={styles.pickerCloseButton}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />

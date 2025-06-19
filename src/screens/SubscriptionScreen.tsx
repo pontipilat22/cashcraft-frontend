@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useNavigation } from '@react-navigation/native';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface SubscriptionPlan {
   id: string;
@@ -25,36 +26,7 @@ interface SubscriptionPlan {
   badge?: string;
 }
 
-const plans: SubscriptionPlan[] = [
-  {
-    id: 'monthly',
-    name: 'Месячная подписка',
-    price: '$2',
-    period: '/месяц',
-    description: [
-      'Неограниченное количество счетов',
-      'Экспорт данных в Excel',
-      'Расширенная аналитика',
-      'Синхронизация между устройствами',
-      'Приоритетная поддержка',
-    ],
-  },
-  {
-    id: 'yearly',
-    name: 'Годовая подписка',
-    price: '$15',
-    period: '/год',
-    pricePerMonth: '$1.25/мес',
-    badge: 'ЭКОНОМИЯ 38%',
-    description: [
-      'Все возможности месячной подписки',
-      'Экономия $9 в год',
-      'Эксклюзивные темы оформления',
-      'Ранний доступ к новым функциям',
-      'Персональные консультации',
-    ],
-  },
-];
+// Plans will be initialized inside component to use translations
 
 interface SubscriptionScreenProps {
   onClose?: () => void;
@@ -64,9 +36,41 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
   const { colors, isDark } = useTheme();
   const { checkSubscription } = useSubscription();
   const navigation = useNavigation();
+  const { t } = useLocalization();
   const [selectedPlan, setSelectedPlan] = useState<string>('yearly');
   const [isLoading, setIsLoading] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
+
+  const plans: SubscriptionPlan[] = [
+    {
+      id: 'monthly',
+      name: t('premium.monthlySubscription'),
+      price: '$2',
+      period: '/месяц',
+      description: [
+        t('premium.features.unlimitedAccounts'),
+        t('premium.features.dataExport'),
+        t('premium.features.advancedAnalytics'),
+        t('premium.features.deviceSync'),
+        t('premium.features.prioritySupport'),
+      ],
+    },
+    {
+      id: 'yearly',
+      name: t('premium.yearlySubscription'),
+      price: '$15',
+      period: '/год',
+      pricePerMonth: '$1.25/мес',
+      badge: t('premium.savingsBadge'),
+      description: [
+        t('premium.features.unlimitedAccounts'),
+        t('premium.features.yearlySavings'),
+        t('premium.features.exclusiveThemes'),
+        t('premium.features.earlyAccess'),
+        t('premium.features.personalConsultations'),
+      ],
+    },
+  ];
 
   useEffect(() => {
     loadSubscriptionStatus();
@@ -110,15 +114,15 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       
       if (!userId || isGuest === 'true') {
         Alert.alert(
-          'Требуется вход',
-          'Для оформления подписки необходимо войти в аккаунт',
+          t('premium.loginRequired'),
+          t('premium.loginRequiredMessage'),
           [
             {
-              text: 'Отмена',
+              text: t('common.cancel'),
               style: 'cancel',
             },
             {
-              text: 'Войти',
+              text: t('auth.login'),
               onPress: handleGoBack,
             },
           ]
@@ -155,7 +159,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       await checkSubscription();
       
       Alert.alert(
-        'Успешно!',
+        t('premium.subscribeSuccess'),
         `Вы успешно оформили ${plan.name.toLowerCase()}`,
         [
           {
@@ -165,7 +169,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
         ]
       );
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось оформить подписку. Попробуйте позже.');
+      Alert.alert(t('common.error'), t('premium.subscribeError'));
     } finally {
       setIsLoading(false);
     }
@@ -173,15 +177,15 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
 
   const handleCancelSubscription = async () => {
     Alert.alert(
-      'Отменить подписку?',
-      'Вы уверены, что хотите отменить подписку? Она будет активна до конца оплаченного периода.',
+      t('premium.cancelSubscription'),
+      t('premium.cancelConfirmation'),
       [
         {
-          text: 'Нет',
+          text: t('premium.no'),
           style: 'cancel',
         },
         {
-          text: 'Да, отменить',
+          text: t('premium.cancelYes'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -192,9 +196,9 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
               const subscriptionKey = `subscription_${userId}`;
               await AsyncStorage.setItem(subscriptionKey, JSON.stringify(subscription));
               setCurrentSubscription(subscription);
-              Alert.alert('Подписка отменена', 'Подписка будет активна до конца оплаченного периода.');
+              Alert.alert(t('premium.subscriptionCancelled'), t('premium.subscriptionCancelledMessage'));
             } catch (error) {
-              Alert.alert('Ошибка', 'Не удалось отменить подписку.');
+              Alert.alert(t('common.error'), t('premium.cancelError'));
             }
           },
         },
@@ -226,7 +230,10 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
               Активна
             </Text>
             <Text style={[styles.activeUntil, { color: colors.textSecondary }]}>
-              Действует еще {daysLeft} {daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}
+              {t('premium.activeFor', { 
+                days: daysLeft, 
+                dayWord: daysLeft === 1 ? t('premium.day') : t('premium.days') 
+              })}
             </Text>
             <Text style={[styles.activeDate, { color: colors.textSecondary }]}>
               До {endDate.toLocaleDateString('ru-RU')}

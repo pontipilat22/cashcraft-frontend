@@ -40,6 +40,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const { colors, isDark } = useTheme();
   const { accounts, createTransaction, refreshData } = useData();
   const { defaultCurrency } = useCurrency();
+  const { t } = useLocalization();
   
   const [amount, setAmount] = useState('');
   const [person, setPerson] = useState('');
@@ -84,38 +85,38 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
 
   const getTitle = () => {
     switch (operationType) {
-      case 'give': return 'Дать в долг';
-      case 'return': return 'Получить долг';
-      case 'borrow': return 'Взять в долг';
-      case 'payback': return 'Вернуть долг';
+      case 'give': return t('debts.giveLoan');
+      case 'return': return t('debts.receiveLoan');
+      case 'borrow': return t('debts.borrowMoney');
+      case 'payback': return t('debts.returnDebt');
       default: return '';
     }
   };
 
   const getPersonLabel = () => {
     switch (operationType) {
-      case 'give': return 'Кому даю';
-      case 'return': return 'Кто возвращает';
-      case 'borrow': return 'У кого беру';
-      case 'payback': return 'Кому возвращаю';
-      default: return 'Человек';
+      case 'give': return t('debts.toWhomGive');
+      case 'return': return t('debts.whoReturns');
+      case 'borrow': return t('debts.fromWhomBorrow');
+      case 'payback': return t('debts.toWhomReturn');
+      default: return t('debts.person');
     }
   };
 
   const handleSave = async () => {
     if (!selectedAccountId) {
-      Alert.alert('Ошибка', 'Выберите счет');
+      Alert.alert(t('common.error'), t('transactions.selectAccount'));
       return;
     }
 
     const amountNum = parseFloat(amount);
     if (!amount || amountNum <= 0) {
-      Alert.alert('Ошибка', 'Введите корректную сумму');
+      Alert.alert(t('common.error'), t('debts.amountError'));
       return;
     }
 
     if (!person.trim() && !selectedDebt) {
-      Alert.alert('Ошибка', 'Введите имя человека');
+      Alert.alert(t('common.error'), t('debts.personNameError'));
       return;
     }
 
@@ -137,18 +138,21 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           type: operationType === 'give' ? 'expense' : 'income',
           accountId: selectedAccountId,
           categoryId: operationType === 'give' ? 'other_expense' : 'other_income',
-          description: `[DEBT:${operationType}] ${description.trim() || `${operationType === 'give' ? 'Дал в долг' : 'Взял в долг'}: ${personName}`}`,
+          description: `[DEBT:${operationType}] ${description.trim() || `${operationType === 'give' ? t('transactions.gaveLoan') : t('transactions.borrowedMoney')}: ${personName}`}`,
           date: transactionDate.toISOString(),
         });
       } else {
         // Погашаем долг
         if (!selectedDebt) {
-          Alert.alert('Ошибка', 'Выберите долг для погашения');
+          Alert.alert(t('common.error'), t('debts.selectDebtForPayment'));
           return;
         }
 
         if (amountNum > selectedDebt.amount) {
-          Alert.alert('Ошибка', `Сумма погашения больше долга (${selectedDebt.amount.toLocaleString('ru-RU')} ${currencySymbol})`);
+          Alert.alert(t('common.error'), t('debts.amountExceedsDebt', { 
+            amount: selectedDebt.amount.toLocaleString('ru-RU'), 
+            currency: currencySymbol 
+          }));
           return;
         }
 
@@ -168,7 +172,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           type: operationType === 'return' ? 'income' : 'expense',
           accountId: selectedAccountId,
           categoryId: operationType === 'return' ? 'other_income' : 'other_expense',
-          description: `[DEBT:${operationType}] ${description.trim() || `${operationType === 'return' ? 'Получил долг' : 'Вернул долг'}: ${personName}`}`,
+          description: `[DEBT:${operationType}] ${description.trim() || `${operationType === 'return' ? t('transactions.receivedLoan') : t('transactions.paidBackDebt')}: ${personName}`}`,
           date: transactionDate.toISOString(),
         });
       }
@@ -178,12 +182,12 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
       
       // Очищаем форму
       resetForm();
-      Alert.alert('Успех', 'Операция успешно выполнена');
+      Alert.alert(t('common.success'), t('debts.operationSuccess'));
       onOperationComplete?.();
       onClose();
     } catch (error) {
       console.error('Error processing debt operation:', error);
-      Alert.alert('Ошибка', 'Не удалось выполнить операцию');
+      Alert.alert(t('common.error'), t('debts.operationError'));
     }
   };
 
@@ -215,9 +219,9 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
     yesterday.setDate(yesterday.getDate() - 1);
     
     if (date.toDateString() === today.toDateString()) {
-      return 'Сегодня';
+      return t('transactions.today');
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Вчера';
+      return t('transactions.yesterday');
     } else {
       return date.toLocaleDateString('ru-RU', {
         day: 'numeric',

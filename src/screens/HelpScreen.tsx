@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, Text, StyleSheet, SafeAreaView, TouchableOpacity, View, Linking } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalization } from '../context/LocalizationContext';
 
 interface HelpScreenProps {
   navigation: any;
@@ -12,60 +13,63 @@ interface FAQItem {
   answer: string;
 }
 
-const faqData: FAQItem[] = [
-  {
-    question: 'Как добавить новый счет?',
-    answer: 'Перейдите на вкладку "Счета" и нажмите кнопку "+" в правом верхнем углу. Выберите тип счета, введите название и начальный баланс. Вы можете выбрать валюту счета и настроить другие параметры.',
-  },
-  {
-    question: 'Как добавить транзакцию?',
-    answer: 'На главном экране нажмите кнопку "+" внизу экрана. Выберите тип операции (доход/расход/перевод), укажите сумму, категорию и счет. При необходимости добавьте описание.',
-  },
-  {
-    question: 'Что такое категории и как их настроить?',
-    answer: 'Категории помогают группировать ваши доходы и расходы. Перейдите в "Ещё" → "Категории", чтобы увидеть стандартные категории. В будущих версиях будет добавлена возможность создания собственных категорий.',
-  },
-  {
-    question: 'Как работают переводы между счетами?',
-    answer: 'При создании транзакции выберите тип "Перевод". Укажите счет отправления и счет получения. Если счета в разных валютах, приложение автоматически применит курс обмена.',
-  },
-  {
-    question: 'Как изменить валюту по умолчанию?',
-    answer: 'Перейдите в "Ещё" → "Настройки" → "Валюта". Выберите нужную валюту из списка. Если у вас есть счета в других валютах, приложение попросит указать курсы обмена.',
-  },
-  {
-    question: 'Как настроить курсы валют?',
-    answer: 'В настройках выберите "Курсы валют". Здесь вы можете добавить, изменить или удалить курсы обмена между различными валютами. Курсы сохраняются и используются для автоматического пересчета.',
-  },
-  {
-    question: 'Как работает синхронизация данных?',
-    answer: 'Если вы вошли в аккаунт Google, ваши данные автоматически синхронизируются с облаком Firebase. Это позволяет использовать приложение на нескольких устройствах. В гостевом режиме данные хранятся только локально.',
-  },
-  {
-    question: 'Сколько счетов можно создать?',
-    answer: 'В бесплатной версии и гостевом режиме можно создать до 2 счетов. Для неограниченного количества счетов необходимо войти в аккаунт и оформить подписку Premium.',
-  },
-  {
-    question: 'Как удалить транзакцию?',
-    answer: 'Найдите нужную транзакцию в списке и смахните её влево. Появится кнопка удаления. Подтвердите удаление во всплывающем окне.',
-  },
-  {
-    question: 'Как изменить язык приложения?',
-    answer: 'Перейдите в "Ещё" → "Настройки" → "Язык". Выберите предпочитаемый язык из списка доступных. Приложение поддерживает 13 языков.',
-  },
-  {
-    question: 'Что делать, если забыл пароль?',
-    answer: 'На экране входа нажмите "Забыли пароль?". Введите email, который использовали при регистрации. На почту придут инструкции по восстановлению пароля.',
-  },
-  {
-    question: 'Как экспортировать данные?',
-    answer: 'Функция экспорта данных находится в разработке и будет добавлена в будущих обновлениях приложения.',
-  },
-];
+// FAQ data will be initialized inside component to use translations
 
 export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const [expandedItems, setExpandedItems] = useState<number[]>([]);
+
+  const faqData: FAQItem[] = [
+    {
+      question: t('help.questions.addAccount.question'),
+      answer: t('help.questions.addAccount.answer'),
+    },
+    {
+      question: t('help.questions.addTransaction.question'),
+      answer: t('help.questions.addTransaction.answer'),
+    },
+    {
+      question: t('help.questions.categories.question'),
+      answer: t('help.questions.categories.answer'),
+    },
+    {
+      question: t('help.questions.transfers.question'),
+      answer: t('help.questions.transfers.answer'),
+    },
+    {
+      question: t('help.questions.defaultCurrency.question'),
+      answer: t('help.questions.defaultCurrency.answer'),
+    },
+    {
+      question: t('help.questions.exchangeRates.question'),
+      answer: t('help.questions.exchangeRates.answer'),
+    },
+    {
+      question: t('help.questions.dataSync.question'),
+      answer: t('help.questions.dataSync.answer'),
+    },
+    {
+      question: t('help.questions.accountLimit.question'),
+      answer: t('help.questions.accountLimit.answer'),
+    },
+    {
+      question: t('help.questions.deleteTransaction.question'),
+      answer: t('help.questions.deleteTransaction.answer'),
+    },
+    {
+      question: t('help.questions.changeLanguage.question'),
+      answer: t('help.questions.changeLanguage.answer'),
+    },
+    {
+      question: t('help.questions.forgotPassword.question'),
+      answer: t('help.questions.forgotPassword.answer'),
+    },
+    {
+      question: t('help.questions.exportData.question'),
+      answer: t('help.questions.exportData.answer'),
+    },
+  ];
 
   const toggleItem = (index: number) => {
     setExpandedItems(prev => 
@@ -89,7 +93,7 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Помощь
+          {t('help.title')}
         </Text>
         <View style={styles.placeholder} />
       </View>
@@ -100,7 +104,7 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
       >
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Часто задаваемые вопросы
+            {t('help.faqTitle')}
           </Text>
           
           {faqData.map((item, index) => (
@@ -131,48 +135,48 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Полезные советы
+            {t('help.tipsTitle')}
           </Text>
           
           <View style={styles.tipItem}>
             <Ionicons name="bulb-outline" size={24} color={colors.primary} style={styles.tipIcon} />
             <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-              Регулярно записывайте все транзакции, чтобы иметь точную картину своих финансов
+              {t('help.tips.recordTransactions')}
             </Text>
           </View>
           
           <View style={styles.tipItem}>
             <Ionicons name="calculator-outline" size={24} color={colors.primary} style={styles.tipIcon} />
             <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-              Используйте категории для анализа, на что уходит больше всего денег
+              {t('help.tips.useCategories')}
             </Text>
           </View>
           
           <View style={styles.tipItem}>
             <Ionicons name="trending-up-outline" size={24} color={colors.primary} style={styles.tipIcon} />
             <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-              Ставьте финансовые цели и отслеживайте прогресс с помощью накопительных счетов
+              {t('help.tips.setGoals')}
             </Text>
           </View>
           
           <View style={styles.tipItem}>
             <Ionicons name="sync-outline" size={24} color={colors.primary} style={styles.tipIcon} />
             <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-              Войдите в аккаунт для автоматического резервного копирования данных
+              {t('help.tips.backup')}
             </Text>
           </View>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Контакты поддержки
+            {t('help.contactTitle')}
           </Text>
           
           <TouchableOpacity style={styles.contactItem} onPress={openEmail}>
             <Ionicons name="mail-outline" size={24} color={colors.primary} />
             <View style={styles.contactInfo}>
               <Text style={[styles.contactTitle, { color: colors.text }]}>
-                Email поддержки
+                {t('help.emailSupport')}
               </Text>
               <Text style={[styles.contactValue, { color: colors.primary }]}>
                 cashcraft325@gmail.com
@@ -183,23 +187,22 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
           <View style={styles.responseTime}>
             <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
             <Text style={[styles.responseTimeText, { color: colors.textSecondary }]}>
-              Обычно мы отвечаем в течение 24-48 часов
+              {t('help.responseTime')}
             </Text>
           </View>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            О приложении
+            {t('help.aboutTitle')}
           </Text>
           
           <Text style={[styles.aboutText, { color: colors.textSecondary }]}>
-            Cashcraft - это простое и удобное приложение для учета личных финансов. 
-            Мы постоянно работаем над улучшением функциональности и будем рады вашим предложениям.
+            {t('help.aboutText')}
           </Text>
           
           <Text style={[styles.versionText, { color: colors.textSecondary }]}>
-            Версия приложения: 1.0.0
+            {t('help.version')} 1.0.0
           </Text>
         </View>
       </ScrollView>

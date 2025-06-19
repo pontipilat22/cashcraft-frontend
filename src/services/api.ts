@@ -99,9 +99,11 @@ export class ApiService {
   ): Promise<T> {
     const accessToken = await this.getAccessToken();
     
-    // Логируем запрос для отладки
-    console.log('Making request to:', `${API_BASE_URL}${endpoint}`);
-    console.log('Method:', options.method || 'GET');
+    // Логируем запрос для отладки только в dev режиме
+    if (__DEV__) {
+      console.log('Making request to:', `${API_BASE_URL}${endpoint}`);
+      console.log('Method:', options.method || 'GET');
+    }
     
     // Используем Record<string, string> для правильной типизации
     const headers: Record<string, string> = {
@@ -124,11 +126,17 @@ export class ApiService {
     }
 
     try {
-      console.log('Fetching:', `${API_BASE_URL}${endpoint}`);
+      // Создаем контроллер для таймаута
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
+
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeout);
 
       // Если токен истек, пробуем обновить
       if (response.status === 401 && accessToken) {
@@ -155,15 +163,26 @@ export class ApiService {
 
       return response.json();
     } catch (error: any) {
-      console.error('Request error:', error);
-      console.error('Error type:', error?.constructor?.name);
-      console.error('Error message:', error?.message);
+      // Логируем ошибки только в dev режиме
+      if (__DEV__) {
+        console.error('Request error:', error);
+        console.error('Error type:', error?.constructor?.name);
+        console.error('Error message:', error?.message);
+      }
+      
+      // Обрабатываем ошибки сети и таймауты
+      if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+        throw new Error('The request timed out.');
+      }
       
       if (error instanceof TypeError && error.message === 'Network request failed') {
-        console.error('Network error details:');
-        console.error('URL:', `${API_BASE_URL}${endpoint}`);
-        console.error('Platform:', Platform.OS);
-        throw new Error(`Нет соединения с сервером по адресу ${API_BASE_URL}. Проверьте, что backend запущен на порту 3000.`);
+        if (__DEV__) {
+          console.error('Network error details:');
+          console.error('URL:', `${API_BASE_URL}${endpoint}`);
+          console.error('Platform:', Platform.OS);
+        }
+        // Не показываем технические детали пользователю
+        throw new Error('Network connection error');
       }
       throw error;
     }

@@ -379,7 +379,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       }
       setShowSavingsActionModal(false);
     } catch (error) {
-      Alert.alert(t('common.error'), error instanceof Error ? error.message : 'Произошла ошибка');
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('common.error'));
     }
   };
 

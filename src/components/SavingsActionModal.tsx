@@ -92,7 +92,7 @@ export const SavingsActionModal: React.FC<SavingsActionModalProps> = ({
 
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Сумма
+                {t('transactions.amount')}
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -113,7 +113,7 @@ export const SavingsActionModal: React.FC<SavingsActionModalProps> = ({
                   onPress={() => setAmount(maxAmount.toString())}
                 >
                   <Text style={[styles.maxButtonText, { color: colors.primary }]}>
-                    МАКС
+                    MAX
                   </Text>
                 </TouchableOpacity>
               )}
@@ -125,7 +125,7 @@ export const SavingsActionModal: React.FC<SavingsActionModalProps> = ({
                 onPress={onClose}
               >
                 <Text style={[styles.buttonText, { color: colors.text }]}>
-                  Отмена
+                  {t('common.cancel')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -137,7 +137,7 @@ export const SavingsActionModal: React.FC<SavingsActionModalProps> = ({
                 disabled={parseFloat(amount) <= 0}
               >
                 <Text style={[styles.buttonText, { color: '#fff' }]}>
-                  {action === 'add' ? 'Пополнить' : 'Снять'}
+                  {action === 'add' ? t('accounts.deposit') : t('accounts.withdraw')}
                 </Text>
               </TouchableOpacity>
             </View>
