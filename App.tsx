@@ -3,7 +3,6 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, ActivityIndicator } from 'react-native';
 import * as SplashScreenExpo from 'expo-splash-screen';
-import * as WebBrowser from 'expo-web-browser';
 import { BottomTabNavigator } from './src/navigation/BottomTabNavigator';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { DataProvider } from './src/context/DataContext';
@@ -17,9 +16,6 @@ import { useCurrency } from './src/context/CurrencyContext';
 
 // Предотвращаем автоматическое скрытие нативного splash screen
 SplashScreenExpo.preventAutoHideAsync();
-
-// Необходимо для корректной работы OAuth redirects
-WebBrowser.maybeCompleteAuthSession();
 
 function AppContent() {
   const { isDark, colors } = useTheme();

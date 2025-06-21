@@ -21,25 +21,16 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.pontipilat.cashcraft",
-      "buildNumber": "1",
-      "scheme": "cashcraft",
-
-
-      "splash": {
-        "image": "./assets/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#4287f5"
-      }
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.pontipilat.cashcraft",
+      "versionCode": 3,
+      "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.pontipilat.cashcraft",
-      "versionCode": 1,
-      "edgeToEdgeEnabled": true,
-
       "intentFilters": [
         {
           "action": "VIEW",
@@ -54,27 +45,27 @@
             "DEFAULT"
           ]
         }
-      ],
-      "splash": {
-        "image": "./assets/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#4287f5"
-      }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.457720015497-urkrpt05vv1q1vtdbps1fnancbb984of"
+        }
+      ]
     ],
     "extra": {
       "eas": {
         "projectId": "993876aa-d5bf-411d-b069-94f585de32af"
       },
-      "googleWebClientId": "457720015497-gkarur46ep22kptgra8qm4v58r686jab.apps.googleusercontent.com",
-      "googleAndroidClientId": "457720015497-phj9gjn84anqsnoufvv6bro3ca9oud03.apps.googleusercontent.com",
-
-      "scheme": "cashcraft"
+      "googleWebClientId": "457720015497-e98pchk5nluung53cjckq960qvjfdm7b.apps.googleusercontent.com",
+      "googleAndroidClientId": "457720015497-8j7ru4jrrec7qe0l53pv0c8tkfnuv1ob.apps.googleusercontent.com",
+      "googleIosClientId": "457720015497-0ac2v6rkqnb1gbv63vt44pvpv0g2igk9.apps.googleusercontent.com"
     }
   }
 }

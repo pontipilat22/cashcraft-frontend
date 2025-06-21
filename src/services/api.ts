@@ -2,38 +2,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ClientEncryption } from '../utils/encryption';
 import { Platform } from 'react-native';
 
-// Базовый URL API - правильная конфигурация для разных платформ
-const getApiBaseUrl = () => {
-  if (__DEV__) {
-    if (Platform.OS === 'android') {
-      return 'http://192.168.2.101:3000/api/v1';
-    } else {
-      return 'http://192.168.2.101:3000/api/v1';
-    }
-  } else {
-    return 'https://your-production-api.com/api/v1';
-  }
-};
+// 🔥 Указываем IP напрямую (без __DEV__), чтобы работало даже в релизе
+const API_BASE_URL = 'https://cashcraft-backend-production.up.railway.app/api/v1';
 
-const API_BASE_URL = getApiBaseUrl();
 
-// Логируем URL для отладки
-console.log('API Base URL:', API_BASE_URL);
-console.log('Platform:', Platform.OS);
-console.log('Dev mode:', __DEV__);
-
-// Ключи для хранения токенов
 const ACCESS_TOKEN_KEY = '@cashcraft_access_token';
 const REFRESH_TOKEN_KEY = '@cashcraft_refresh_token';
 
-// Класс для работы с API
+console.log('🔌 API URL:', API_BASE_URL);
+console.log('📱 Platform:', Platform.OS);
+
 export class ApiService {
-  // Инициализация (вызывается при запуске приложения)
   static async initialize(): Promise<void> {
     await ClientEncryption.initialize();
   }
 
-  // Получение токена доступа
   static async getAccessToken(): Promise<string | null> {
     try {
       return await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
@@ -43,7 +26,6 @@ export class ApiService {
     }
   }
 
-  // Получение refresh токена
   static async getRefreshToken(): Promise<string | null> {
     try {
       return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
@@ -53,7 +35,6 @@ export class ApiService {
     }
   }
 
-  // Сохранение access токена
   static async setAccessToken(token: string): Promise<void> {
     try {
       await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token);
@@ -62,7 +43,6 @@ export class ApiService {
     }
   }
 
-  // Сохранение refresh токена
   static async setRefreshToken(token: string): Promise<void> {
     try {
       await AsyncStorage.setItem(REFRESH_TOKEN_KEY, token);
@@ -71,7 +51,6 @@ export class ApiService {
     }
   }
 
-  // Сохранение токенов
   static async saveTokens(accessToken: string, refreshToken: string): Promise<void> {
     try {
       await AsyncStorage.multiSet([
@@ -83,7 +62,6 @@ export class ApiService {
     }
   }
 
-  // Удаление токенов
   static async clearTokens(): Promise<void> {
     try {
       await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
@@ -92,20 +70,14 @@ export class ApiService {
     }
   }
 
-  // Базовый метод для выполнения запросов
   static async request<T = any>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const accessToken = await this.getAccessToken();
-    
-    // Логируем запрос для отладки только в dev режиме
-    if (__DEV__) {
-      console.log('Making request to:', `${API_BASE_URL}${endpoint}`);
-      console.log('Method:', options.method || 'GET');
-    }
-    
-    // Используем Record<string, string> для правильной типизации
+
+    console.log('📡 Request →', `${API_BASE_URL}${endpoint}`);
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),
@@ -115,44 +87,39 @@ export class ApiService {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
-    // Добавляем Device ID для отслеживания устройств
     const deviceId = await ClientEncryption.getDeviceId();
     headers['X-Device-ID'] = deviceId;
 
-    // Для POST/PUT запросов добавляем HMAC подпись
     if ((options.method === 'POST' || options.method === 'PUT') && options.body) {
       const hmac = await ClientEncryption.createHmac(options.body as string);
       headers['X-HMAC-Signature'] = hmac;
     }
 
     try {
-      // Создаем контроллер для таймаута
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
+      const timeout = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers,
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeout);
 
-      // Если токен истек, пробуем обновить
       if (response.status === 401 && accessToken) {
         const refreshed = await this.refreshAccessToken();
         if (refreshed) {
-          // Повторяем запрос с новым токеном
           headers['Authorization'] = `Bearer ${refreshed}`;
           const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
             ...options,
             headers,
           });
-          
+
           if (!retryResponse.ok) {
             throw new Error(await this.getErrorMessage(retryResponse));
           }
-          
+
           return retryResponse.json();
         }
       }
@@ -163,32 +130,20 @@ export class ApiService {
 
       return response.json();
     } catch (error: any) {
-      // Логируем ошибки только в dev режиме
-      if (__DEV__) {
-        console.error('Request error:', error);
-        console.error('Error type:', error?.constructor?.name);
-        console.error('Error message:', error?.message);
-      }
-      
-      // Обрабатываем ошибки сети и таймауты
+      console.error('❌ API Request Error:', error?.message || error);
+
       if (error.name === 'AbortError' || error.message?.includes('aborted')) {
-        throw new Error('The request timed out.');
+        throw new Error('Запрос превысил лимит времени.');
       }
-      
+
       if (error instanceof TypeError && error.message === 'Network request failed') {
-        if (__DEV__) {
-          console.error('Network error details:');
-          console.error('URL:', `${API_BASE_URL}${endpoint}`);
-          console.error('Platform:', Platform.OS);
-        }
-        // Не показываем технические детали пользователю
-        throw new Error('Network connection error');
+        throw new Error('Ошибка сети: проверьте подключение к серверу.');
       }
+
       throw error;
     }
   }
 
-  // Обновление токена доступа
   private static async refreshAccessToken(): Promise<string | null> {
     try {
       const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
@@ -196,9 +151,7 @@ export class ApiService {
 
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
       });
 
@@ -211,12 +164,11 @@ export class ApiService {
       await this.saveTokens(data.accessToken, data.refreshToken);
       return data.accessToken;
     } catch (error) {
-      console.error('Error refreshing token:', error);
+      console.error('Ошибка обновления токена:', error);
       return null;
     }
   }
 
-  // Получение сообщения об ошибке из ответа
   private static async getErrorMessage(response: Response): Promise<string> {
     try {
       const data = await response.json();
@@ -226,7 +178,6 @@ export class ApiService {
     }
   }
 
-  // Методы для удобства
   static get<T = any>(endpoint: string, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, { ...options, method: 'GET' });
   }
@@ -250,4 +201,4 @@ export class ApiService {
   static delete<T = any>(endpoint: string, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, { ...options, method: 'DELETE' });
   }
-} 
+}
