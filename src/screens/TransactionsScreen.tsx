@@ -648,14 +648,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 8,
-    gap: 8,
   },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    padding: 12,
+    height: 44,
+    paddingHorizontal: 12,
     borderRadius: 12,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
@@ -663,7 +664,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   deleteButton: {
-    padding: 12,
+    flexShrink: 0,
     borderRadius: 12,
     width: 44,
     height: 44,
@@ -671,6 +672,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectionActions: {
+    flexShrink: 0,
     flexDirection: 'row',
     gap: 8,
   },
