@@ -41,6 +41,20 @@ export class LocalDatabaseService {
     if (__DEV__) {
       console.log(`Database ready check: db=${!!this.db}, userId=${!!this.currentUserId}, initialized=${this.isInitialized}, ready=${ready}`);
     }
+    
+    // Дополнительная проверка: пытаемся выполнить простой запрос
+    if (ready && this.db) {
+      try {
+        this.db.getFirstSync('SELECT 1 as test');
+        return true;
+      } catch (error) {
+        if (__DEV__) {
+          console.log('Database ready check failed:', error);
+        }
+        return false;
+      }
+    }
+    
     return ready;
   }
 
@@ -99,7 +113,7 @@ export class LocalDatabaseService {
       // Проверяем, что база данных действительно готова
       try {
         // Пытаемся выполнить простой запрос
-        const testResult = db.getFirstSync('SELECT 1 as test');
+        const testResult = this.safeGetFirstSync('SELECT 1 as test');
         if (__DEV__) {
           console.log('Database test query result:', testResult);
         }
@@ -575,22 +589,15 @@ export class LocalDatabaseService {
 
   // Сброс всех данных
   static async resetAllData(defaultCurrency: string = 'USD'): Promise<void> {
-          // Проверяем, что база данных инициализирована
-      if (!this.db || !this.currentUserId) {
-        throw new Error('База данных не инициализирована');
-      }
-    
     try {
-      const db = this.getDb();
-      
-      // Удаляем все данные
-      db.runSync('DELETE FROM transactions');
-      db.runSync('DELETE FROM debts');
-      db.runSync('DELETE FROM accounts');
-      db.runSync('DELETE FROM categories');
-      db.runSync('DELETE FROM sync_metadata');
-      db.runSync('DELETE FROM exchange_rates');  // Очищаем курсы валют
-      db.runSync('DELETE FROM settings');  // Очищаем настройки
+      // Удаляем все данные используя безопасные методы
+      this.safeRunSync('DELETE FROM transactions');
+      this.safeRunSync('DELETE FROM debts');
+      this.safeRunSync('DELETE FROM accounts');
+      this.safeRunSync('DELETE FROM categories');
+      this.safeRunSync('DELETE FROM sync_metadata');
+      this.safeRunSync('DELETE FROM exchange_rates');  // Очищаем курсы валют
+      this.safeRunSync('DELETE FROM settings');  // Очищаем настройки
       
       // Пересоздаем базовые данные
       await this.initDatabase(defaultCurrency);
@@ -604,16 +611,14 @@ export class LocalDatabaseService {
     if (!this.db || !this.currentUserId) {
       return null;
     }
-    const db = this.getDb();
-    const result = db.getFirstSync<{ lastSyncAt: string }>(
+    const result = this.safeGetFirstSync<{ lastSyncAt: string }>(
       'SELECT lastSyncAt FROM sync_metadata ORDER BY id DESC LIMIT 1'
     );
     return result?.lastSyncAt || null;
   }
 
   static async updateSyncTime(syncTime: string, syncToken?: string): Promise<void> {
-    const db = this.getDb();
-    db.runSync(
+    this.safeRunSync(
       'INSERT INTO sync_metadata (lastSyncAt, syncToken) VALUES (?, ?)',
       syncTime, syncToken || null
     );
@@ -626,7 +631,6 @@ export class LocalDatabaseService {
     debts: Debt[];
     exchangeRates: any[];
   }> {
-    const db = this.getDb();
     const lastSync = await this.getLastSyncTime();
     
     const syncCondition = lastSync 
@@ -637,20 +641,19 @@ export class LocalDatabaseService {
     const exchangeRates = await this.getAllExchangeRatesForSync();
 
     return {
-      accounts: db.getAllSync(`SELECT * FROM accounts ${syncCondition}`) as Account[],
-      transactions: db.getAllSync(`SELECT * FROM transactions ${syncCondition}`) as Transaction[],
-      categories: db.getAllSync(`SELECT * FROM categories ${syncCondition}`) as Category[],
-      debts: db.getAllSync(`SELECT * FROM debts ${syncCondition}`) as Debt[],
+      accounts: this.safeGetAllSync(`SELECT * FROM accounts ${syncCondition}`) as Account[],
+      transactions: this.safeGetAllSync(`SELECT * FROM transactions ${syncCondition}`) as Transaction[],
+      categories: this.safeGetAllSync(`SELECT * FROM categories ${syncCondition}`) as Category[],
+      debts: this.safeGetAllSync(`SELECT * FROM debts ${syncCondition}`) as Debt[],
       exchangeRates,
     };
   }
 
   static async markAsSynced(table: string, ids: string[]): Promise<void> {
-    const db = this.getDb();
     const syncTime = new Date().toISOString();
     
     ids.forEach(id => {
-      db.runSync(
+      this.safeRunSync(
         `UPDATE ${table} SET syncedAt = ? WHERE id = ?`,
         syncTime, id
       );
