@@ -2,6 +2,7 @@ import { ApiService } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocalDatabaseService } from './localDatabase';
 import { Platform } from 'react-native';
+import { DataService } from './data';
 
 // Копируем логику получения URL из api.ts
 const getApiBaseUrl = () => {
@@ -33,7 +34,7 @@ export interface CurrencyRatesResponse {
 
 export class ExchangeRateService {
   // Единый кеш для хранения курсов
-  private static ratesCache: Map<string, { rates: { [currency: string]: number }; timestamp: number }> = new Map();
+  private static ratesCache: Map<string, { rate: number; timestamp: number }> = new Map();
   private static CACHE_DURATION = 1000 * 60 * 60 * 24; // 24 часа
 
   /**
@@ -43,17 +44,37 @@ export class ExchangeRateService {
     try {
       if (__DEV__) {
         console.log(`ExchangeRateService.getRate called: ${from} -> ${to}`);
+        console.log(`Database ready: ${LocalDatabaseService.isDatabaseReady()}`);
       }
       
       if (from === to) return 1;
       
-      // Сначала ВСЕГДА пытаемся получить из локальной базы
-      const localRate = await LocalDatabaseService.getLocalExchangeRate(from, to);
-      if (localRate) {
+      // Сначала проверяем кэш в памяти
+      const cacheKey = `${from}_${to}`;
+      const cachedRate = this.ratesCache.get(cacheKey);
+      
+      if (cachedRate && (Date.now() - cachedRate.timestamp) < this.CACHE_DURATION) {
         if (__DEV__) {
-          console.log('Using local rate:', localRate);
+          console.log(`Using cached rate for ${from}/${to}: ${cachedRate.rate}`);
         }
-        return localRate;
+        return cachedRate.rate;
+      }
+      
+      // Пробуем получить из локальной базы (если она готова)
+      if (LocalDatabaseService.isDatabaseReady()) {
+        try {
+          const localRate = await LocalDatabaseService.getLocalExchangeRate(from, to);
+          if (localRate) {
+            if (__DEV__) {
+              console.log('Using local rate:', localRate);
+            }
+            return localRate;
+          }
+        } catch (dbError) {
+          if (__DEV__) {
+            console.log('Error accessing local database:', dbError);
+          }
+        }
       }
       
       const token = await AsyncStorage.getItem('@cashcraft_access_token');
@@ -85,25 +106,35 @@ export class ExchangeRateService {
           // Backend возвращает { success: true, data: { rate, from, to } }
           if (response.success && response.data?.rate) {
             if (__DEV__) {
-              console.log(`Saving rate ${from}->${to}: ${response.data.rate}`);
+              console.log(`Got rate ${from}->${to}: ${response.data.rate}`);
             }
-            // Сохраняем локально
-            await LocalDatabaseService.saveExchangeRate(from, to, response.data.rate);
-            await LocalDatabaseService.saveExchangeRate(to, from, 1 / response.data.rate);
-            return response.data.rate;
+            
+            rate = response.data.rate;
+            
+            // Сохраняем в кэш и пытаемся сохранить в БД
+            await this.safeSaveRate(from, to, rate);
+            
+            return rate;
           } else if (__DEV__) {
             console.log('No rate in response, success:', response.success);
           }
         } catch (error: any) {
-          // Не показываем ошибку пользователю если это таймаут или сеть недоступна
-          if (__DEV__ && !error.message?.includes('timed out') && !error.message?.includes('Network request failed')) {
+          // Если токен истек, используем внешний API
+          if (error.message?.includes('Token expired') || error.message?.includes('401')) {
+            if (__DEV__) {
+              console.log('Token expired, falling back to external API');
+            }
+            rate = await this.getRateFromExternalAPI(from, to);
+          } else if (__DEV__ && !error.message?.includes('timed out') && !error.message?.includes('Network request failed')) {
             console.log('Backend request failed:', error);
           }
         }
         
-        // Если не удалось получить с backend, используем внешний API
-        console.log('Backend failed, using external API');
-        rate = await this.getRateFromExternalAPI(from, to);
+        // Если не удалось получить с backend и еще не пробовали внешний API
+        if (!rate) {
+          console.log('Backend failed, using external API');
+          rate = await this.getRateFromExternalAPI(from, to);
+        }
       }
       
       // Если прямого курса нет и валюты не USD, пробуем через USD
@@ -118,9 +149,8 @@ export class ExchangeRateService {
           rate = fromToUsd * usdToTarget;
           console.log(`Cross rate ${from}->${to} = ${rate} (${from}->USD: ${fromToUsd}, USD->${to}: ${usdToTarget})`);
           
-          // Сохраняем кросс-курс локально
-          await LocalDatabaseService.saveExchangeRate(from, to, rate);
-          await LocalDatabaseService.saveExchangeRate(to, from, 1 / rate);
+          // Сохраняем кросс-курс
+          await this.safeSaveRate(from, to, rate);
         }
       }
       
@@ -178,7 +208,7 @@ export class ExchangeRateService {
 
     // Если есть кеш и он не устарел, возвращаем его
     if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
-      return cached.rates;
+      return { [currency]: cached.rate };
     }
 
     // Иначе получаем свежие данные
@@ -188,7 +218,7 @@ export class ExchangeRateService {
       // Кешируем результат
       if (Object.keys(rates).length > 0) {
         this.ratesCache.set(currency, {
-          rates,
+          rate: rates[currency],
           timestamp: now,
         });
       }
@@ -197,7 +227,7 @@ export class ExchangeRateService {
     } catch (error) {
       // Если не удалось получить данные, но есть устаревший кеш - используем его
       if (cached) {
-        return cached.rates;
+        return { [currency]: cached.rate };
       }
       
       return {};
@@ -217,20 +247,28 @@ export class ExchangeRateService {
   static async forceUpdateRate(from: string, to: string): Promise<number | null> {
     console.log(`Force updating rate ${from} -> ${to}`);
     
-    // Очищаем локальный кеш
-    await LocalDatabaseService.saveExchangeRate(from, to, 0); // Удаляем старый курс
-    await LocalDatabaseService.saveExchangeRate(to, from, 0); // Удаляем обратный курс
-    this.ratesCache.delete(from);
-    this.ratesCache.delete(to);
+    // ВРЕМЕННО ОТКЛЮЧАЕМ ЛОКАЛЬНОЕ КЕШИРОВАНИЕ ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+    /*
+    // Очищаем локальный кеш только если база данных готова
+    if (LocalDatabaseService.isDatabaseReady()) {
+      await LocalDatabaseService.saveExchangeRate(from, to, 0); // Удаляем старый курс
+      await LocalDatabaseService.saveExchangeRate(to, from, 0); // Удаляем обратный курс
+    }
+    */
+    this.ratesCache.delete(`${from}_${to}`);
+    this.ratesCache.delete(`${to}_${from}`);
     
     // Получаем свежий курс с API
     const rate = await this.getRateFromExternalAPI(from, to);
     
-    if (rate) {
-      // Сохраняем новый курс
+    // ВРЕМЕННО НЕ СОХРАНЯЕМ ЛОКАЛЬНО ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+    /*
+    if (rate && LocalDatabaseService.isDatabaseReady()) {
+      // Сохраняем новый курс только если база данных готова
       await LocalDatabaseService.saveExchangeRate(from, to, rate);
       await LocalDatabaseService.saveExchangeRate(to, from, 1 / rate);
     }
+    */
     
     return rate;
   }
@@ -242,15 +280,20 @@ export class ExchangeRateService {
     console.log('Clearing all saved exchange rates');
     this.clearCache();
     
-    // Получаем все сохраненные курсы
-    const allRates = await LocalDatabaseService.getAllExchangeRates();
-    
-    // Удаляем каждый курс
-    for (const fromCurrency in allRates) {
-      for (const toCurrency in allRates[fromCurrency]) {
-        await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, 0);
+    // ВРЕМЕННО ОТКЛЮЧАЕМ ЛОКАЛЬНОЕ КЕШИРОВАНИЕ ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+    /*
+    // Получаем все сохраненные курсы только если база данных готова
+    if (LocalDatabaseService.isDatabaseReady()) {
+      const allRates = await LocalDatabaseService.getAllExchangeRates();
+      
+      // Удаляем каждый курс
+      for (const fromCurrency in allRates) {
+        for (const toCurrency in allRates[fromCurrency]) {
+          await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, 0);
+        }
       }
     }
+    */
   }
 
   // Получение курса из внешнего API (как было раньше)
@@ -268,9 +311,12 @@ export class ExchangeRateService {
       // Проверяем структуру ответа
       if (response.success && response.data?.rate) {
         console.log(`External API: Got rate ${from}->${to}: ${response.data.rate}`);
+        // ВРЕМЕННО НЕ СОХРАНЯЕМ ЛОКАЛЬНО ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+        /*
         // Сохраняем курс локально
         await LocalDatabaseService.saveExchangeRate(from, to, response.data.rate);
         await LocalDatabaseService.saveExchangeRate(to, from, 1 / response.data.rate);
+        */
         return response.data.rate;
       }
       
@@ -296,15 +342,25 @@ export class ExchangeRateService {
       });
 
       if (response) {
-        // Сохраняем и локально
-        await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, rate);
+        // ВРЕМЕННО НЕ СОХРАНЯЕМ ЛОКАЛЬНО ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+        /*
+        // Сохраняем и локально только если база данных готова
+        if (LocalDatabaseService.isDatabaseReady()) {
+          await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, rate);
+        }
+        */
         return true;
       }
       return false;
     } catch (error) {
       console.error('Error saving user rate:', error);
+      // ВРЕМЕННО НЕ СОХРАНЯЕМ ЛОКАЛЬНО ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+      /*
       // Если ошибка сети, сохраняем только локально
-      await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, rate);
+      if (LocalDatabaseService.isDatabaseReady()) {
+        await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, rate);
+      }
+      */
       return true;
     }
   }
@@ -328,23 +384,38 @@ export class ExchangeRateService {
     try {
       const token = await AsyncStorage.getItem('@cashcraft_access_token');
       if (!token) {
+        // ВРЕМЕННО НЕ СОХРАНЯЕМ ЛОКАЛЬНО ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+        /*
         // Если нет токена, сохраняем только локально
-        await LocalDatabaseService.setExchangeRatesMode(mode);
+        if (LocalDatabaseService.isDatabaseReady()) {
+          await LocalDatabaseService.setExchangeRatesMode(mode);
+        }
+        */
         return true;
       }
 
       const response = await ApiService.put('/exchange-rates/user/mode', { mode });
 
       if (response) {
-        // Сохраняем и локально
-        await LocalDatabaseService.setExchangeRatesMode(mode);
+        // ВРЕМЕННО НЕ СОХРАНЯЕМ ЛОКАЛЬНО ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+        /*
+        // Сохраняем и локально только если база данных готова
+        if (LocalDatabaseService.isDatabaseReady()) {
+          await LocalDatabaseService.setExchangeRatesMode(mode);
+        }
+        */
         return true;
       }
       return false;
     } catch (error) {
       console.error('Error setting rates mode:', error);
+      // ВРЕМЕННО НЕ СОХРАНЯЕМ ЛОКАЛЬНО ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+      /*
       // Если ошибка сети, сохраняем только локально
-      await LocalDatabaseService.setExchangeRatesMode(mode);
+      if (LocalDatabaseService.isDatabaseReady()) {
+        await LocalDatabaseService.setExchangeRatesMode(mode);
+      }
+      */
       return true;
     }
   }
@@ -358,12 +429,157 @@ export class ExchangeRateService {
       // Получаем пользовательские курсы с backend
       const userRates = await this.getUserRates();
       
-      if (userRates.length > 0) {
-        // Сохраняем их локально
+      // ВРЕМЕННО НЕ СОХРАНЯЕМ ЛОКАЛЬНО ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+      /*
+      if (userRates.length > 0 && LocalDatabaseService.isDatabaseReady()) {
+        // Сохраняем их локально только если база данных готова
         await LocalDatabaseService.saveExchangeRatesFromSync(userRates);
       }
+      */
     } catch (error) {
       console.error('Error syncing rates with backend:', error);
+    }
+  }
+
+  // Безопасная инициализация курсов валют при запуске приложения
+  static async initializeRatesFromBackend(): Promise<boolean> {
+    try {
+      console.log('Initializing exchange rates from backend...');
+      
+      // Проверяем подключение к интернету
+      // const netInfo = await NetInfo.fetch();
+      // if (!netInfo.isConnected) {
+      //   console.log('No internet connection, skipping rate initialization');
+      //   return false;
+      // }
+      
+      // Получаем список всех используемых валют из локальной базы данных
+      const accounts = await LocalDatabaseService.getAccounts();
+      const currencies = new Set<string>();
+      
+      // Добавляем валюту по умолчанию
+      const defaultCurrency = await AsyncStorage.getItem('defaultCurrency') || 'USD';
+      currencies.add(defaultCurrency);
+      
+      // Добавляем валюты из счетов
+      accounts.forEach(account => {
+        if (account.currency) {
+          currencies.add(account.currency);
+        }
+      });
+      
+      // Если есть только одна валюта, не нужно загружать курсы
+      if (currencies.size <= 1) {
+        console.log('Only one currency in use, no rates needed');
+        return true;
+      }
+      
+      const currencyArray = Array.from(currencies);
+      console.log('Loading rates for currencies:', currencyArray);
+      
+      // Загружаем курсы для всех пар валют
+      let successCount = 0;
+      let totalPairs = 0;
+      
+      for (let i = 0; i < currencyArray.length; i++) {
+        for (let j = i + 1; j < currencyArray.length; j++) {
+          totalPairs++;
+          try {
+            const fromCurrency = currencyArray[i];
+            const toCurrency = currencyArray[j];
+            
+            // Загружаем курс с backend (без авторизации, используя внешний API)
+            const rate = await this.getRateFromExternalAPI(fromCurrency, toCurrency);
+            
+            if (rate && rate > 0) {
+              // Безопасно сохраняем в локальную базу
+              await this.safeSaveRate(fromCurrency, toCurrency, rate);
+              await this.safeSaveRate(toCurrency, fromCurrency, 1 / rate);
+              successCount++;
+              
+              console.log(`Loaded rate: ${fromCurrency}/${toCurrency} = ${rate}`);
+            }
+          } catch (error) {
+            console.error(`Failed to load rate for pair:`, error);
+          }
+        }
+      }
+      
+      console.log(`Successfully loaded ${successCount}/${totalPairs} currency pairs`);
+      return successCount > 0;
+      
+    } catch (error) {
+      console.error('Error initializing exchange rates:', error);
+      return false;
+    }
+  }
+  
+  // Безопасное сохранение курса в локальную базу
+  private static async safeSaveRate(fromCurrency: string, toCurrency: string, rate: number): Promise<void> {
+    try {
+      // ВРЕМЕННО ОТКЛЮЧАЕМ СОХРАНЕНИЕ В БД ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+      // Сохраняем только в кэш памяти
+      const key = `${fromCurrency}_${toCurrency}`;
+      this.ratesCache.set(key, {
+        rate,
+        timestamp: Date.now()
+      });
+      
+      if (__DEV__) {
+        console.log(`Rate ${fromCurrency}/${toCurrency} = ${rate} saved to memory cache`);
+      }
+      
+      // TODO: Включить обратно после исправления проблем с expo-sqlite
+      /*
+      // Проверяем готовность базы данных
+      if (!LocalDatabaseService.isDatabaseReady()) {
+        console.log('Database not ready, caching rate in memory');
+        // Сохраняем в кэш памяти
+        const key = `${fromCurrency}_${toCurrency}`;
+        this.ratesCache.set(key, {
+          rate,
+          timestamp: Date.now()
+        });
+        return;
+      }
+      
+      // Пытаемся сохранить в базу данных
+      await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, rate);
+      */
+      
+    } catch (error) {
+      console.error(`Error saving rate ${fromCurrency}/${toCurrency}:`, error);
+      // Даже если произошла ошибка, сохраняем в кэш
+      const key = `${fromCurrency}_${toCurrency}`;
+      this.ratesCache.set(key, {
+        rate,
+        timestamp: Date.now()
+      });
+    }
+  }
+  
+  // Метод для переноса курсов из кэша в базу данных
+  static async transferCacheToDatabase(): Promise<void> {
+    if (!LocalDatabaseService.isDatabaseReady()) {
+      return;
+    }
+    
+    const cacheEntries = Array.from(this.ratesCache.entries());
+    if (cacheEntries.length === 0) {
+      return;
+    }
+    
+    console.log(`Transferring ${cacheEntries.length} cached rates to database...`);
+    
+    for (const [key, value] of cacheEntries) {
+      try {
+        const [fromCurrency, toCurrency] = key.split('_');
+        await LocalDatabaseService.saveExchangeRate(fromCurrency, toCurrency, value.rate);
+        // Удаляем из кэша после успешного сохранения
+        this.ratesCache.delete(key);
+      } catch (error) {
+        console.error(`Error transferring cached rate ${key}:`, error);
+      }
     }
   }
 }

@@ -51,6 +51,22 @@ export class ApiService {
     }
   }
 
+  static async getTokens(): Promise<{ accessToken: string | null; refreshToken: string | null }> {
+    try {
+      const [accessToken, refreshToken] = await AsyncStorage.multiGet([
+        ACCESS_TOKEN_KEY,
+        REFRESH_TOKEN_KEY,
+      ]);
+      return {
+        accessToken: accessToken[1],
+        refreshToken: refreshToken[1],
+      };
+    } catch (error) {
+      console.error('Error getting tokens:', error);
+      return { accessToken: null, refreshToken: null };
+    }
+  }
+
   static async saveTokens(accessToken: string, refreshToken: string): Promise<void> {
     try {
       await AsyncStorage.multiSet([

@@ -115,22 +115,24 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   useEffect(() => {
     const loadSuggestedRate = async () => {
       if (selectedCurrency !== defaultCurrency) {
-        // Пытаемся найти сохраненный курс
-        const rate = await LocalDatabaseService.getExchangeRate(selectedCurrency, defaultCurrency);
-        if (rate) {
-          setSuggestedRate(rate);
-          setExchangeRate(rate.toString());
-        } else {
-          // Пытаемся найти через кросс-курс
-          const crossRate = await LocalDatabaseService.calculateCrossRate(
-            selectedCurrency,
-            defaultCurrency,
-            'USD' // используем USD как промежуточную валюту
-          );
-          if (crossRate) {
-            setSuggestedRate(crossRate);
-            setExchangeRate(crossRate.toString());
+        try {
+          // Используем безопасный метод ExchangeRateService
+          const { ExchangeRateService } = await import('../services/exchangeRate');
+          
+          // Пытаемся найти сохраненный курс
+          const rate = await ExchangeRateService.getRate(selectedCurrency, defaultCurrency);
+          if (rate) {
+            setSuggestedRate(rate);
+            setExchangeRate(rate.toString());
+          } else {
+            // Если курса нет, устанавливаем 1:1
+            setSuggestedRate(null);
+            setExchangeRate('1');
           }
+        } catch (error) {
+          console.error('Error loading exchange rate:', error);
+          setSuggestedRate(null);
+          setExchangeRate('1');
         }
       } else {
         setSuggestedRate(null);
@@ -144,13 +146,17 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const handleSave = async () => {
     if (!name.trim()) return;
     
-    // Сохраняем курс в БД для будущего использования
+    // Сохраняем курс если он был указан
     if (selectedCurrency !== defaultCurrency && exchangeRate) {
       const rate = parseFloat(exchangeRate);
       if (rate > 0) {
-        await LocalDatabaseService.saveExchangeRate(selectedCurrency, defaultCurrency, rate);
-        // Сохраняем и обратный курс
-        await LocalDatabaseService.saveExchangeRate(defaultCurrency, selectedCurrency, 1 / rate);
+        // ВРЕМЕННО ОТКЛЮЧАЕМ СОХРАНЕНИЕ В БД
+        // await LocalDatabaseService.saveExchangeRate(selectedCurrency, defaultCurrency, rate);
+        // // Сохраняем и обратный курс
+        // await LocalDatabaseService.saveExchangeRate(defaultCurrency, selectedCurrency, 1 / rate);
+        
+        // Курс будет автоматически кэширован при следующем запросе
+        console.log(`Exchange rate ${selectedCurrency}/${defaultCurrency} = ${rate} will be cached on next request`);
       }
     }
     

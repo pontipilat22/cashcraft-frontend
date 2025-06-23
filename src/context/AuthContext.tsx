@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AuthService, User as ApiUser } from '../services/auth';
+import { AuthService, User, AuthResponse } from '../services/auth';
 import { ApiService } from '../services/api';
-import { DatabaseService } from '../services/database';
-import { UserDataService } from '../services/userDataService';
+import { LocalDatabaseService } from '../services/localDatabase';
+import { useCurrency } from './CurrencyContext';
 
 interface AuthUser {
   id: string;
@@ -16,6 +16,7 @@ interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
+  isPreparing: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -28,242 +29,140 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const { defaultCurrency } = useCurrency();
 
-  // Проверка авторизации при запуске
-  useEffect(() => {
-    checkAuthState();
-  }, []);
-
-  const checkAuthState = async () => {
+  const setupUserSession = useCallback(async (authUser: AuthUser) => {
+    setIsPreparing(true);
     try {
-      setIsLoading(true);
+      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
       
-      // Сначала проверяем локально сохраненного пользователя
-      const savedUser = await AsyncStorage.getItem('currentUser');
-      if (savedUser) {
-        try {
-          const parsedUser: AuthUser = JSON.parse(savedUser);
-          
-          // Если это гость, используем только локальные данные
-          if (parsedUser.isGuest) {
-            setUser(parsedUser);
-            DatabaseService.setUserId(parsedUser.id);
-            await DatabaseService.initDatabase();
-            UserDataService.setUserId(parsedUser.id);
-            await UserDataService.initializeUserData();
-            return; // Выходим рано, не пытаемся подключиться к API
-          }
-        } catch (error) {
-          await AsyncStorage.removeItem('currentUser');
-        }
+      LocalDatabaseService.setUserId(authUser.id);
+      await LocalDatabaseService.initDatabase(defaultCurrency);
+      
+      // Инициализируем курсы валют с backend
+      try {
+        console.log('Initializing exchange rates...');
+        const { ExchangeRateService } = await import('../services/exchangeRate');
+        const ratesInitialized = await ExchangeRateService.initializeRatesFromBackend();
+        console.log('Exchange rates initialized:', ratesInitialized);
+      } catch (rateError) {
+        console.error('Failed to initialize exchange rates:', rateError);
+        // Не критично, продолжаем работу
       }
       
-      // Для не-гостей пытаемся подключиться к API
-      try {
-        await ApiService.initialize();
-        const isAuthenticated = await AuthService.isAuthenticated();
-        
-        if (isAuthenticated) {
-          // Получаем данные пользователя с сервера
-          const apiUser = await AuthService.getCurrentUser();
-          
-          if (apiUser) {
-            const authUser: AuthUser = {
-              id: apiUser.id,
-              email: apiUser.email,
-              displayName: apiUser.name || apiUser.email.split('@')[0],
-              isGuest: apiUser.isGuest,
-              isPremium: apiUser.isPremium
-            };
-            
-            setUser(authUser);
-            await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
-            
-            // Инициализируем базу данных для пользователя
-            DatabaseService.setUserId(apiUser.id);
-            await DatabaseService.initDatabase();
-            
-            // Загружаем данные пользователя
-            UserDataService.setUserId(apiUser.id);
-            await UserDataService.initializeUserData();
-          } else {
-            // Токен есть, но пользователь не найден
-            await AuthService.logout();
-            setUser(null);
-          }
-        }
-      } catch (networkError) {
-        // Если нет интернета, но есть сохраненный пользователь - используем его
-        if (savedUser) {
+      setUser(authUser);
+    } catch (error) {
+      console.error("Failed to setup user session", error);
+      await logout();
+    } finally {
+      setIsPreparing(false);
+    }
+  }, [defaultCurrency]);
+  
+  const checkAuthState = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const savedUserStr = await AsyncStorage.getItem('currentUser');
+      if (!savedUserStr) {
+        return;
+      }
+      const savedUser: AuthUser = JSON.parse(savedUserStr);
+
+      if (savedUser.isGuest) {
+        await setupUserSession(savedUser);
+        return;
+      }
+      
+      const tokens = await ApiService.getTokens();
+      if (tokens.accessToken && tokens.refreshToken) {
+        ApiService.setAccessToken(tokens.accessToken);
+        const isValid = await AuthService.isAuthenticated();
+        if (isValid) {
+          await setupUserSession(savedUser);
+        } else {
           try {
-            const parsedUser: AuthUser = JSON.parse(savedUser);
-            setUser(parsedUser);
-            DatabaseService.setUserId(parsedUser.id);
-            await DatabaseService.initDatabase();
-            UserDataService.setUserId(parsedUser.id);
-            await UserDataService.initializeUserData();
-          } catch (error) {
-            console.error('Failed to restore user:', error);
+            const newTokens = await AuthService.refreshToken(tokens.refreshToken);
+            if (newTokens) {
+              await ApiService.saveTokens(newTokens.accessToken, newTokens.refreshToken);
+              await setupUserSession(savedUser);
+            } else {
+              await logout();
+            }
+          } catch (e) {
+            await logout();
           }
         }
       }
     } catch (error) {
       console.error('Auth state check error:', error);
-      setUser(null);
+      await logout();
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [setupUserSession]);
+
+  useEffect(() => {
+    checkAuthState();
+  }, [checkAuthState]);
+
+
+  const handleAuthResponse = async (response: AuthResponse) => {
+    await ApiService.saveTokens(response.accessToken, response.refreshToken);
+    const authUser: AuthUser = {
+      id: response.user.id,
+      email: response.user.email,
+      displayName: response.user.displayName,
+      isGuest: response.user.isGuest,
+      isPremium: response.user.isPremium,
+    };
+    await setupUserSession(authUser);
+  }
 
   const login = async (email: string, password: string) => {
-    try {
-      const response = await AuthService.login({ email, password });
-      
-      const authUser: AuthUser = {
-        id: response.user.id,
-        email: response.user.email,
-        displayName: response.user.name || response.user.email.split('@')[0],
-        isGuest: false,
-        isPremium: response.user.isPremium
-      };
-      
-      setUser(authUser);
-      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
-      
-      // Инициализируем базу данных
-      DatabaseService.setUserId(response.user.id);
-      await DatabaseService.initDatabase();
-      UserDataService.setUserId(response.user.id);
-      await UserDataService.initializeUserData();
-    } catch (error) {
-      throw error;
-    }
+    const response = await AuthService.login({ email, password });
+    await handleAuthResponse(response);
   };
 
   const register = async (email: string, password: string, displayName?: string) => {
-    try {
-      const response = await AuthService.register({ 
-        email, 
-        password, 
-        name: displayName || email.split('@')[0] 
-      });
-      
-      const authUser: AuthUser = {
-        id: response.user.id,
-        email: response.user.email,
-        displayName: response.user.name,
-        isGuest: false,
-        isPremium: response.user.isPremium
-      };
-      
-      setUser(authUser);
-      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
-      
-      // Инициализируем базу данных
-      DatabaseService.setUserId(response.user.id);
-      await DatabaseService.initDatabase();
-      UserDataService.setUserId(response.user.id);
-      await UserDataService.initializeUserData();
-    } catch (error) {
-      throw error;
-    }
+    const response = await AuthService.register({ email, password, display_name: displayName });
+    await handleAuthResponse(response);
   };
 
   const logout = async () => {
-    try {
-      // Очищаем данные
-      UserDataService.setUserId(null);
-      DatabaseService.setUserId(null);
-      
-      // Выходим из API только если это не гость и есть интернет
-      if (!user?.isGuest) {
-        try {
-          await AuthService.logout();
-        } catch (error) {
-          // Игнорируем ошибки сети при выходе
-          console.log('Logout network error (ignored):', error);
-        }
+    const isGuest = user?.isGuest;
+    setUser(null);
+    LocalDatabaseService.setUserId(null);
+    await ApiService.clearTokens();
+    await AsyncStorage.removeItem('currentUser');
+    if (!isGuest) {
+      try {
+        await AuthService.logout();
+      } catch (error) {
+        console.log('Logout network error (ignored):', error);
       }
-      
-      // Очищаем локальное состояние
-      await AsyncStorage.removeItem('currentUser');
-      setUser(null);
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Все равно очищаем локальное состояние
-      await AsyncStorage.removeItem('currentUser');
-      setUser(null);
     }
   };
 
   const loginAsGuest = async () => {
-    try {
-      // Генерируем локальный ID для гостя
-      const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      const authUser: AuthUser = {
-        id: guestId,
-        email: `${guestId}@local`,
-        displayName: 'Гость',
-        isGuest: true,
-        isPremium: false
-      };
-      
-      setUser(authUser);
-      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
-      
-      // Инициализируем локальную базу данных
-      DatabaseService.setUserId(guestId);
-      await DatabaseService.initDatabase();
-      UserDataService.setUserId(guestId);
-      await UserDataService.initializeUserData();
-    } catch (error) {
-      console.error('Guest login error:', error);
-      throw new Error('Не удалось войти как гость');
-    }
+    const guestId = `guest_${Date.now()}`;
+    const authUser: AuthUser = {
+      id: guestId,
+      email: `${guestId}@local.guest`,
+      displayName: 'Гость',
+      isGuest: true,
+      isPremium: false
+    };
+    await setupUserSession(authUser);
   };
 
   const loginWithGoogle = async (googleData: { idToken: string; email: string; name: string; googleId: string }) => {
-    try {
-      const response = await ApiService.post<any>('/auth/google', googleData);
-      
-      const authUser: AuthUser = {
-        id: response.user.id,
-        email: response.user.email,
-        displayName: response.user.displayName,
-        isGuest: false,
-        isPremium: response.user.isPremium
-      };
-      
-      setUser(authUser);
-      await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
-      
-      // Сохраняем токены
-      await ApiService.setAccessToken(response.accessToken);
-      await ApiService.setRefreshToken(response.refreshToken);
-      
-      // Инициализируем базу данных
-      DatabaseService.setUserId(response.user.id);
-      await DatabaseService.initDatabase();
-      UserDataService.setUserId(response.user.id);
-      await UserDataService.initializeUserData();
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const value: AuthContextType = {
-    user,
-    isLoading,
-    login,
-    register,
-    logout,
-    loginAsGuest,
-    loginWithGoogle
+    const response = await AuthService.loginWithGoogle(googleData);
+    await handleAuthResponse(response);
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, isLoading, isPreparing, login, register, logout, loginAsGuest, loginWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );
@@ -271,7 +170,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;

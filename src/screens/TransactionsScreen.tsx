@@ -29,6 +29,7 @@ import { getCurrentLanguage } from '../services/i18n';
 import { CURRENCIES } from '../config/currencies';
 import { SectionHeader } from '../components/SectionHeader';
 import { DateRangePicker } from '../components/DateRangePicker';
+import { DateFilterModal } from '../components/DateFilterModal';
 
 // Хук для debounce
 const useDebounce = (value: string, delay: number) => {
@@ -53,33 +54,26 @@ const ListHeader = React.memo(({
   customStartDate,
   customEndDate,
   onDateFilterChange,
-  onShowDateRangePicker
+  onShowDateRangePicker,
+  onShowMoreFilters
 }: {
   dateFilter: string;
   customStartDate: Date;
   customEndDate: Date;
   onDateFilterChange: (filter: string) => void;
   onShowDateRangePicker: () => void;
+  onShowMoreFilters: () => void;
 }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const isCustomActive = dateFilter === 'week' || dateFilter === 'month' || dateFilter === 'custom';
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.filterContainer}
-      contentContainerStyle={styles.filterContent}
-    >
+    <View style={styles.filterContainer}>
       {[
-        { key: 'all', label: t('transactions.allTransactions'), icon: 'time-outline' },
-        { key: 'today', label: t('transactions.todayTransactions'), icon: 'today' },
-        { key: 'yesterday', label: t('transactions.yesterdayTransactions'), icon: 'arrow-back' },
-        { key: 'week', label: t('transactions.weekTransactions'), icon: 'calendar' },
-        { key: 'month', label: t('transactions.monthTransactions'), icon: 'calendar-outline' },
-        { key: 'custom', label: dateFilter === 'custom' ? 
-          `${customStartDate.getDate()}.${customStartDate.getMonth() + 1} - ${customEndDate.getDate()}.${customEndDate.getMonth() + 1}` : 
-          t('transactions.customPeriod'), icon: 'options-outline' },
+        { key: 'all', label: t('transactions.allTransactions') },
+        { key: 'today', label: t('transactions.todayTransactions') },
+        { key: 'yesterday', label: t('transactions.yesterdayTransactions') },
       ].map(filter => (
         <TouchableOpacity
           key={filter.key}
@@ -90,31 +84,44 @@ const ListHeader = React.memo(({
               borderColor: dateFilter === filter.key ? colors.primary : colors.border,
             }
           ]}
-          onPress={() => {
-            if (filter.key === 'custom') {
-              onShowDateRangePicker();
-            } else {
-              onDateFilterChange(filter.key);
-            }
-          }}
+          onPress={() => onDateFilterChange(filter.key)}
         >
-          <Ionicons 
-            name={filter.icon as any} 
-            size={16} 
-            color={dateFilter === filter.key ? '#fff' : colors.text} 
-          />
           <Text
             style={[
               styles.filterText,
               { color: dateFilter === filter.key ? '#fff' : colors.text }
             ]}
-            numberOfLines={1}
           >
             {filter.label}
           </Text>
         </TouchableOpacity>
       ))}
-    </ScrollView>
+      <TouchableOpacity
+        style={[
+          styles.filterButton,
+          styles.moreFiltersButton,
+          { 
+            backgroundColor: isCustomActive ? colors.primary : colors.card,
+            borderColor: isCustomActive ? colors.primary : colors.border,
+          }
+        ]}
+        onPress={onShowMoreFilters}
+      >
+        <Ionicons 
+          name="options-outline"
+          size={16} 
+          color={isCustomActive ? '#fff' : colors.text} 
+        />
+        <Text
+          style={[
+            styles.filterText,
+            { color: isCustomActive ? '#fff' : colors.text }
+          ]}
+        >
+          {t('common.more')}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -144,6 +151,11 @@ export const TransactionsScreen = () => {
   const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
   const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+  const [showDateFilterModal, setShowDateFilterModal] = useState(false);
+
+  const handleDateFilterChange = (filter: string) => {
+    setDateFilter(filter as 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom');
+  };
 
   // Используем debounce для поиска
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -420,15 +432,21 @@ export const TransactionsScreen = () => {
     setSearchQuery('');
   }, []);
 
-  const renderHeader = useCallback(() => (
-    <ListHeader
-      dateFilter={dateFilter}
-      customStartDate={customStartDate}
-      customEndDate={customEndDate}
-      onDateFilterChange={(filter) => setDateFilter(filter as any)}
-      onShowDateRangePicker={() => setShowDateRangePicker(true)}
-    />
-  ), [dateFilter, customStartDate, customEndDate]);
+  const ListHeaderComponent = useCallback(() => {
+    return (
+      <ListHeader 
+        dateFilter={dateFilter}
+        customStartDate={customStartDate}
+        customEndDate={customEndDate}
+        onDateFilterChange={handleDateFilterChange}
+        onShowDateRangePicker={() => {
+          setShowDateFilterModal(false);
+          setShowDateRangePicker(true);
+        }}
+        onShowMoreFilters={() => setShowDateFilterModal(true)}
+      />
+    );
+  }, [dateFilter, customStartDate, customEndDate]);
 
   const renderSectionHeader = useCallback(({ section }: { section: any }) => {
     return <SectionHeader title={section.title} data={section.data} />;
@@ -526,7 +544,7 @@ export const TransactionsScreen = () => {
       </View>
 
       <SectionList
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={ListHeaderComponent}
         sections={groupedTransactions}
         keyExtractor={useCallback((item: Transaction) => item.id, [])}
         renderItem={renderItem}
@@ -615,20 +633,32 @@ export const TransactionsScreen = () => {
         />
       )}
 
-      {showDateRangePicker && (
-        <DateRangePicker
-          visible={showDateRangePicker}
-          onClose={() => setShowDateRangePicker(false)}
-          onConfirm={(startDate, endDate) => {
-            setCustomStartDate(startDate);
-            setCustomEndDate(endDate);
-            setDateFilter('custom');
-            setShowDateRangePicker(false);
-          }}
-          initialStartDate={customStartDate}
-          initialEndDate={customEndDate}
-        />
-      )}
+      <DateFilterModal 
+        visible={showDateFilterModal}
+        onClose={() => setShowDateFilterModal(false)}
+        currentFilter={dateFilter}
+        onSelectFilter={(filter) => {
+          setShowDateFilterModal(false);
+          if (filter === 'custom') {
+            setShowDateRangePicker(true);
+          } else {
+            handleDateFilterChange(filter);
+          }
+        }}
+      />
+
+      <DateRangePicker
+        visible={showDateRangePicker}
+        onClose={() => setShowDateRangePicker(false)}
+        onConfirm={(startDate, endDate) => {
+          setCustomStartDate(startDate);
+          setCustomEndDate(endDate);
+          handleDateFilterChange('custom');
+          setShowDateRangePicker(false);
+        }}
+        initialStartDate={customStartDate}
+        initialEndDate={customEndDate}
+      />
     </View>
   );
 };
@@ -692,30 +722,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   filterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  filterContent: {
-    gap: 6,
-    paddingVertical: 4,
+    paddingVertical: 8,
   },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    marginRight: 6,
-    gap: 4,
-    minHeight: 36,
+    borderRadius: 20,
+    justifyContent: 'center',
+  },
+  moreFiltersButton: {
+    gap: 6,
   },
   filterText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
-    maxWidth: 100,
   },
   emptyContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,

@@ -174,31 +174,26 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           
           // Проверяем нужна ли конверсия валют
           let fromAmount = parseFloat(amount);
-          let toAmount = parseFloat(amount);
+          let toAmount = fromAmount;
           
+          // При переносе между счетами конвертируем сумму
           if (fromAccount.currency !== toAccount.currency) {
-            // Нужна конверсия
-            const exchangeRate = await LocalDatabaseService.getExchangeRate(
-              fromAccount.currency || defaultCurrency,
-              toAccount.currency || defaultCurrency
-            );
-            
-            if (exchangeRate) {
-              toAmount = fromAmount * exchangeRate;
-            } else {
-              // Попробуем через базовую валюту
-              const fromToDefault = await LocalDatabaseService.getExchangeRate(
+            try {
+              const { ExchangeRateService } = await import('../services/exchangeRate');
+              const exchangeRate = await ExchangeRateService.getRate(
                 fromAccount.currency || defaultCurrency,
-                defaultCurrency
-              );
-              const defaultToTo = await LocalDatabaseService.getExchangeRate(
-                defaultCurrency,
                 toAccount.currency || defaultCurrency
               );
               
-              if (fromToDefault && defaultToTo) {
-                toAmount = fromAmount * fromToDefault * defaultToTo;
+              if (exchangeRate) {
+                toAmount = fromAmount * exchangeRate;
+              } else {
+                console.warn('No exchange rate found for conversion');
+                // Используем исходную сумму если курс не найден
               }
+            } catch (error) {
+              console.error('Error getting exchange rate:', error);
+              // Используем исходную сумму в случае ошибки
             }
           }
           

@@ -9,13 +9,13 @@ export interface LoginCredentials {
 export interface RegisterData {
   email: string;
   password: string;
-  name: string;
+  display_name?: string;
 }
 
 export interface User {
   id: string;
   email: string;
-  name: string;
+  displayName: string;
   isGuest: boolean;
   isPremium: boolean;
   createdAt: string;
@@ -61,18 +61,26 @@ export class AuthService {
     return response;
   }
 
-  // Обновление access токена
-  static async refreshToken(): Promise<string | null> {
-    try {
-      const refreshToken = await ApiService.getRefreshToken();
-      if (!refreshToken) return null;
+  // Вход через Google
+  static async loginWithGoogle(googleData: { idToken: string; email: string; name: string; googleId: string }): Promise<AuthResponse> {
+    const response = await ApiService.post<AuthResponse>('/auth/google', googleData);
+    
+    // Сохраняем токены
+    await ApiService.setAccessToken(response.accessToken);
+    await ApiService.setRefreshToken(response.refreshToken);
+    
+    return response;
+  }
 
-      const response = await ApiService.post<{ accessToken: string }>('/auth/refresh', {
-        refreshToken
+  // Обновление access токена
+  static async refreshToken(token: string): Promise<{accessToken: string, refreshToken: string} | null> {
+    try {
+      const response = await ApiService.post<{ accessToken: string, refreshToken: string }>('/auth/refresh', {
+        refreshToken: token
       });
 
-      await ApiService.setAccessToken(response.accessToken);
-      return response.accessToken;
+      await ApiService.saveTokens(response.accessToken, response.refreshToken);
+      return response;
     } catch (error) {
       await ApiService.clearTokens();
       return null;

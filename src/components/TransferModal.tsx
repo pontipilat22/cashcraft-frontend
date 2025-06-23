@@ -69,40 +69,36 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       
       if (!fromAccount || !toAccount) return;
       
-      // Определяем сумму для зачисления с учетом курса валют
+      // Конвертируем сумму если нужно
       let toAmount = transferAmount;
       
-      const fromCurrency = fromAccount.currency || defaultCurrency;
-      const toCurrency = toAccount.currency || defaultCurrency;
-      
-      if (fromCurrency !== toCurrency) {
-        // Нужна конвертация валют
-        const { LocalDatabaseService } = await import('../services/localDatabase');
-        
-        // Пытаемся получить прямой курс
-        let exchangeRate = await LocalDatabaseService.getExchangeRate(
-          fromCurrency,
-          toCurrency
-        );
-        
-        // Если нет прямого курса, пытаемся через кросс-курс
-        if (!exchangeRate) {
-          exchangeRate = await LocalDatabaseService.calculateCrossRate(
-            fromCurrency,
-            toCurrency,
-            defaultCurrency
+      if (fromAccount.currency !== toAccount.currency) {
+        try {
+          const { ExchangeRateService } = await import('../services/exchangeRate');
+          const exchangeRate = await ExchangeRateService.getRate(
+            fromAccount.currency || defaultCurrency,
+            toAccount.currency || defaultCurrency
           );
-        }
-        
-        if (exchangeRate) {
-          toAmount = transferAmount * exchangeRate;
-        } else {
-          // Если курс не найден, показываем предупреждение
+          
+          if (exchangeRate) {
+            toAmount = transferAmount * exchangeRate;
+          } else {
+            Alert.alert(
+              t('common.error'),
+              t('transactions.noExchangeRate', {
+                from: fromAccount.currency || defaultCurrency,
+                to: toAccount.currency || defaultCurrency
+              })
+            );
+            return;
+          }
+        } catch (error) {
+          console.error('Error getting exchange rate:', error);
           Alert.alert(
             t('common.error'),
             t('transactions.noExchangeRate', {
-              from: fromCurrency,
-              to: toCurrency
+              from: fromAccount.currency || defaultCurrency,
+              to: toAccount.currency || defaultCurrency
             })
           );
           return;

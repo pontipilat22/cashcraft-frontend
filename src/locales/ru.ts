@@ -34,6 +34,7 @@ export default {
     optional: 'необязательно',
     done: 'Готово',
     featureNotAvailable: 'Эта функция пока не доступна',
+    more: 'Еще',
   },
   auth: {
     login: 'Вход',

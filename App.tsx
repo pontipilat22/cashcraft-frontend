@@ -13,50 +13,37 @@ import { CurrencyProvider } from './src/context/CurrencyContext';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { SplashScreen } from './src/components/SplashScreen';
 import { useCurrency } from './src/context/CurrencyContext';
+import { LocalDatabaseService } from './src/services/localDatabase';
 
 // Предотвращаем автоматическое скрытие нативного splash screen
 SplashScreenExpo.preventAutoHideAsync();
 
 function AppContent() {
   const { isDark, colors } = useTheme();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isPreparing } = useAuth();
   const { defaultCurrency } = useCurrency();
-  const [showCustomSplash, setShowCustomSplash] = useState(true);
-  const [forceHideSplash, setForceHideSplash] = useState(false);
   const [dataProviderKey, setDataProviderKey] = useState(0);
 
-
-
   useEffect(() => {
-    const prepare = async () => {
-      try {
-        // Скрываем нативный splash screen
-        await SplashScreenExpo.hideAsync();
-      } catch (error) {
-        // Игнорируем ошибку
-      }
-      
-      // Показываем кастомный splash screen минимум 2 секунды
-      setTimeout(() => {
-        setShowCustomSplash(false);
-      }, 2000);
-      
-      // Аварийный таймаут - скрываем splash через 5 секунд в любом случае
-      setTimeout(() => {
-        setForceHideSplash(true);
-      }, 5000);
-    };
-    
-    prepare();
+    // Принудительно скрываем нативный сплэш-скрин после инициализации
+    SplashScreenExpo.hideAsync();
   }, []);
 
   // Обновляем DataProvider при изменении валюты
   useEffect(() => {
-    // Принудительно перемонтируем DataProvider чтобы обновить валюту
-    setDataProviderKey(prev => prev + 1);
-  }, [defaultCurrency]);
+    if (user) {
+      setDataProviderKey(prev => prev + 1);
+    }
+  }, [defaultCurrency, user]);
 
-  if ((showCustomSplash || authLoading) && !forceHideSplash) {
+  // Обновляем валюту по умолчанию в базе данных после инициализации
+  useEffect(() => {
+    if (user && !isPreparing && LocalDatabaseService.isDatabaseReady()) {
+      LocalDatabaseService.updateDefaultCurrency(defaultCurrency);
+    }
+  }, [user, isPreparing, defaultCurrency]);
+
+  if (authLoading || isPreparing) {
     return <SplashScreen />;
   }
 

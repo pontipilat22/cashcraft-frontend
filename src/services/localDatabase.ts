@@ -1,17 +1,25 @@
 import * as SQLite from 'expo-sqlite';
 import { Account, Transaction, Category, Debt } from '../types';
+import { Platform } from 'react-native';
 
 export class LocalDatabaseService {
   private static db: SQLite.SQLiteDatabase | null = null;
   private static currentUserId: string | null = null;
+  private static isInitialized: boolean = false;
+  private static initializationPromise: Promise<void> | null = null;
 
   static setUserId(userId: string | null) {
     this.currentUserId = userId;
+    this.isInitialized = false;
+    this.initializationPromise = null;
     if (userId) {
       try {
         // Открываем базу данных для конкретного пользователя
         const safeUserId = userId.replace(/[^a-zA-Z0-9]/g, '_');
         this.db = SQLite.openDatabaseSync(`cashcraft_${safeUserId}.db`);
+        if (__DEV__) {
+          console.log(`Database opened in setUserId: cashcraft_${safeUserId}.db`);
+        }
       } catch (error) {
         this.db = null;
         throw error;
@@ -22,22 +30,89 @@ export class LocalDatabaseService {
   }
 
   private static getDb(): SQLite.SQLiteDatabase {
-    if (!this.db || !this.currentUserId) {
-      throw new Error('Database not initialized. Call setUserId first.');
+    if (!this.db || !this.currentUserId || !this.isInitialized) {
+      throw new Error('Database not initialized. Call setUserId and initDatabase first.');
     }
     return this.db;
   }
 
-  static async initDatabase(defaultCurrency: string = 'USD'): Promise<void> {
-    if (!this.db || !this.currentUserId) {
-      return;
+  static isDatabaseReady(): boolean {
+    const ready = this.db !== null && this.currentUserId !== null && this.isInitialized;
+    if (__DEV__) {
+      console.log(`Database ready check: db=${!!this.db}, userId=${!!this.currentUserId}, initialized=${this.isInitialized}, ready=${ready}`);
     }
+    return ready;
+  }
 
-    const db = this.getDb();
+  static async initDatabase(defaultCurrency: string): Promise<void> {
+    // Если уже идет инициализация, ждем ее завершения
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+    
+    this.initializationPromise = this._initDatabaseInternal(defaultCurrency);
     
     try {
-      // Создаем таблицы
-      db.execSync(`
+      await this.initializationPromise;
+    } catch (error) {
+      // Сбрасываем состояние при ошибке
+      this.isInitialized = false;
+      throw error;
+    }
+  }
+
+  private static async _initDatabaseInternal(defaultCurrency: string): Promise<void> {
+    // Открываем базу данных если она еще не открыта
+    if (!this.db && this.currentUserId) {
+      try {
+        const safeUserId = this.currentUserId.replace(/[^a-zA-Z0-9]/g, '_');
+        const dbName = `cashcraft_${safeUserId}.db`;
+        this.db = SQLite.openDatabaseSync(dbName);
+        if (__DEV__) {
+          console.log(`Database opened in _initDatabaseInternal: ${dbName}`);
+        }
+      } catch (error) {
+        console.error('Failed to open database:', error);
+        throw new Error('Failed to open database');
+      }
+    }
+    
+    const db = this.db;
+    
+    if (!db) {
+      throw new Error('Database not opened');
+    }
+    
+    try {
+      // Добавляем задержку для Android, чтобы дать базе данных время инициализироваться
+      if (__DEV__) {
+        console.log('Waiting for database to fully initialize...');
+      }
+      
+      // Увеличиваем задержку до 2 секунд для Android
+      if (Platform.OS === 'android') {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Проверяем, что база данных действительно готова
+      try {
+        // Пытаемся выполнить простой запрос
+        const testResult = db.getFirstSync('SELECT 1 as test');
+        if (__DEV__) {
+          console.log('Database test query result:', testResult);
+        }
+      } catch (testError) {
+        if (__DEV__) {
+          console.error('Database not ready yet, waiting more...', testError);
+        }
+        // Дополнительная задержка если база не готова
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Создаем таблицы используя безопасные операции
+      this.safeExecSync(`
         CREATE TABLE IF NOT EXISTS accounts (
           id TEXT PRIMARY KEY NOT NULL,
           name TEXT NOT NULL,
@@ -66,26 +141,26 @@ export class LocalDatabaseService {
 
       // Миграция: добавляем колонку exchangeRate если её нет
       try {
-        db.execSync(`ALTER TABLE accounts ADD COLUMN exchangeRate REAL DEFAULT 1`);
+        this.safeExecSync(`ALTER TABLE accounts ADD COLUMN exchangeRate REAL DEFAULT 1`);
       } catch (error) {
         // Колонка уже существует, игнорируем ошибку
       }
       
       // Миграция: добавляем колонку linkedAccountId если её нет
       try {
-        db.execSync(`ALTER TABLE accounts ADD COLUMN linkedAccountId TEXT`);
+        this.safeExecSync(`ALTER TABLE accounts ADD COLUMN linkedAccountId TEXT`);
       } catch (error) {
         // Колонка уже существует, игнорируем ошибку
       }
       
       // Миграция: добавляем колонку savedAmount если её нет
       try {
-        db.execSync(`ALTER TABLE accounts ADD COLUMN savedAmount REAL DEFAULT 0`);
+        this.safeExecSync(`ALTER TABLE accounts ADD COLUMN savedAmount REAL DEFAULT 0`);
       } catch (error) {
         // Колонка уже существует, игнорируем ошибку
       }
 
-      db.execSync(`
+      this.safeExecSync(`
         CREATE TABLE IF NOT EXISTS transactions (
           id TEXT PRIMARY KEY NOT NULL,
           amount REAL NOT NULL,
@@ -96,12 +171,11 @@ export class LocalDatabaseService {
           date TEXT NOT NULL,
           createdAt TEXT NOT NULL,
           updatedAt TEXT NOT NULL,
-          syncedAt TEXT,
-          FOREIGN KEY (accountId) REFERENCES accounts (id)
+          syncedAt TEXT
         );
       `);
 
-      db.execSync(`
+      this.safeExecSync(`
         CREATE TABLE IF NOT EXISTS categories (
           id TEXT PRIMARY KEY NOT NULL,
           name TEXT NOT NULL,
@@ -112,7 +186,7 @@ export class LocalDatabaseService {
         );
       `);
 
-      db.execSync(`
+      this.safeExecSync(`
         CREATE TABLE IF NOT EXISTS debts (
           id TEXT PRIMARY KEY,
           type TEXT NOT NULL,
@@ -127,7 +201,7 @@ export class LocalDatabaseService {
       `);
 
       // Создаем таблицу для метаданных синхронизации
-      db.execSync(`
+      this.safeExecSync(`
         CREATE TABLE IF NOT EXISTS sync_metadata (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           lastSyncAt TEXT,
@@ -136,7 +210,7 @@ export class LocalDatabaseService {
       `);
 
       // Создаем таблицу для курсов валют
-      db.execSync(`
+      this.safeExecSync(`
         CREATE TABLE IF NOT EXISTS exchange_rates (
           id TEXT PRIMARY KEY NOT NULL,
           fromCurrency TEXT NOT NULL,
@@ -148,7 +222,7 @@ export class LocalDatabaseService {
       `);
 
       // Создаем таблицу для настроек
-      db.execSync(`
+      this.safeExecSync(`
         CREATE TABLE IF NOT EXISTS settings (
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
@@ -156,27 +230,27 @@ export class LocalDatabaseService {
       `);
 
       // Инициализируем настройки по умолчанию
-      const existingRatesMode = db.getFirstSync<{ value: string }>(
+      const existingRatesMode = this.safeGetFirstSync<{ value: string }>(
         'SELECT value FROM settings WHERE key = ?',
         'exchangeRatesMode'
       );
       
       if (!existingRatesMode) {
-        db.runSync(
+        this.safeRunSync(
           'INSERT INTO settings (key, value) VALUES (?, ?)',
           'exchangeRatesMode', 'auto' // По умолчанию автоматический режим
         );
       }
 
       // Инициализируем базовые данные если это первый запуск
-      const accountsCount = db.getFirstSync<{ count: number }>(
+      const accountsCount = this.safeGetFirstSync<{ count: number }>(
         'SELECT COUNT(*) as count FROM accounts'
       )?.count || 0;
 
       if (accountsCount === 0) {
         // Создаем счет "Наличные" по умолчанию с валютой пользователя
         const now = new Date().toISOString();
-        db.runSync(
+        this.safeRunSync(
           `INSERT INTO accounts (id, name, type, balance, currency, isDefault, isIncludedInTotal, createdAt, updatedAt)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           '1', 'Наличные', 'cash', 0, defaultCurrency, 1, 1, now, now
@@ -184,7 +258,7 @@ export class LocalDatabaseService {
       }
 
       // Проверяем и добавляем базовые категории если их нет
-      const categoriesCount = db.getFirstSync<{ count: number }>(
+      const categoriesCount = this.safeGetFirstSync<{ count: number }>(
         'SELECT COUNT(*) as count FROM categories'
       )?.count || 0;
 
@@ -208,7 +282,7 @@ export class LocalDatabaseService {
 
         categories.forEach(cat => {
           try {
-            db.runSync(
+            this.safeRunSync(
               `INSERT OR IGNORE INTO categories (id, name, type, icon, color) VALUES (?, ?, ?, ?, ?)`,
               cat.id, cat.name, cat.type, cat.icon, cat.color
             );
@@ -217,8 +291,43 @@ export class LocalDatabaseService {
           }
         });
       }
+      
+      this.isInitialized = true;
+      if (__DEV__) {
+        console.log('Database initialization completed successfully');
+      }
     } catch (error) {
+      if (__DEV__) {
+        console.error('Database initialization failed:', error);
+      }
       throw error;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  // Метод для обновления валюты по умолчанию после инициализации
+  static async updateDefaultCurrency(newCurrency: string): Promise<void> {
+    if (!this.isDatabaseReady()) {
+      return;
+    }
+    
+    try {
+      // Обновляем валюту в счете "Наличные" если он существует
+      const cashAccount = this.safeGetFirstSync<{ id: string; currency: string }>(
+        'SELECT id, currency FROM accounts WHERE name = ? AND type = ?',
+        'Наличные', 'cash'
+      );
+      
+      if (cashAccount && cashAccount.currency !== newCurrency) {
+        this.safeRunSync(
+          'UPDATE accounts SET currency = ? WHERE id = ?',
+          newCurrency, cashAccount.id
+        );
+        console.log(`Updated default currency from ${cashAccount.currency} to ${newCurrency}`);
+      }
+    } catch (error) {
+      console.error('Error updating default currency:', error);
     }
   }
 
@@ -227,28 +336,19 @@ export class LocalDatabaseService {
     if (!this.db || !this.currentUserId) {
       return [];
     }
-    const db = this.getDb();
-    const accounts = db.getAllSync('SELECT * FROM accounts ORDER BY createdAt DESC');
-    // Логируем для отладки
-    console.log('Loaded accounts from DB:', accounts.map((acc: any) => ({
-      id: acc.id,
-      name: acc.name,
-      currency: acc.currency,
-      exchangeRate: acc.exchangeRate
-    })));
-    return accounts as Account[];
+    const accounts = this.safeGetAllSync('SELECT * FROM accounts ORDER BY name') as Account[];
+    return accounts;
   }
 
   static async createAccount(account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>): Promise<Account> {
-    const db = this.getDb();
     const id = Date.now().toString();
     const now = new Date().toISOString();
 
     if (account.isDefault) {
-      db.runSync('UPDATE accounts SET isDefault = 0');
+      this.safeRunSync('UPDATE accounts SET isDefault = 0');
     }
 
-    db.runSync(
+    this.safeRunSync(
       `INSERT INTO accounts (id, name, type, balance, currency, exchangeRate, cardNumber, icon, isDefault, isIncludedInTotal, 
        targetAmount, linkedAccountId, savedAmount, creditStartDate, creditTerm, creditRate, creditPaymentType, creditInitialAmount, 
        createdAt, updatedAt)
@@ -265,12 +365,11 @@ export class LocalDatabaseService {
   }
 
   static async updateAccount(id: string, updates: Partial<Account>): Promise<void> {
-    const db = this.getDb();
     const fields: string[] = [];
     const values: any[] = [];
 
     if (updates.isDefault === true) {
-      db.runSync('UPDATE accounts SET isDefault = 0');
+      this.safeRunSync('UPDATE accounts SET isDefault = 0');
     }
 
     Object.entries(updates).forEach(([key, value]) => {
@@ -282,7 +381,7 @@ export class LocalDatabaseService {
 
     if (fields.length > 0) {
       values.push(new Date().toISOString(), id);
-      db.runSync(
+      this.safeRunSync(
         `UPDATE accounts SET ${fields.join(', ')}, updatedAt = ? WHERE id = ?`,
         ...values
       );
@@ -290,9 +389,8 @@ export class LocalDatabaseService {
   }
 
   static async deleteAccount(id: string): Promise<void> {
-    const db = this.getDb();
-    db.runSync('DELETE FROM transactions WHERE accountId = ?', id);
-    db.runSync('DELETE FROM accounts WHERE id = ?', id);
+    this.safeRunSync('DELETE FROM transactions WHERE accountId = ?', id);
+    this.safeRunSync('DELETE FROM accounts WHERE id = ?', id);
   }
 
   // Методы для работы с транзакциями
@@ -300,18 +398,15 @@ export class LocalDatabaseService {
     if (!this.db || !this.currentUserId) {
       return [];
     }
-    const db = this.getDb();
-    const transactions = db.getAllSync('SELECT * FROM transactions ORDER BY date DESC, createdAt DESC');
-    return transactions as Transaction[];
+    return this.safeGetAllSync('SELECT * FROM transactions ORDER BY date DESC, createdAt DESC') as Transaction[];
   }
 
   static async createTransaction(transaction: Omit<Transaction, 'id'>): Promise<Transaction> {
-    const db = this.getDb();
     const id = Date.now().toString();
     const now = new Date().toISOString();
 
     // Создаем транзакцию
-    db.runSync(
+    this.safeRunSync(
       `INSERT INTO transactions (id, amount, type, accountId, categoryId, description, date, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       id, transaction.amount, transaction.type, transaction.accountId,
@@ -321,7 +416,7 @@ export class LocalDatabaseService {
 
     // Обновляем баланс счета
     const balanceChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
-    db.runSync(
+    this.safeRunSync(
       'UPDATE accounts SET balance = balance + ?, updatedAt = ? WHERE id = ?',
       balanceChange, now, transaction.accountId
     );
@@ -330,12 +425,11 @@ export class LocalDatabaseService {
   }
 
   static async updateTransaction(id: string, oldTransaction: Transaction, updates: Partial<Transaction>): Promise<void> {
-    const db = this.getDb();
     const now = new Date().toISOString();
 
     // Отменяем старое изменение баланса
     const oldBalanceChange = oldTransaction.type === 'income' ? -oldTransaction.amount : oldTransaction.amount;
-    db.runSync(
+    this.safeRunSync(
       'UPDATE accounts SET balance = balance + ? WHERE id = ?',
       oldBalanceChange, oldTransaction.accountId
     );
@@ -353,7 +447,7 @@ export class LocalDatabaseService {
 
     if (fields.length > 0) {
       values.push(now, id);
-      db.runSync(
+      this.safeRunSync(
         `UPDATE transactions SET ${fields.join(', ')}, updatedAt = ? WHERE id = ?`,
         ...values
       );
@@ -362,22 +456,21 @@ export class LocalDatabaseService {
     // Применяем новое изменение баланса
     const newTransaction = { ...oldTransaction, ...updates };
     const newBalanceChange = newTransaction.type === 'income' ? newTransaction.amount : -newTransaction.amount;
-    db.runSync(
+    this.safeRunSync(
       'UPDATE accounts SET balance = balance + ?, updatedAt = ? WHERE id = ?',
       newBalanceChange, now, newTransaction.accountId
     );
   }
 
   static async deleteTransaction(transaction: Transaction): Promise<void> {
-    const db = this.getDb();
     const now = new Date().toISOString();
 
     // Удаляем транзакцию
-    db.runSync('DELETE FROM transactions WHERE id = ?', transaction.id);
+    this.safeRunSync('DELETE FROM transactions WHERE id = ?', transaction.id);
 
     // Отменяем изменение баланса
     const balanceChange = transaction.type === 'income' ? -transaction.amount : transaction.amount;
-    db.runSync(
+    this.safeRunSync(
       'UPDATE accounts SET balance = balance + ?, updatedAt = ? WHERE id = ?',
       balanceChange, now, transaction.accountId
     );
@@ -388,16 +481,13 @@ export class LocalDatabaseService {
     if (!this.db || !this.currentUserId) {
       return [];
     }
-    const db = this.getDb();
-    const categories = db.getAllSync('SELECT * FROM categories ORDER BY name');
-    return categories as Category[];
+    return this.safeGetAllSync('SELECT * FROM categories ORDER BY name') as Category[];
   }
 
   static async createCategory(category: Omit<Category, 'id'>): Promise<Category> {
-    const db = this.getDb();
     const id = Date.now().toString();
 
-    db.runSync(
+    this.safeRunSync(
       `INSERT INTO categories (id, name, type, icon, color) VALUES (?, ?, ?, ?, ?)`,
       id, category.name, category.type, category.icon, category.color
     );
@@ -406,7 +496,6 @@ export class LocalDatabaseService {
   }
 
   static async updateCategory(id: string, updates: Partial<Category>): Promise<void> {
-    const db = this.getDb();
     const fields: string[] = [];
     const values: any[] = [];
 
@@ -419,7 +508,7 @@ export class LocalDatabaseService {
 
     if (fields.length > 0) {
       values.push(id);
-      db.runSync(
+      this.safeRunSync(
         `UPDATE categories SET ${fields.join(', ')} WHERE id = ?`,
         ...values
       );
@@ -427,18 +516,16 @@ export class LocalDatabaseService {
   }
 
   static async deleteCategory(id: string): Promise<void> {
-    const db = this.getDb();
-    
     // Получаем тип категории
-    const category = db.getFirstSync<Category>('SELECT * FROM categories WHERE id = ?', id);
+    const category = this.safeGetFirstSync<Category>('SELECT * FROM categories WHERE id = ?', id);
     if (!category) return;
 
     // Перемещаем транзакции в категорию "Другое"
     const otherId = category.type === 'income' ? 'other_income' : 'other_expense';
-    db.runSync('UPDATE transactions SET categoryId = ? WHERE categoryId = ?', otherId, id);
+    this.safeRunSync('UPDATE transactions SET categoryId = ? WHERE categoryId = ?', otherId, id);
     
     // Удаляем категорию
-    db.runSync('DELETE FROM categories WHERE id = ?', id);
+    this.safeRunSync('DELETE FROM categories WHERE id = ?', id);
   }
 
   // Методы для работы с долгами
@@ -447,17 +534,14 @@ export class LocalDatabaseService {
       // Не логируем предупреждение, так как это нормальная ситуация при инициализации
       return [];
     }
-    const db = this.getDb();
-    const debts = db.getAllSync('SELECT * FROM debts ORDER BY createdAt DESC');
-    return debts as Debt[];
+    return this.safeGetAllSync('SELECT * FROM debts ORDER BY createdAt DESC') as Debt[];
   }
 
   static async createDebt(debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
-    const db = this.getDb();
     const id = Date.now().toString();
     const now = new Date().toISOString();
 
-    db.runSync(
+    this.safeRunSync(
       `INSERT INTO debts (id, type, name, amount, isIncludedInTotal, dueDate, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       id, debt.type, debt.name, debt.amount, debt.isIncludedInTotal !== false ? 1 : 0,
@@ -466,7 +550,6 @@ export class LocalDatabaseService {
   }
 
   static async updateDebt(id: string, updates: Partial<Debt>): Promise<void> {
-    const db = this.getDb();
     const fields: string[] = [];
     const values: any[] = [];
 
@@ -479,7 +562,7 @@ export class LocalDatabaseService {
 
     if (fields.length > 0) {
       values.push(new Date().toISOString(), id);
-      db.runSync(
+      this.safeRunSync(
         `UPDATE debts SET ${fields.join(', ')}, updatedAt = ? WHERE id = ?`,
         ...values
       );
@@ -487,8 +570,7 @@ export class LocalDatabaseService {
   }
 
   static async deleteDebt(id: string): Promise<void> {
-    const db = this.getDb();
-    db.runSync('DELETE FROM debts WHERE id = ?', id);
+    this.safeRunSync('DELETE FROM debts WHERE id = ?', id);
   }
 
   // Сброс всех данных
@@ -577,14 +659,13 @@ export class LocalDatabaseService {
 
   // Методы для работы с курсами валют
   static async getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number | null> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
       return null;
     }
-    const db = this.getDb();
     
     try {
-      // Сначала проверяем локальную базу
-      const result = db.getFirstSync<{ rate: number }>(
+      // Сначала проверяем локальную базу используя безопасный метод
+      const result = this.safeGetFirstSync<{ rate: number }>(
         'SELECT rate FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
         fromCurrency, toCurrency
       );
@@ -593,6 +674,9 @@ export class LocalDatabaseService {
         return result.rate;
       }
       
+      // ВРЕМЕННО ОТКЛЮЧАЕМ АВТОЗАГРУЗКУ ИЗ-ЗА ПРОБЛЕМ С EXPO-SQLITE
+      // TODO: Включить обратно после исправления проблем с базой данных
+      /*
       // Если курса нет и включен автоматический режим, пытаемся загрузить из backend
       const mode = await this.getExchangeRatesMode();
       if (mode === 'auto') {
@@ -616,6 +700,7 @@ export class LocalDatabaseService {
           }
         }
       }
+      */
       
       return null;
     } catch (error) {
@@ -626,55 +711,53 @@ export class LocalDatabaseService {
 
   // Метод для получения курса только из локальной базы (без автозагрузки)
   static async getLocalExchangeRate(fromCurrency: string, toCurrency: string): Promise<number | null> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
+      if (__DEV__) {
+        console.log('getLocalExchangeRate: Database not ready');
+      }
       return null;
     }
-    const db = this.getDb();
     
-    try {
-      const result = db.getFirstSync<{ rate: number }>(
-        'SELECT rate FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
-        fromCurrency, toCurrency
-      );
-      
-      return result?.rate || null;
-    } catch (error) {
-      console.error('Error getting local exchange rate:', error);
-      return null;
-    }
+    const result = this.safeGetFirstSync<{ rate: number }>(
+      'SELECT rate FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
+      fromCurrency, toCurrency
+    );
+    
+    return result?.rate || null;
   }
 
   static async saveExchangeRate(fromCurrency: string, toCurrency: string, rate: number): Promise<void> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
+      if (__DEV__) {
+        console.log('saveExchangeRate: Database not ready');
+      }
       return;
     }
-    const db = this.getDb();
     
-    try {
-      if (rate <= 0) {
-        // Удаляем курс если rate <= 0
-        db.runSync(
-          'DELETE FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
-          fromCurrency, toCurrency
-        );
-      } else {
-        const id = `${fromCurrency}_${toCurrency}`;
-        const now = new Date().toISOString();
-        
-        db.runSync(
-          `INSERT OR REPLACE INTO exchange_rates (id, fromCurrency, toCurrency, rate, updatedAt) 
-           VALUES (?, ?, ?, ?, ?)`,
-          id, fromCurrency, toCurrency, rate, now
-        );
-      }
-    } catch (error) {
-      console.error('Error saving exchange rate:', error);
+    if (rate <= 0) {
+      // Удаляем курс если rate <= 0
+      this.safeRunSync(
+        'DELETE FROM exchange_rates WHERE fromCurrency = ? AND toCurrency = ?',
+        fromCurrency, toCurrency
+      );
+    } else {
+      const id = `${fromCurrency}_${toCurrency}`;
+      const now = new Date().toISOString();
+      
+      this.safeRunSync(
+        `INSERT OR REPLACE INTO exchange_rates (id, fromCurrency, toCurrency, rate, updatedAt) 
+         VALUES (?, ?, ?, ?, ?)`,
+        id, fromCurrency, toCurrency, rate, now
+      );
     }
   }
 
   static async getStoredRates(currency: string): Promise<{ [key: string]: number }> {
-    const db = this.getDb();
-    const rates = db.getAllSync<{ fromCurrency: string; toCurrency: string; rate: number }>(
+    if (!this.isDatabaseReady()) {
+      return {};
+    }
+    
+    const rates = this.safeGetAllSync<{ fromCurrency: string; toCurrency: string; rate: number }>(
       'SELECT * FROM exchange_rates WHERE fromCurrency = ? OR toCurrency = ?',
       currency, currency
     );
@@ -693,7 +776,9 @@ export class LocalDatabaseService {
   }
 
   static async calculateCrossRate(fromCurrency: string, toCurrency: string, baseCurrency: string): Promise<number | null> {
-    const db = this.getDb();
+    if (!this.isDatabaseReady()) {
+      return null;
+    }
     
     // Пытаемся найти прямой курс
     let directRate = await this.getLocalExchangeRate(fromCurrency, toCurrency);
@@ -724,35 +809,26 @@ export class LocalDatabaseService {
 
   // Методы для управления источником курсов
   static async getExchangeRatesMode(): Promise<'auto' | 'manual'> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
       return 'auto';
     }
     
-    try {
-      const result = this.db.getFirstSync<{ value: string }>(
-        'SELECT value FROM settings WHERE key = ?',
-        'exchangeRatesMode'
-      );
-      return (result?.value as 'auto' | 'manual') || 'auto';
-    } catch (error) {
-      console.error('Error getting exchange rates mode:', error);
-      return 'auto';
-    }
+    const result = this.safeGetFirstSync<{ value: string }>(
+      'SELECT value FROM settings WHERE key = ?',
+      'exchangeRatesMode'
+    );
+    return (result?.value as 'auto' | 'manual') || 'auto';
   }
 
   static async setExchangeRatesMode(mode: 'auto' | 'manual'): Promise<void> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
       return;
     }
     
-    try {
-      this.db.runSync(
-        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-        'exchangeRatesMode', mode
-      );
-    } catch (error) {
-      console.error('Error setting exchange rates mode:', error);
-    }
+    this.safeRunSync(
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      'exchangeRatesMode', mode
+    );
   }
 
   // Метод для массового обновления курсов из backend
@@ -817,143 +893,164 @@ export class LocalDatabaseService {
 
   // Получить время последнего обновления курсов
   static async getLastRatesUpdate(): Promise<Date | null> {
-    try {
-      const result = this.db?.getFirstSync(
-        'SELECT MAX(updatedAt) as lastUpdate FROM exchange_rates'
-      );
-      
-      if ((result as any)?.lastUpdate) {
-        return new Date((result as any).lastUpdate);
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error getting last rates update:', error);
+    if (!this.isDatabaseReady()) {
       return null;
     }
+    
+    const result = this.safeGetFirstSync(
+      'SELECT MAX(updatedAt) as lastUpdate FROM exchange_rates'
+    );
+    
+    if ((result as any)?.lastUpdate) {
+      return new Date((result as any).lastUpdate);
+    }
+    
+    return null;
   }
 
   // Получить все сохраненные курсы
   static async getAllExchangeRates(): Promise<{ [key: string]: { [key: string]: number } }> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
       return {};
     }
-    const db = this.getDb();
     
-    try {
-      const rates = db.getAllSync<{ fromCurrency: string; toCurrency: string; rate: number }>(
-        'SELECT fromCurrency, toCurrency, rate FROM exchange_rates ORDER BY fromCurrency, toCurrency'
-      );
-      const ratesMap: { [key: string]: { [key: string]: number } } = {};
-      rates.forEach(r => {
-        if (!ratesMap[r.fromCurrency]) {
-          ratesMap[r.fromCurrency] = {};
-        }
-        ratesMap[r.fromCurrency][r.toCurrency] = r.rate;
-      });
-      return ratesMap;
-    } catch (error) {
-      console.error('Error getting all exchange rates:', error);
-      return {};
-    }
+    const rates = this.safeGetAllSync<{ fromCurrency: string; toCurrency: string; rate: number }>(
+      'SELECT fromCurrency, toCurrency, rate FROM exchange_rates ORDER BY fromCurrency, toCurrency'
+    );
+    const ratesMap: { [key: string]: { [key: string]: number } } = {};
+    rates.forEach(r => {
+      if (!ratesMap[r.fromCurrency]) {
+        ratesMap[r.fromCurrency] = {};
+      }
+      ratesMap[r.fromCurrency][r.toCurrency] = r.rate;
+    });
+    return ratesMap;
   }
 
   // Получить все курсы валют для синхронизации
   static async getAllExchangeRatesForSync(): Promise<any[]> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
       return [];
     }
-    const db = this.getDb();
     
-    try {
-      const rates = db.getAllSync<{ 
-        fromCurrency: string; 
-        toCurrency: string; 
-        rate: number;
-        updatedAt: string;
-      }>(
-        'SELECT fromCurrency as from_currency, toCurrency as to_currency, rate, updatedAt as updated_at FROM exchange_rates'
-      );
-      
-      // Получаем режим курсов
-      const mode = await this.getExchangeRatesMode();
-      
-      // Добавляем режим ко всем курсам
-      return rates.map(rate => ({ ...rate, mode })) || [];
-    } catch (error) {
-      console.error('Error getting exchange rates for sync:', error);
-      return [];
-    }
+    const rates = this.safeGetAllSync<{ 
+      fromCurrency: string; 
+      toCurrency: string; 
+      rate: number;
+      updatedAt: string;
+    }>(
+      'SELECT fromCurrency as from_currency, toCurrency as to_currency, rate, updatedAt as updated_at FROM exchange_rates'
+    );
+    
+    // Получаем режим курсов
+    const mode = await this.getExchangeRatesMode();
+    
+    // Добавляем режим ко всем курсам
+    return rates.map(rate => ({ ...rate, mode })) || [];
   }
 
   // Сохранить курсы валют из синхронизации
   static async saveExchangeRatesFromSync(rates: any[]): Promise<void> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
       return;
     }
-    const db = this.getDb();
     
-    try {
-      // Очищаем существующие курсы
-      db.runSync('DELETE FROM exchange_rates');
-      
-      // Вставляем новые курсы
-      rates.forEach(rate => {
-        const id = `${rate.from_currency}_${rate.to_currency}`;
-        db.runSync(
-          `INSERT INTO exchange_rates (id, fromCurrency, toCurrency, rate, updatedAt) 
-           VALUES (?, ?, ?, ?, ?)`,
-          id, 
-          rate.from_currency, 
-          rate.to_currency, 
-          rate.rate, 
-          rate.updated_at || new Date().toISOString()
-        );
-      });
-      
-      // Обновляем режим если он есть
-      if (rates.length > 0 && rates[0].mode) {
-        await this.setExchangeRatesMode(rates[0].mode);
-      }
-    } catch (error) {
-      console.error('Error saving exchange rates from sync:', error);
+    // Очищаем существующие курсы
+    this.safeRunSync('DELETE FROM exchange_rates');
+    
+    // Вставляем новые курсы
+    rates.forEach(rate => {
+      const id = `${rate.from_currency}_${rate.to_currency}`;
+      this.safeRunSync(
+        `INSERT INTO exchange_rates (id, fromCurrency, toCurrency, rate, updatedAt) 
+         VALUES (?, ?, ?, ?, ?)`,
+        id, 
+        rate.from_currency, 
+        rate.to_currency, 
+        rate.rate, 
+        rate.updated_at || new Date().toISOString()
+      );
+    });
+    
+    // Обновляем режим если он есть
+    if (rates.length > 0 && rates[0].mode) {
+      await this.setExchangeRatesMode(rates[0].mode);
     }
   }
 
   static async clearAllExchangeRates(): Promise<void> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
       return;
     }
-    const db = this.getDb();
     
-    try {
-      // Очищаем все курсы из базы
-      db.runSync('DELETE FROM exchange_rates');
-      
-      // Сбрасываем последнее время обновления
-      await this.setLastRatesUpdate(null);
-      
-      console.log('All exchange rates cleared');
-    } catch (error) {
-      console.error('Error clearing exchange rates:', error);
-      throw error;
-    }
+    // Очищаем все курсы из базы
+    this.safeRunSync('DELETE FROM exchange_rates');
+    
+    // Сбрасываем последнее время обновления
+    await this.setLastRatesUpdate(null);
+    
+    console.log('All exchange rates cleared');
   }
 
   static async setLastRatesUpdate(lastUpdate: Date | null): Promise<void> {
-    if (!this.db || !this.currentUserId) {
+    if (!this.isDatabaseReady()) {
       return;
     }
-    const db = this.getDb();
-    const now = new Date().toISOString();
     
     if (lastUpdate) {
-      db.runSync(
+      this.safeRunSync(
         'INSERT INTO settings (key, value) VALUES (?, ?)',
         'lastRatesUpdate', lastUpdate.toISOString()
       );
     } else {
-      db.runSync('DELETE FROM settings WHERE key = ?', 'lastRatesUpdate');
+      this.safeRunSync('DELETE FROM settings WHERE key = ?', 'lastRatesUpdate');
+    }
+  }
+
+  // Безопасные методы для работы с базой данных
+  private static safeGetFirstSync<T>(query: string, ...params: any[]): T | null {
+    try {
+      if (!this.db) return null;
+      return this.db.getFirstSync<T>(query, ...params);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('Safe database operation failed (getFirstSync):', error);
+      }
+      return null;
+    }
+  }
+
+  private static safeGetAllSync<T>(query: string, ...params: any[]): T[] {
+    try {
+      if (!this.db) return [];
+      return this.db.getAllSync<T>(query, ...params);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('Safe database operation failed (getAllSync):', error);
+      }
+      return [];
+    }
+  }
+
+  private static safeRunSync(query: string, ...params: any[]): void {
+    try {
+      if (!this.db) return;
+      this.db.runSync(query, ...params);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('Safe database operation failed (runSync):', error);
+      }
+    }
+  }
+
+  private static safeExecSync(sql: string): void {
+    try {
+      if (!this.db) return;
+      this.db.execSync(sql);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('Safe database operation failed (execSync):', error);
+      }
     }
   }
 } 
