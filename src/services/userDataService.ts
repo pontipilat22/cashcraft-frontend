@@ -271,7 +271,7 @@ export class UserDataService {
     return userData.debts || [];
   }
 
-  static async createDebt(debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
+  static async createDebt(debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>): Promise<Debt> {
     const userData = await this.getUserData();
     if (!userData.debts) userData.debts = [];
     
@@ -284,6 +284,7 @@ export class UserDataService {
     
     userData.debts.push(newDebt);
     await this.saveUserData(userData);
+    return newDebt;
   }
 
   static async updateDebt(id: string, updates: Partial<Debt>): Promise<void> {

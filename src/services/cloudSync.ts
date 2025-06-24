@@ -15,10 +15,10 @@ interface CloudData {
 
 export class CloudSyncService {
   // URL вашего backend API (замените на реальный)
-  private static API_URL = 'https://api.cashcraft.app';
+  private static API_URL = 'https://cashcraft-backend-production.up.railway.app';
   
   // Для демо используем AsyncStorage как "облако"
-  private static DEMO_MODE = true;
+  private static DEMO_MODE = false;
 
   static async authenticate(email: string, password: string): Promise<string | null> {
     if (this.DEMO_MODE) {
@@ -47,8 +47,23 @@ export class CloudSyncService {
 
   static async syncData(userId: string, token: string): Promise<boolean> {
     try {
+      console.log('[CloudSync] Начинаем синхронизацию для пользователя:', userId);
+      
+      // Проверяем, что база данных готова
+      if (!LocalDatabaseService.isDatabaseReady()) {
+        console.log('[CloudSync] База данных не готова, пропускаем синхронизацию');
+        return false;
+      }
+      
       // Получаем несинхронизированные данные
       const localData = await LocalDatabaseService.getUnsyncedData();
+      
+      console.log('[CloudSync] Получены локальные данные:', {
+        accounts: localData.accounts.length,
+        transactions: localData.transactions.length,
+        categories: localData.categories.length,
+        debts: localData.debts.length
+      });
       
       if (this.DEMO_MODE) {
         // В демо режиме сохраняем в AsyncStorage
@@ -96,7 +111,9 @@ export class CloudSyncService {
         return true;
       } else {
         // В реальном приложении отправляем на сервер
-        const response = await fetch(`${this.API_URL}/sync`, {
+        console.log('[CloudSync] Отправляем данные на сервер:', `${this.API_URL}/api/v1/sync`);
+        
+        const response = await fetch(`${this.API_URL}/api/v1/sync`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -109,8 +126,11 @@ export class CloudSyncService {
           }),
         });
         
+        console.log('[CloudSync] Ответ сервера:', response.status, response.statusText);
+        
         if (response.ok) {
           const result = await response.json();
+          console.log('[CloudSync] Синхронизация успешна:', result);
           
           // Применяем изменения с сервера
           await this.applyCloudChanges(result.changes);
@@ -122,58 +142,147 @@ export class CloudSyncService {
           await LocalDatabaseService.updateSyncTime(result.syncTime, result.syncToken);
           
           return true;
+        } else {
+          const errorText = await response.text();
+          console.error('[CloudSync] Ошибка синхронизации:', response.status, errorText);
+          
+          // Если ошибка 401, пробрасываем её для обработки в DataContext
+          if (response.status === 401) {
+            throw new Error('401 Token expired');
+          }
+          
+          return false;
         }
-        return false;
       }
     } catch (error) {
       console.error('Sync error:', error);
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        console.log('[CloudSync] Ошибка сети - возможно нет интернета или сервер недоступен');
+      }
       return false;
     }
   }
 
   static async downloadData(userId: string, token: string): Promise<boolean> {
     try {
+      console.log('☁️ [CloudSync] Начинаем загрузку данных для пользователя:', userId);
+      
       if (this.DEMO_MODE) {
+        console.log('🎭 [CloudSync] Демо режим - загружаем из AsyncStorage');
         // В демо режиме получаем из AsyncStorage
         const cloudKey = `cloudData_${userId}`;
         const cloudDataString = await AsyncStorage.getItem(cloudKey);
         
         if (cloudDataString) {
           const cloudData: CloudData = JSON.parse(cloudDataString);
+          console.log('📊 [CloudSync] Данные из AsyncStorage:', {
+            accounts: cloudData.accounts.length,
+            transactions: cloudData.transactions.length,
+            categories: cloudData.categories.length,
+            debts: cloudData.debts.length
+          });
           
-          // Очищаем локальную базу
-          await LocalDatabaseService.resetAllData();
-          
-          // Загружаем данные из облака
-          await this.importCloudData(cloudData);
-          
-          return true;
+          // Проверяем, что база данных готова перед очисткой
+          if (LocalDatabaseService.isDatabaseReady()) {
+            console.log('🗄️ [CloudSync] База данных готова, очищаем и импортируем...');
+            // Очищаем локальную базу
+            await LocalDatabaseService.resetAllData();
+            
+            // Загружаем данные из облака
+            await this.importCloudData(cloudData);
+            
+            console.log('✅ [CloudSync] Данные успешно импортированы из AsyncStorage');
+            return true;
+          } else {
+            console.log('⚠️ [CloudSync] База данных не готова, сохраняем данные для fallback режима');
+            // Сохраняем данные в AsyncStorage для fallback режима
+            await AsyncStorage.setItem('fallback_cloud_data', cloudDataString);
+            return true;
+          }
         }
+        console.log('⚠️ [CloudSync] Нет данных в AsyncStorage');
         return false;
       } else {
+        console.log('🌐 [CloudSync] Реальный режим - загружаем с сервера');
         // В реальном приложении
-        const response = await fetch(`${this.API_URL}/sync/download`, {
+        const response = await fetch(`${this.API_URL}/api/v1/sync/download`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
         
+        console.log('📡 [CloudSync] Ответ сервера:', response.status, response.statusText);
+        
         if (response.ok) {
           const cloudData = await response.json();
+          console.log('📊 [CloudSync] Полный ответ сервера:', JSON.stringify(cloudData, null, 2));
+          console.log('📊 [CloudSync] Данные с сервера:', {
+            accounts: cloudData.accounts?.length || 0,
+            transactions: cloudData.transactions?.length || 0,
+            categories: cloudData.categories?.length || 0,
+            debts: cloudData.debts?.length || 0
+          });
           
-          // Очищаем локальную базу
-          await LocalDatabaseService.resetAllData();
+          // Проверяем структуру данных
+          if (!cloudData.accounts || !Array.isArray(cloudData.accounts)) {
+            console.log('⚠️ [CloudSync] Неверная структура данных: accounts не является массивом');
+            console.log('⚠️ [CloudSync] cloudData.accounts:', cloudData.accounts);
+          }
           
-          // Загружаем данные из облака
-          await this.importCloudData(cloudData);
+          // Проверяем, что данные имеют правильную структуру
+          const hasValidStructure = Array.isArray(cloudData.accounts) && 
+                                   Array.isArray(cloudData.transactions) &&
+                                   Array.isArray(cloudData.categories) &&
+                                   Array.isArray(cloudData.debts);
           
-          return true;
+          if (!hasValidStructure) {
+            console.log('❌ [CloudSync] Неверная структура данных от сервера');
+            return false;
+          }
+          
+          // Даже если данные пустые, это валидное состояние
+          const hasData = (cloudData.accounts?.length || 0) > 0 || 
+                         (cloudData.transactions?.length || 0) > 0 ||
+                         (cloudData.categories?.length || 0) > 0 ||
+                         (cloudData.debts?.length || 0) > 0;
+          
+          if (!hasData) {
+            console.log('ℹ️ [CloudSync] Сервер вернул пустые данные (новый пользователь)');
+          }
+          
+          // Проверяем, что база данных готова перед очисткой
+          const isDatabaseReady = LocalDatabaseService.isDatabaseReady();
+          console.log('🗄️ [CloudSync] Проверка готовности базы данных:', isDatabaseReady);
+          
+          if (isDatabaseReady) {
+            console.log('🗄️ [CloudSync] База данных готова, очищаем и импортируем...');
+            // Очищаем локальную базу
+            await LocalDatabaseService.resetAllData();
+            
+            // Загружаем данные из облака
+            await this.importCloudData(cloudData);
+            
+            console.log('✅ [CloudSync] Данные успешно импортированы с сервера');
+            return true;
+          } else {
+            console.log('⚠️ [CloudSync] База данных не готова, сохраняем данные для fallback режима');
+            // Сохраняем данные в AsyncStorage для fallback режима
+            await AsyncStorage.setItem('fallback_cloud_data', JSON.stringify(cloudData));
+            console.log('💾 [CloudSync] Данные сохранены в fallback хранилище');
+            return true;
+          }
+        } else {
+          const errorText = await response.text();
+          console.error('❌ [CloudSync] Ошибка загрузки данных:', response.status, errorText);
         }
         return false;
       }
     } catch (error) {
-      console.error('Download error:', error);
+      console.error('❌ [CloudSync] Download error:', error);
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        console.log('🌐 [CloudSync] Ошибка сети при загрузке данных - возможно нет интернета или сервер недоступен');
+      }
       return false;
     }
   }
@@ -261,54 +370,61 @@ export class CloudSyncService {
     // Например, новые/измененные записи, удаленные записи и т.д.
   }
 
-  private static async importCloudData(cloudData: CloudData): Promise<void> {
+  private static async importCloudData(cloudData: any): Promise<void> {
+    console.log('📥 [CloudSync] Начинаем импорт данных из облака...');
+    
+    // Проверяем и инициализируем структуру данных
+    const safeData = {
+      accounts: Array.isArray(cloudData.accounts) ? cloudData.accounts : [],
+      transactions: Array.isArray(cloudData.transactions) ? cloudData.transactions : [],
+      categories: Array.isArray(cloudData.categories) ? cloudData.categories : [],
+      debts: Array.isArray(cloudData.debts) ? cloudData.debts : []
+    };
+    
     // Импортируем категории
-    for (const category of cloudData.categories) {
+    console.log('📂 [CloudSync] Импортируем категории:', safeData.categories.length);
+    for (const category of safeData.categories) {
       try {
         await LocalDatabaseService.createCategory(category);
       } catch (error) {
-        console.error('Error importing category:', error);
+        console.error('❌ [CloudSync] Error importing category:', error);
       }
     }
 
     // Импортируем счета
-    for (const account of cloudData.accounts) {
+    console.log('🏦 [CloudSync] Импортируем счета:', safeData.accounts.length);
+    for (const account of safeData.accounts) {
       try {
         const { id, createdAt, updatedAt, ...accountData } = account;
         await LocalDatabaseService.createAccount(accountData);
       } catch (error) {
-        console.error('Error importing account:', error);
+        console.error('❌ [CloudSync] Error importing account:', error);
       }
     }
 
     // Импортируем транзакции
-    for (const transaction of cloudData.transactions) {
+    console.log('💳 [CloudSync] Импортируем транзакции:', safeData.transactions.length);
+    for (const transaction of safeData.transactions) {
       try {
         const { id, ...transactionData } = transaction;
         await LocalDatabaseService.createTransaction(transactionData);
       } catch (error) {
-        console.error('Error importing transaction:', error);
+        console.error('❌ [CloudSync] Error importing transaction:', error);
       }
     }
 
     // Импортируем долги
-    for (const debt of cloudData.debts) {
+    console.log('💸 [CloudSync] Импортируем долги:', safeData.debts.length);
+    for (const debt of safeData.debts) {
       try {
         const { id, createdAt, updatedAt, ...debtData } = debt;
         await LocalDatabaseService.createDebt(debtData);
       } catch (error) {
-        console.error('Error importing debt:', error);
+        console.error('❌ [CloudSync] Error importing debt:', error);
       }
     }
 
-    // Импортируем курсы валют
-    if (cloudData.exchangeRates && cloudData.exchangeRates.length > 0) {
-      try {
-        await LocalDatabaseService.saveExchangeRatesFromSync(cloudData.exchangeRates);
-      } catch (error) {
-        console.error('Error importing exchange rates:', error);
-      }
-    }
+    console.log('✅ [CloudSync] Импорт данных завершен');
   }
 
   // Автоматическая синхронизация
@@ -326,9 +442,8 @@ export class CloudSyncService {
     try {
       const response = await fetch('https://www.google.com', {
         method: 'HEAD',
-        mode: 'no-cors',
       });
-      return true;
+      return response.ok;
     } catch (error) {
       return false;
     }
@@ -353,6 +468,49 @@ export class CloudSyncService {
     } catch (error) {
       console.error('Delete cloud data error:', error);
       return false;
+    }
+  }
+
+  // Метод для загрузки данных из fallback хранилища
+  static async getFallbackData(): Promise<CloudData | null> {
+    try {
+      const fallbackDataString = await AsyncStorage.getItem('fallback_cloud_data');
+      if (fallbackDataString) {
+        const fallbackData = JSON.parse(fallbackDataString);
+        
+        // Обеспечиваем правильную структуру данных
+        const safeData: CloudData = {
+          accounts: Array.isArray(fallbackData.accounts) ? fallbackData.accounts : [],
+          transactions: Array.isArray(fallbackData.transactions) ? fallbackData.transactions : [],
+          categories: Array.isArray(fallbackData.categories) ? fallbackData.categories : [],
+          debts: Array.isArray(fallbackData.debts) ? fallbackData.debts : [],
+          exchangeRates: Array.isArray(fallbackData.exchangeRates) ? fallbackData.exchangeRates : [],
+          lastSyncAt: fallbackData.lastSyncAt || new Date().toISOString(),
+          userId: fallbackData.userId || ''
+        };
+        
+        console.log('📊 [CloudSync] Данные из fallback хранилища:', {
+          accounts: safeData.accounts.length,
+          transactions: safeData.transactions.length,
+          categories: safeData.categories.length,
+          debts: safeData.debts.length
+        });
+        return safeData;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ [CloudSync] Ошибка загрузки fallback данных:', error);
+      return null;
+    }
+  }
+
+  // Метод для очистки fallback данных
+  static async clearFallbackData(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem('fallback_cloud_data');
+      console.log('🗑️ [CloudSync] Fallback данные очищены');
+    } catch (error) {
+      console.error('❌ [CloudSync] Ошибка очистки fallback данных:', error);
     }
   }
 } 

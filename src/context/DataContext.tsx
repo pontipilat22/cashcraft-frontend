@@ -2,13 +2,16 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Account, Transaction, Category, Debt } from '../types';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { CloudSyncService } from '../services/cloudSync';
+import { ApiService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ExchangeRateService } from '../services/exchangeRate';
+import { AuthService } from '../services/auth';
 
 interface DataContextType {
   accounts: Account[];
   transactions: Transaction[];
   categories: Category[];
+  debts: Debt[];
   totalBalance: number;
   isLoading: boolean;
   lastSyncTime: string | null;
@@ -23,6 +26,11 @@ interface DataContextType {
   createTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  
+  // Методы для работы с долгами
+  createDebt: (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateDebt: (id: string, updates: Partial<Debt>) => Promise<void>;
+  deleteDebt: (id: string) => Promise<void>;
   
   // Метод для пополнения накоплений
   addToSavings: (savingsId: string, amount: number) => Promise<void>;
@@ -55,6 +63,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalBalance, setTotalBalance] = useState(0);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -73,6 +82,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       setAccounts([]);
       setTransactions([]);
       setCategories([]);
+      setDebts([]);
       setTotalBalance(0);
       stopAutoSync();
     }
@@ -84,31 +94,91 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
 
   const initializeApp = async () => {
     try {
+      console.log('🚀 [DataContext] Начинаем инициализацию приложения...');
+      console.log('🚀 [DataContext] userId:', userId);
+      console.log('🚀 [DataContext] defaultCurrency:', defaultCurrency);
+      
       // Устанавливаем userId для базы данных
       if (userId) {
+        console.log('🗄️ [DataContext] Устанавливаем userId для базы данных:', userId);
         LocalDatabaseService.setUserId(userId);
+        
+        console.log('🗄️ [DataContext] Инициализируем базу данных...');
         await LocalDatabaseService.initDatabase(defaultCurrency);
+        
+        // Проверяем, что база данных действительно готова
+        if (!LocalDatabaseService.isDatabaseReady()) {
+          console.log('⚠️ [DataContext] База данных не готова, пытаемся переинициализировать...');
+          await LocalDatabaseService.forceReinitialize(defaultCurrency);
+        }
+        
+        console.log('📊 [DataContext] Обновляем данные из базы...');
         await refreshData();
         
         // Проверяем есть ли данные в облаке
         const isGuest = await AsyncStorage.getItem('isGuest');
+        console.log('👤 [DataContext] isGuest:', isGuest);
+        
         if (isGuest !== 'true') {
-          const token = await AsyncStorage.getItem(`authToken_${userId}`);
-          if (token) {
-            // Пытаемся загрузить данные из облака при первом входе
-            const hasCloudData = await CloudSyncService.downloadData(userId, token);
-            if (hasCloudData) {
-              await refreshData();
+          console.log('☁️ [DataContext] Пользователь не гость, пытаемся загрузить данные из облака...');
+          let token = await ApiService.getAccessToken();
+          console.log('🔑 [DataContext] Access token при инициализации:', token ? 'Есть' : 'Нет');
+          
+          // Если токена нет, пытаемся обновить
+          if (!token) {
+            console.log('🔄 [DataContext] Токен отсутствует при инициализации, пытаемся обновить...');
+            const refreshToken = await ApiService.getRefreshToken();
+            console.log('🔄 [DataContext] Refresh token при инициализации:', refreshToken ? 'Есть' : 'Нет');
+            
+            if (refreshToken) {
+              const newTokens = await AuthService.refreshToken(refreshToken);
+              if (newTokens) {
+                token = newTokens.accessToken;
+                console.log('✅ [DataContext] Токен обновлен при инициализации');
+              }
             }
           }
+          
+          if (token) {
+            console.log('☁️ [DataContext] Пытаемся загрузить данные из облака...');
+            // Пытаемся загрузить данные из облака при первом входе
+            const hasCloudData = await CloudSyncService.downloadData(userId, token);
+            console.log('☁️ [DataContext] Результат загрузки из облака:', hasCloudData ? 'Успешно' : 'Неудачно');
+            
+            if (hasCloudData) {
+              console.log('📊 [DataContext] Данные загружены из облака, обновляем локальные данные...');
+              await refreshData();
+            } else {
+              console.log('⚠️ [DataContext] Не удалось загрузить данные из облака');
+            }
+          } else {
+            console.log('❌ [DataContext] Нет токена для загрузки данных из облака');
+          }
+        } else {
+          console.log('👤 [DataContext] Гостевой режим, пропускаем загрузку из облака');
         }
         
         // Получаем время последней синхронизации
         const syncTime = await LocalDatabaseService.getLastSyncTime();
+        console.log('⏰ [DataContext] Время последней синхронизации:', syncTime);
         setLastSyncTime(syncTime);
+      } else {
+        console.log('❌ [DataContext] userId отсутствует, инициализация пропущена');
       }
+      
+      console.log('✅ [DataContext] Инициализация приложения завершена');
     } catch (error) {
-      console.error('Error initializing data:', error);
+      console.error('❌ [DataContext] Ошибка инициализации данных:', error);
+      // Если база данных не инициализирована, пробуем инициализировать заново
+      if (error instanceof Error && error.message.includes('База данных не инициализирована')) {
+        try {
+          console.log('🔄 [DataContext] Пытаемся переинициализировать базу данных...');
+          await LocalDatabaseService.forceReinitialize(defaultCurrency);
+          await refreshData();
+        } catch (initError) {
+          console.error('❌ [DataContext] Не удалось переинициализировать базу данных:', initError);
+        }
+      }
     } finally {
       setIsLoading(false);
     }
@@ -142,7 +212,27 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     setIsSyncing(true);
     
     try {
-      const token = await AsyncStorage.getItem(`authToken_${userId}`);
+      let token = await ApiService.getAccessToken();
+      
+      // Если токена нет, пытаемся обновить
+      if (!token) {
+        console.log('[DataContext] Токен отсутствует, пытаемся обновить...');
+        const refreshToken = await ApiService.getRefreshToken();
+        if (refreshToken) {
+          const newTokens = await AuthService.refreshToken(refreshToken);
+          if (newTokens) {
+            console.log('[DataContext] Токен обновлен после ошибки 401');
+            // Повторяем синхронизацию с новым токеном
+            const success = await CloudSyncService.syncData(userId, newTokens.accessToken);
+            if (success) {
+              const syncTime = await LocalDatabaseService.getLastSyncTime();
+              setLastSyncTime(syncTime);
+              return; // Успешно обновили токен и синхронизировали
+            }
+          }
+        }
+      }
+      
       if (token) {
         const success = await CloudSyncService.syncData(userId, token);
         if (success) {
@@ -152,78 +242,216 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       }
     } catch (error) {
       console.error('Sync error:', error);
+      // Если ошибка 401, пытаемся обновить токен
+      if (error instanceof Error && error.message.includes('401')) {
+        console.log('[DataContext] Ошибка 401, пытаемся обновить токен...');
+        try {
+          const refreshToken = await ApiService.getRefreshToken();
+          if (refreshToken) {
+            const newTokens = await AuthService.refreshToken(refreshToken);
+            if (newTokens) {
+              console.log('[DataContext] Токен обновлен после ошибки 401');
+              // Повторяем синхронизацию с новым токеном
+              const success = await CloudSyncService.syncData(userId, newTokens.accessToken);
+              if (success) {
+                const syncTime = await LocalDatabaseService.getLastSyncTime();
+                setLastSyncTime(syncTime);
+                return; // Успешно обновили токен и синхронизировали
+              }
+            }
+          }
+        } catch (refreshError) {
+          console.error('Failed to refresh token:', refreshError);
+        }
+        // Если не удалось обновить токен, пробрасываем ошибку дальше
+        throw error;
+      }
+      // Для других ошибок тоже пробрасываем
+      throw error;
     } finally {
       setIsSyncing(false);
     }
   };
 
   const refreshData = async () => {
-    console.log('RefreshData called...');
-    const [accountsFromDb, transactions, categories] = await Promise.all([
-      LocalDatabaseService.getAccounts(),
-      LocalDatabaseService.getTransactions(),
-      LocalDatabaseService.getCategories()
-    ]);
+    console.log('📊 [DataContext] RefreshData called...');
     
-    console.log('Accounts from DB before rate update:', accountsFromDb);
-    
-    // Обновляем курсы валют для счетов с другой валютой
-    const accountsWithRates = await Promise.all(
-      accountsFromDb.map(async (account: Account) => {
-        if (account.currency && account.currency !== defaultCurrency) {
-          try {
-            // Пробуем получить прямой курс
-            let rate = await ExchangeRateService.getRate(account.currency, defaultCurrency);
-            
-            // Если прямого курса нет, пробуем через USD
-            if (!rate && account.currency !== 'USD' && defaultCurrency !== 'USD') {
-              console.log(`No direct rate ${account.currency}->${defaultCurrency}, trying through USD`);
-              const toUsd = await ExchangeRateService.getRate(account.currency, 'USD');
-              const fromUsd = await ExchangeRateService.getRate('USD', defaultCurrency);
-              
-              if (toUsd && fromUsd) {
-                rate = toUsd * fromUsd;
-                console.log(`Cross rate ${account.currency}->${defaultCurrency} = ${rate} (via USD)`);
+    try {
+      // Проверяем готовность базы данных
+      const isDatabaseReady = LocalDatabaseService.isDatabaseReady();
+      console.log('🗄️ [DataContext] Проверка готовности базы данных в refreshData:', isDatabaseReady);
+      
+      if (!isDatabaseReady) {
+        console.log('⚠️ [DataContext] База данных не готова, работаем в fallback режиме...');
+        
+        // Пытаемся загрузить данные из fallback хранилища
+        const fallbackData = await CloudSyncService.getFallbackData();
+        if (fallbackData) {
+          console.log('📊 [DataContext] Загружаем данные из fallback хранилища...');
+          
+          // Обновляем данные из fallback
+          const fallbackAccounts = fallbackData.accounts || [];
+          const fallbackTransactions = fallbackData.transactions || [];
+          const fallbackCategories = fallbackData.categories || [];
+          const fallbackDebts = fallbackData.debts || [];
+          
+          setAccounts(fallbackAccounts);
+          setTransactions(fallbackTransactions);
+          setCategories(fallbackCategories);
+          setDebts(fallbackDebts);
+          
+          console.log('📊 [DataContext] Данные из fallback хранилища:');
+          console.log('  - Счета:', fallbackAccounts.length);
+          console.log('  - Транзакции:', fallbackTransactions.length);
+          console.log('  - Категории:', fallbackCategories.length);
+          console.log('  - Долги:', fallbackDebts.length);
+          
+          // Вычисляем общий баланс
+          const total = fallbackAccounts
+            .filter(account => account.isIncludedInTotal !== false)
+            .reduce((sum, account) => {
+              let balance = account.balance;
+              // Если валюта счета отличается от основной и есть курс обмена
+              if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+                balance = account.balance * (account as any).exchangeRate;
               }
+              return sum + balance;
+            }, 0);
+          
+          setTotalBalance(total);
+          console.log('💰 [DataContext] Общий баланс из fallback:', total);
+          console.log('✅ [DataContext] Данные загружены из fallback хранилища');
+        } else {
+          console.log('❌ [DataContext] Нет данных в fallback хранилище');
+          console.log('📊 [DataContext] Текущие данные в состоянии:');
+          console.log('  - Счета:', accounts.length);
+          console.log('  - Транзакции:', transactions.length);
+          console.log('  - Категории:', categories.length);
+          console.log('  - Долги:', debts.length);
+        }
+        
+        console.log('✅ [DataContext] RefreshData завершен в fallback режиме');
+        return;
+      }
+      
+      const [accountsFromDb, transactionsFromDb, categoriesFromDb, debtsFromDb] = await Promise.all([
+        LocalDatabaseService.getAccounts(),
+        LocalDatabaseService.getTransactions(),
+        LocalDatabaseService.getCategories(),
+        LocalDatabaseService.getDebts()
+      ]);
+      
+      console.log('📊 [DataContext] Данные из базы:');
+      console.log('  - Счета:', accountsFromDb.length);
+      console.log('  - Транзакции:', transactionsFromDb.length);
+      console.log('  - Категории:', categoriesFromDb.length);
+      console.log('  - Долги:', debtsFromDb.length);
+      
+      console.log('📊 [DataContext] Счета из базы:', accountsFromDb);
+      
+      // Обновляем курсы валют для счетов с другой валютой
+      const accountsWithRates = await Promise.all(
+        accountsFromDb.map(async (account: Account) => {
+          if (account.currency && account.currency !== defaultCurrency) {
+            try {
+              // Пробуем получить прямой курс
+              let rate = await ExchangeRateService.getRate(account.currency, defaultCurrency);
+              
+              // Если прямого курса нет, пробуем через USD
+              if (!rate && account.currency !== 'USD' && defaultCurrency !== 'USD') {
+                console.log(`No direct rate ${account.currency}->${defaultCurrency}, trying through USD`);
+                const toUsd = await ExchangeRateService.getRate(account.currency, 'USD');
+                const fromUsd = await ExchangeRateService.getRate('USD', defaultCurrency);
+                
+                if (toUsd && fromUsd) {
+                  rate = toUsd * fromUsd;
+                  console.log(`Cross rate ${account.currency}->${defaultCurrency} = ${rate} (via USD)`);
+                }
+              }
+              
+              if (rate) {
+                return { ...account, exchangeRate: rate };
+              }
+            } catch (error) {
+              console.error(`Failed to get rate for ${account.currency}:`, error);
             }
-            
-            if (rate) {
-              return { ...account, exchangeRate: rate };
-            }
-          } catch (error) {
-            console.error(`Failed to get rate for ${account.currency}:`, error);
           }
-        }
-        return account;
-      })
-    );
-    
-    console.log('Accounts with updated rates:', accountsWithRates);
-    
-    // Обновляем состояние счетов с новыми курсами
-    setAccounts(accountsWithRates);
-    setTransactions(transactions);
-    setCategories(categories);
-    
-    // Считаем общий баланс только по счетам с учетом курса обмена
-    const accountsTotal = accountsWithRates
-      .filter((acc: Account) => acc.isIncludedInTotal !== false)
-      .reduce((sum: number, account: Account) => {
-        // Если валюта счета отличается от основной и есть курс обмена
-        if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
-          // Конвертируем баланс в основную валюту
-          return sum + (account.balance * (account as any).exchangeRate);
-        }
-        // Иначе используем баланс как есть
-        return sum + account.balance;
-      }, 0);
-    
-    setTotalBalance(accountsTotal);
+          return account;
+        })
+      );
+      
+      console.log('📊 [DataContext] Счета с курсами валют:', accountsWithRates);
+      
+      // Обновляем состояние
+      setAccounts(accountsWithRates);
+      setTransactions(transactionsFromDb);
+      setCategories(categoriesFromDb);
+      setDebts(debtsFromDb);
+      
+      // Вычисляем общий баланс
+      const total = accountsWithRates
+        .filter(account => account.isIncludedInTotal !== false)
+        .reduce((sum, account) => {
+          let balance = account.balance;
+          // Если валюта счета отличается от основной и есть курс обмена
+          if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+            balance = account.balance * (account as any).exchangeRate;
+          }
+          return sum + balance;
+        }, 0);
+      
+      console.log('💰 [DataContext] Общий баланс:', total);
+      setTotalBalance(total);
+      
+      console.log('✅ [DataContext] RefreshData завершен успешно');
+    } catch (error) {
+      console.error('❌ [DataContext] Ошибка в refreshData:', error);
+      console.log('⚠️ [DataContext] Переключаемся в fallback режим из-за ошибки...');
+    }
   };
 
   // Методы для работы со счетами
   const createAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
+      // Проверяем готовность базы данных
+      if (!LocalDatabaseService.isDatabaseReady()) {
+        console.log('[DataContext] База данных не готова, работаем в fallback режиме...');
+        
+        // Создаем счет только в локальном состоянии
+        const newAccount: Account = {
+          ...account,
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        
+        setAccounts(prev => [newAccount, ...prev]);
+        
+        // Обновляем общий баланс
+        if (newAccount.isIncludedInTotal !== false) {
+          let balanceToAdd = newAccount.balance;
+          if (newAccount.currency && newAccount.currency !== defaultCurrency && 'exchangeRate' in newAccount && (newAccount as any).exchangeRate) {
+            balanceToAdd = newAccount.balance * (newAccount as any).exchangeRate;
+          }
+          setTotalBalance(prev => prev + balanceToAdd);
+        }
+        
+        console.log('[DataContext] Счет создан в fallback режиме:', newAccount);
+        
+        // Пытаемся сохранить в SQLite, если база данных стала доступна
+        try {
+          if (LocalDatabaseService.isDatabaseReady()) {
+            console.log('[DataContext] База данных стала доступна, сохраняем счет в SQLite...');
+            await LocalDatabaseService.createAccount(account);
+            console.log('[DataContext] Счет сохранен в SQLite');
+          }
+        } catch (dbError) {
+          console.log('[DataContext] Не удалось сохранить в SQLite:', dbError instanceof Error ? dbError.message : String(dbError));
+        }
+        
+        return;
+      }
+      
       const newAccount = await LocalDatabaseService.createAccount(account);
       setAccounts(prev => [newAccount, ...prev]);
       
@@ -236,6 +464,9 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         }
         setTotalBalance(prev => prev + balanceToAdd);
       }
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error creating account:', error);
       throw error;
@@ -281,6 +512,9 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         
         setTotalBalance(newTotalBalance);
       }
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error updating account:', error);
       throw error;
@@ -305,6 +539,9 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         }
         setTotalBalance(prev => prev - balanceToRemove);
       }
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error deleting account:', error);
       throw error;
@@ -314,6 +551,44 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Методы для работы с транзакциями
   const createTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
+      // Проверяем готовность базы данных
+      if (!LocalDatabaseService.isDatabaseReady()) {
+        console.log('[DataContext] База данных не готова, создаем транзакцию в fallback режиме...');
+        
+        // Создаем транзакцию только в локальном состоянии
+        const newTransaction: Transaction = {
+          ...transaction,
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        
+        setTransactions(prev => [newTransaction, ...prev]);
+        
+        // Обновляем баланс счета
+        const account = accounts.find(acc => acc.id === transaction.accountId);
+        if (account) {
+          const balanceChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
+          setAccounts(prev => prev.map(acc => 
+            acc.id === transaction.accountId 
+              ? { ...acc, balance: acc.balance + balanceChange }
+              : acc
+          ));
+          
+          // Обновляем общий баланс
+          if (account.isIncludedInTotal !== false) {
+            let balanceChangeConverted = balanceChange;
+            if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+              balanceChangeConverted = balanceChange * (account as any).exchangeRate;
+            }
+            setTotalBalance(prev => prev + balanceChangeConverted);
+          }
+        }
+        
+        console.log('[DataContext] Транзакция создана в fallback режиме:', newTransaction);
+        return;
+      }
+      
       const newTransaction = await LocalDatabaseService.createTransaction(transaction);
       setTransactions(prev => [newTransaction, ...prev]);
       
@@ -327,16 +602,18 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
             : acc
         ));
         
-        // Обновляем общий баланс если счет включен в него
+        // Обновляем общий баланс
         if (account.isIncludedInTotal !== false) {
-          let convertedBalanceChange = balanceChange;
-          // Конвертируем изменение баланса если валюта счета отличается от основной
+          let balanceChangeConverted = balanceChange;
           if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
-            convertedBalanceChange = balanceChange * (account as any).exchangeRate;
+            balanceChangeConverted = balanceChange * (account as any).exchangeRate;
           }
-          setTotalBalance(prev => prev + convertedBalanceChange);
+          setTotalBalance(prev => prev + balanceChangeConverted);
         }
       }
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error creating transaction:', error);
       throw error;
@@ -359,6 +636,9 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       if (updates.amount !== undefined || updates.type !== undefined || updates.accountId !== undefined) {
         await refreshData(); // Проще перезагрузить все данные для правильных балансов
       }
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error updating transaction:', error);
       throw error;
@@ -395,6 +675,9 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
           setTotalBalance(prev => prev + convertedBalanceChange);
         }
       }
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error deleting transaction:', error);
       throw error;
@@ -405,7 +688,10 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   const createCategory = async (category: Omit<Category, 'id'>) => {
     try {
       const newCategory = await LocalDatabaseService.createCategory(category);
-      setCategories(prev => [...prev, newCategory]);
+      setCategories(prev => [newCategory, ...prev]);
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error creating category:', error);
       throw error;
@@ -418,6 +704,9 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       setCategories(prev => prev.map(cat => 
         cat.id === id ? { ...cat, ...updates } : cat
       ));
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error updating category:', error);
       throw error;
@@ -442,6 +731,9 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
           trans.categoryId === id ? { ...trans, categoryId: otherId } : trans
         ));
       }
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error deleting category:', error);
       throw error;
@@ -451,29 +743,23 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Пополнение накоплений
   const addToSavings = async (savingsId: string, amount: number) => {
     try {
-      const savings = accounts.find(acc => acc.id === savingsId && acc.type === 'savings');
-      if (!savings || !savings.linkedAccountId) {
-        throw new Error('Накопление не найдено или не связано со счетом');
-      }
+      const savingsAccount = accounts.find(acc => acc.id === savingsId);
+      if (!savingsAccount) throw new Error('Savings account not found');
       
-      const linkedAccount = accounts.find(acc => acc.id === savings.linkedAccountId);
-      if (!linkedAccount) {
-        throw new Error('Связанный счет не найден');
-      }
-      
-      // Создаем транзакцию на связанном счете
-      await createTransaction({
-        accountId: savings.linkedAccountId,
-        amount,
-        type: 'expense',
-        categoryId: 'other_expense',
-        description: `Пополнение накопления: ${savings.name}`,
-        date: new Date().toISOString(),
+      // Обновляем баланс накопительного счета
+      await LocalDatabaseService.updateAccount(savingsId, {
+        savedAmount: (savingsAccount.savedAmount || 0) + amount
       });
       
-      // Обновляем savedAmount у накопления
-      const newSavedAmount = (savings.savedAmount || 0) + amount;
-      await updateAccount(savingsId, { savedAmount: newSavedAmount });
+      // Обновляем локальное состояние
+      setAccounts(prev => prev.map(acc => 
+        acc.id === savingsId 
+          ? { ...acc, savedAmount: (acc.savedAmount || 0) + amount }
+          : acc
+      ));
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error adding to savings:', error);
       throw error;
@@ -483,29 +769,28 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   // Снятие с накоплений
   const withdrawFromSavings = async (savingsId: string, amount: number) => {
     try {
-      const savings = accounts.find(acc => acc.id === savingsId && acc.type === 'savings');
-      if (!savings || !savings.linkedAccountId) {
-        throw new Error('Накопление не найдено или не связано со счетом');
+      const savingsAccount = accounts.find(acc => acc.id === savingsId);
+      if (!savingsAccount) throw new Error('Savings account not found');
+      
+      const currentSavedAmount = savingsAccount.savedAmount || 0;
+      if (currentSavedAmount < amount) {
+        throw new Error('Insufficient savings amount');
       }
       
-      const currentSaved = savings.savedAmount || 0;
-      if (currentSaved < amount) {
-        throw new Error('Недостаточно средств в накоплении');
-      }
-      
-      // Создаем транзакцию на связанном счете
-      await createTransaction({
-        accountId: savings.linkedAccountId,
-        amount,
-        type: 'income',
-        categoryId: 'other_income',
-        description: `Снятие с накопления: ${savings.name}`,
-        date: new Date().toISOString(),
+      // Обновляем баланс накопительного счета
+      await LocalDatabaseService.updateAccount(savingsId, {
+        savedAmount: currentSavedAmount - amount
       });
       
-      // Обновляем savedAmount у накопления
-      const newSavedAmount = currentSaved - amount;
-      await updateAccount(savingsId, { savedAmount: newSavedAmount });
+      // Обновляем локальное состояние
+      setAccounts(prev => prev.map(acc => 
+        acc.id === savingsId 
+          ? { ...acc, savedAmount: currentSavedAmount - amount }
+          : acc
+      ));
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
     } catch (error) {
       console.error('Error withdrawing from savings:', error);
       throw error;
@@ -562,12 +847,54 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
+  const createDebt = async (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const newDebt = await LocalDatabaseService.createDebt(debt);
+      setDebts(prev => [newDebt, ...prev]);
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
+    } catch (error) {
+      console.error('Error creating debt:', error);
+      throw error;
+    }
+  };
+
+  const updateDebt = async (id: string, updates: Partial<Debt>) => {
+    try {
+      await LocalDatabaseService.updateDebt(id, updates);
+      setDebts(prev => prev.map(debt => 
+        debt.id === id ? { ...debt, ...updates } : debt
+      ));
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
+    } catch (error) {
+      console.error('Error updating debt:', error);
+      throw error;
+    }
+  };
+
+  const deleteDebt = async (id: string) => {
+    try {
+      await LocalDatabaseService.deleteDebt(id);
+      setDebts(prev => prev.filter(debt => debt.id !== id));
+      
+      // Мгновенная синхронизация с backend
+      await syncData();
+    } catch (error) {
+      console.error('Error deleting debt:', error);
+      throw error;
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
         accounts,
         transactions,
         categories,
+        debts,
         totalBalance,
         isLoading,
         lastSyncTime,
@@ -587,6 +914,9 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         resetAllData,
         syncData,
         getStatistics,
+        createDebt,
+        updateDebt,
+        deleteDebt,
       }}
     >
       {children}

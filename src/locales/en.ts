@@ -254,7 +254,7 @@ export default {
   settings: {
     title: 'Settings',
     language: 'Language',
-    currency: 'Default Currency',
+    currency: 'Currency',
     theme: 'Theme',
     darkMode: 'Dark Mode',
     notifications: 'Notifications',
@@ -272,7 +272,7 @@ export default {
     errorChangingCurrency: 'Error changing currency',
     selectCurrency: 'Select Currency',
     defaultCurrency: 'Default Currency',
-    useSuggestedRate: 'Use suggested rate: {{rate}}',
+    useSuggestedRate: 'Use suggested rate: {rate}',
     useAllSuggestedRates: 'Use all suggested rates',
     exchangeRates: 'Exchange Rates',
     manageExchangeRates: 'Manage Exchange Rates',
@@ -295,13 +295,24 @@ export default {
     errorChangingMode: 'Error changing mode',
     errorUpdatingRates: 'Error updating rates',
     exchangeRatesResetAndUpdated: 'Exchange rates reset and updated successfully',
-    autoMode: 'Automatic',
-    manualMode: 'Manual',
+    autoMode: 'Auto Mode',
+    manualMode: 'Manual Mode',
     noMultiCurrencyAccounts: 'No multi-currency accounts',
     addAccountsInDifferentCurrencies: 'Add accounts in different currencies to manage exchange rates',
     currentlyUsedCurrencies: 'Currently used currencies',
     addAccountsHint: 'Add more accounts with different currencies to see more options',
     tapToEditRate: 'Tap on a rate to edit',
+    forceLogin: {
+      title: 'Force Login',
+      description: 'Clear tokens and login again',
+      message: 'This will clear all tokens and force you to login again. Continue?',
+      confirm: 'Force Login',
+      success: {
+        title: 'Success',
+        message: 'Tokens cleared. Please login again.'
+      },
+      error: 'Error clearing tokens'
+    }
   },
   currencies: {
     USD: 'US Dollar',
@@ -559,5 +570,15 @@ export default {
         answer: 'Data export feature is under development and will be added in future app updates.',
       },
     },
+  },
+  validation: {
+    accountNameRequired: 'Enter account name',
+    balanceRequired: 'Enter initial balance',
+    amountRequired: 'Enter amount',
+    accountRequired: 'Select account',
+    categoryRequired: 'Select category',
+    creditTermRequired: 'Enter credit term',
+    creditRateRequired: 'Enter interest rate',
+    targetAmountInvalid: 'Target amount must be greater than 0',
   },
 }; 

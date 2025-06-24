@@ -110,6 +110,16 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   // Для накоплений - связанный счет
   const [linkedAccountId, setLinkedAccountId] = useState<string>('');
   const [showAccountPicker, setShowAccountPicker] = useState(false);
+  
+  // Состояние для валидации
+  const [errors, setErrors] = useState<{
+    name?: boolean;
+    balance?: boolean;
+    creditTerm?: boolean;
+    creditRate?: boolean;
+    targetAmount?: boolean;
+  }>({});
+  const [showErrors, setShowErrors] = useState(false);
 
   // Загружаем предложенный курс при изменении валюты
   useEffect(() => {
@@ -144,7 +154,37 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   }, [selectedCurrency, defaultCurrency]);
 
   const handleSave = async () => {
-    if (!name.trim()) return;
+    // Валидация обязательных полей
+    const newErrors: typeof errors = {};
+    
+    if (!name.trim()) {
+      newErrors.name = true;
+    }
+    
+    if (accountType !== 'savings' && (!balance || parseFloat(balance) < 0)) {
+      newErrors.balance = true;
+    }
+    
+    if (accountType === 'credit') {
+      if (!creditTerm || parseInt(creditTerm) <= 0) {
+        newErrors.creditTerm = true;
+      }
+      if (!creditRate || parseFloat(creditRate) < 0) {
+        newErrors.creditRate = true;
+      }
+    }
+    
+    if (accountType === 'savings' && targetAmount && parseFloat(targetAmount) <= 0) {
+      newErrors.targetAmount = true;
+    }
+    
+    setErrors(newErrors);
+    
+    // Если есть ошибки, показываем их и не сохраняем
+    if (Object.keys(newErrors).length > 0) {
+      setShowErrors(true);
+      return;
+    }
     
     // Сохраняем курс если он был указан
     if (selectedCurrency !== defaultCurrency && exchangeRate) {
@@ -197,7 +237,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
     onSave(accountData);
     
-    // Очищаем форму
+    // Очищаем форму и ошибки
     setName('');
     setBalance('');
     setSelectedCurrency(defaultCurrency);
@@ -215,6 +255,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     setCreditTerm('');
     setCreditRate('');
     setCreditPaymentType('annuity');
+    setErrors({});
+    setShowErrors(false);
   };
 
   const getIcon = () => {
@@ -285,13 +327,23 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 style={[styles.input, { 
                   backgroundColor: colors.background,
                   color: colors.text,
-                  borderColor: colors.border,
+                  borderColor: showErrors && errors.name ? '#FF4444' : colors.border,
                 }]}
                 value={name}
-                onChangeText={setName}
+                onChangeText={(text) => {
+                  setName(text);
+                  if (showErrors && errors.name && text.trim()) {
+                    setErrors(prev => ({ ...prev, name: false }));
+                  }
+                }}
                 placeholder={t('accounts.accountName')}
                 placeholderTextColor={colors.textSecondary}
               />
+              {showErrors && errors.name && (
+                <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                  {t('validation.accountNameRequired')}
+                </Text>
+              )}
             </View>
 
             {accountType !== 'savings' && (
@@ -301,14 +353,24 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                   style={[styles.input, { 
                     backgroundColor: colors.background,
                     color: colors.text,
-                    borderColor: colors.border,
+                    borderColor: showErrors && errors.balance ? '#FF4444' : colors.border,
                   }]}
                   value={balance}
-                  onChangeText={setBalance}
+                  onChangeText={(text) => {
+                    setBalance(text);
+                    if (showErrors && errors.balance && text && parseFloat(text) >= 0) {
+                      setErrors(prev => ({ ...prev, balance: false }));
+                    }
+                  }}
                   placeholder="0"
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />
+                {showErrors && errors.balance && (
+                  <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                    {t('validation.balanceRequired')}
+                  </Text>
+                )}
               </View>
             )}
 
@@ -372,14 +434,24 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                     style={[styles.input, { 
                       backgroundColor: colors.background,
                       color: colors.text,
-                      borderColor: colors.border,
+                      borderColor: showErrors && errors.targetAmount ? '#FF4444' : colors.border,
                     }]}
                     value={targetAmount}
-                    onChangeText={setTargetAmount}
+                    onChangeText={(text) => {
+                      setTargetAmount(text);
+                      if (showErrors && errors.targetAmount && text && parseFloat(text) > 0) {
+                        setErrors(prev => ({ ...prev, targetAmount: false }));
+                      }
+                    }}
                     placeholder="0"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="numeric"
                   />
+                  {showErrors && errors.targetAmount && (
+                    <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                      {t('validation.targetAmountInvalid')}
+                    </Text>
+                  )}
                 </View>
                 
                 {/* Выбор связанного счета */}
@@ -523,14 +595,24 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                     style={[styles.input, { 
                       backgroundColor: colors.background,
                       color: colors.text,
-                      borderColor: colors.border,
+                      borderColor: showErrors && errors.creditTerm ? '#FF4444' : colors.border,
                     }]}
                     value={creditTerm}
-                    onChangeText={setCreditTerm}
+                    onChangeText={(text) => {
+                      setCreditTerm(text);
+                      if (showErrors && errors.creditTerm && text && parseInt(text) > 0) {
+                        setErrors(prev => ({ ...prev, creditTerm: false }));
+                      }
+                    }}
                     placeholder="12"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="numeric"
                   />
+                  {showErrors && errors.creditTerm && (
+                    <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                      {t('validation.creditTermRequired')}
+                    </Text>
+                  )}
                 </View>
 
                 {/* Процентная ставка */}
@@ -540,14 +622,24 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                     style={[styles.input, { 
                       backgroundColor: colors.background,
                       color: colors.text,
-                      borderColor: colors.border,
+                      borderColor: showErrors && errors.creditRate ? '#FF4444' : colors.border,
                     }]}
                     value={creditRate}
-                    onChangeText={setCreditRate}
+                    onChangeText={(text) => {
+                      setCreditRate(text);
+                      if (showErrors && errors.creditRate && text && parseFloat(text) >= 0) {
+                        setErrors(prev => ({ ...prev, creditRate: false }));
+                      }
+                    }}
                     placeholder="15.5"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="numeric"
                   />
+                  {showErrors && errors.creditRate && (
+                    <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                      {t('validation.creditRateRequired')}
+                    </Text>
+                  )}
                 </View>
 
                 {/* Тип платежей */}
@@ -1045,5 +1137,9 @@ const styles = StyleSheet.create({
   currencyName: {
     fontSize: 14,
     marginTop: 2,
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
   },
 }); 

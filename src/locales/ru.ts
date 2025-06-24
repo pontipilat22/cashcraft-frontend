@@ -255,9 +255,9 @@ export default {
   settings: {
     title: 'Настройки',
     language: 'Язык',
-    currency: 'Валюта по умолчанию',
+    currency: 'Валюта',
     theme: 'Тема',
-    darkMode: 'Тёмная тема',
+    darkMode: 'Темная тема',
     notifications: 'Уведомления',
     security: 'Безопасность',
     about: 'О приложении',
@@ -273,7 +273,7 @@ export default {
     errorChangingCurrency: 'Ошибка при изменении валюты',
     selectCurrency: 'Выберите валюту',
     defaultCurrency: 'Валюта по умолчанию',
-    useSuggestedRate: 'Использовать предложенный курс: {{rate}}',
+    useSuggestedRate: 'Использовать предложенный курс: {rate}',
     useAllSuggestedRates: 'Использовать все предложенные курсы',
     exchangeRates: 'Курсы валют',
     manageExchangeRates: 'Управление курсами валют',
@@ -296,13 +296,24 @@ export default {
     errorChangingMode: 'Ошибка при изменении режима',
     errorUpdatingRates: 'Ошибка при обновлении курсов',
     exchangeRatesResetAndUpdated: 'Курсы валют сброшены и обновлены',
-    autoMode: 'Автоматический',
-    manualMode: 'Ручной',
+    autoMode: 'Автоматический режим',
+    manualMode: 'Ручной режим',
     noMultiCurrencyAccounts: 'Нет мультивалютных счетов',
     addAccountsInDifferentCurrencies: 'Добавьте счета в разных валютах для управления курсами',
     currentlyUsedCurrencies: 'Используемые валюты',
     addAccountsHint: 'Добавьте больше счетов с разными валютами для большего выбора',
     tapToEditRate: 'Нажмите на курс для редактирования',
+    forceLogin: {
+      title: 'Войти заново',
+      description: 'Очистить токены и войти заново',
+      message: 'Это очистит все токены и заставит вас войти заново. Продолжить?',
+      confirm: 'Войти заново',
+      success: {
+        title: 'Успешно',
+        message: 'Токены очищены. Теперь войдите заново.'
+      },
+      error: 'Ошибка при очистке токенов'
+    }
   },
   currencies: {
     USD: 'Доллар США',
@@ -560,5 +571,15 @@ export default {
         answer: 'Функция экспорта данных находится в разработке и будет добавлена в будущих обновлениях приложения.',
       },
     },
+  },
+  validation: {
+    accountNameRequired: 'Введите название счета',
+    balanceRequired: 'Введите начальный баланс',
+    amountRequired: 'Введите сумму',
+    accountRequired: 'Выберите счет',
+    categoryRequired: 'Выберите категорию',
+    creditTermRequired: 'Введите срок кредита',
+    creditRateRequired: 'Введите процентную ставку',
+    targetAmountInvalid: 'Целевая сумма должна быть больше 0',
   },
 }; 

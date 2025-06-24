@@ -13,6 +13,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",
     "@expo/vector-icons": "^14.1.0",
+    "@nozbe/watermelondb": "^0.28.0",
     "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/datetimepicker": "8.3.0",
     "@react-native-google-signin/google-signin": "^14.0.1",
@@ -30,7 +31,6 @@
     "expo-linear-gradient": "~14.1.5",
     "expo-localization": "^16.1.5",
     "expo-splash-screen": "^0.30.9",
-    "expo-sqlite": "^15.2.12",
     "expo-status-bar": "~2.2.3",
     "expo-web-browser": "~14.1.6",
     "i18n-js": "^4.5.1",
@@ -39,14 +39,18 @@
     "react-dom": "19.0.0",
     "react-native": "^0.79.3",
     "react-native-gesture-handler": "^2.12.1",
+    "react-native-get-random-values": "~1.11.0",
     "react-native-reanimated": "^3.17.4",
     "react-native-safe-area-context": "^5.4.0",
     "react-native-screens": "^4.11.1",
-    "react-native-web": "^0.20.0"
+    "react-native-web": "^0.20.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@babel/plugin-proposal-decorators": "^7.27.1",
     "@types/react": "^19.0.10",
+    "@types/uuid": "^10.0.0",
     "typescript": "^5.3.3"
   },
   "private": true

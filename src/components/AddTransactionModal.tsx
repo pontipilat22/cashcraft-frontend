@@ -48,6 +48,14 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   
+  // Состояние для валидации
+  const [errors, setErrors] = useState<{
+    amount?: boolean;
+    account?: boolean;
+    category?: boolean;
+  }>({});
+  const [showErrors, setShowErrors] = useState(false);
+  
   // Устанавливаем тип транзакции при открытии
   React.useEffect(() => {
     if (visible && initialType) {
@@ -86,13 +94,26 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   }, [isIncome]);
   
   const handleSave = async () => {
-    if (!selectedAccountId) {
-      Alert.alert(t('common.error'), t('transactions.selectAccount'));
-      return;
-    }
+    // Валидация обязательных полей
+    const newErrors: typeof errors = {};
     
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert(t('common.error'), t('transactions.enterAmount'));
+      newErrors.amount = true;
+    }
+    
+    if (!selectedAccountId) {
+      newErrors.account = true;
+    }
+    
+    if (!selectedCategoryId) {
+      newErrors.category = true;
+    }
+    
+    setErrors(newErrors);
+    
+    // Если есть ошибки, показываем их и не сохраняем
+    if (Object.keys(newErrors).length > 0) {
+      setShowErrors(true);
       return;
     }
     
@@ -108,12 +129,14 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         date: selectedDate.toISOString(),
       });
       
-      // Очищаем форму
+      // Очищаем форму и ошибки
       setAmount('');
       setDescription('');
       setIsIncome(false);
       setSelectedDate(new Date());
       setSelectedCategoryId('');
+      setErrors({});
+      setShowErrors(false);
       onClose();
     } catch (error) {
       console.error('Error creating transaction:', error);
@@ -228,19 +251,32 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               <Text style={[styles.label, { color: colors.textSecondary }]}>
                 {t('transactions.amount')}
               </Text>
-              <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View style={[styles.amountInput, { 
+                backgroundColor: colors.background, 
+                borderColor: showErrors && errors.amount ? '#FF4444' : colors.border 
+              }]}>
                 <Text style={[styles.currencySymbol, { color: isIncome ? '#4CAF50' : colors.primary }]}>
                   {isIncome ? '+' : '-'}{currencySymbol}
                 </Text>
                 <TextInput
                   style={[styles.amountTextInput, { color: colors.text }]}
                   value={amount}
-                  onChangeText={setAmount}
+                  onChangeText={(text) => {
+                    setAmount(text);
+                    if (showErrors && errors.amount && text && parseFloat(text) > 0) {
+                      setErrors(prev => ({ ...prev, amount: false }));
+                    }
+                  }}
                   placeholder="0"
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />
               </View>
+              {showErrors && errors.amount && (
+                <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                  {t('validation.amountRequired')}
+                </Text>
+              )}
             </View>
 
             {/* Дата */}
@@ -268,7 +304,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 {t('transactions.category')}
               </Text>
               <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                style={[styles.selector, { 
+                  backgroundColor: colors.background, 
+                  borderColor: showErrors && errors.category ? '#FF4444' : colors.border 
+                }]}
                 onPress={() => setShowCategoryPicker(true)}
               >
                 <View style={styles.selectorContent}>
@@ -283,6 +322,11 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 </View>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
+              {showErrors && errors.category && (
+                <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                  {t('validation.categoryRequired')}
+                </Text>
+              )}
             </View>
 
             {/* Счет */}
@@ -291,7 +335,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 {t('transactions.account')}
               </Text>
               <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                style={[styles.selector, { 
+                  backgroundColor: colors.background, 
+                  borderColor: showErrors && errors.account ? '#FF4444' : colors.border 
+                }]}
                 onPress={() => setShowAccountPicker(true)}
               >
                 <Text style={[styles.selectorText, { color: colors.text }]}>
@@ -299,6 +346,11 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 </Text>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
+              {showErrors && errors.account && (
+                <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                  {t('validation.accountRequired')}
+                </Text>
+              )}
             </View>
 
             {/* Описание */}
@@ -691,5 +743,10 @@ const styles = StyleSheet.create({
   datePickerButton: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#FF4444',
+    marginTop: 4,
   },
 }); 

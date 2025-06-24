@@ -19,35 +19,56 @@ export class ApiService {
 
   static async getAccessToken(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      console.log('🔍 [ApiService] Получен access token из хранилища:', token ? 'Есть (' + token.substring(0, 20) + '...)' : 'Нет');
+      return token;
     } catch (error) {
-      console.error('Error getting access token:', error);
+      console.error('❌ [ApiService] Error getting access token:', error);
       return null;
     }
   }
 
   static async getRefreshToken(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      const token = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      console.log('🔍 [ApiService] Получен refresh token из хранилища:', token ? 'Есть (' + token.substring(0, 20) + '...)' : 'Нет');
+      return token;
     } catch (error) {
-      console.error('Error getting refresh token:', error);
+      console.error('❌ [ApiService] Error getting refresh token:', error);
       return null;
     }
   }
 
   static async setAccessToken(token: string): Promise<void> {
     try {
+      console.log('💾 [ApiService] Сохраняем access token:', token ? 'Есть (' + token.substring(0, 20) + '...)' : 'Нет');
       await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token);
+      console.log('✅ [ApiService] Access token сохранен');
     } catch (error) {
-      console.error('Error saving access token:', error);
+      console.error('❌ [ApiService] Error saving access token:', error);
     }
   }
 
   static async setRefreshToken(token: string): Promise<void> {
     try {
+      console.log('💾 [ApiService] Сохраняем refresh token:', token ? 'Есть (' + token.substring(0, 20) + '...)' : 'Нет');
+      console.log('💾 [ApiService] Длина refresh token:', token ? token.length : 0);
+      console.log('💾 [ApiService] Ключ для сохранения:', REFRESH_TOKEN_KEY);
+      
+      if (!token) {
+        console.error('❌ [ApiService] КРИТИЧЕСКАЯ ОШИБКА: Попытка сохранить пустой refresh token!');
+        return;
+      }
+      
       await AsyncStorage.setItem(REFRESH_TOKEN_KEY, token);
+      console.log('✅ [ApiService] Refresh token сохранен');
+      
+      // Проверяем, что токен действительно сохранился
+      const savedToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      console.log('🔍 [ApiService] Проверка сохранения refresh token:', savedToken ? 'Сохранен' : 'НЕ СОХРАНЕН!');
+      
     } catch (error) {
-      console.error('Error saving refresh token:', error);
+      console.error('❌ [ApiService] Error saving refresh token:', error);
     }
   }
 
@@ -92,7 +113,8 @@ export class ApiService {
   ): Promise<T> {
     const accessToken = await this.getAccessToken();
 
-    console.log('📡 Request →', `${API_BASE_URL}${endpoint}`);
+    console.log('📡 [ApiService] Request →', `${API_BASE_URL}${endpoint}`);
+    console.log('🔑 [ApiService] Access token для запроса:', accessToken ? 'Есть (' + accessToken.substring(0, 20) + '...)' : 'Нет');
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -101,6 +123,9 @@ export class ApiService {
 
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
+      console.log('📤 [ApiService] Добавлен заголовок Authorization с токеном');
+    } else {
+      console.log('⚠️ [ApiService] Access token отсутствует, запрос без авторизации');
     }
 
     const deviceId = await ClientEncryption.getDeviceId();

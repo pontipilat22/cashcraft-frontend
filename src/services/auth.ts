@@ -63,11 +63,39 @@ export class AuthService {
 
   // Вход через Google
   static async loginWithGoogle(googleData: { idToken: string; email: string; name: string; googleId: string }): Promise<AuthResponse> {
+    console.log('🔑 [AuthService] Начинаем вход через Google для:', googleData.email);
+    
     const response = await ApiService.post<AuthResponse>('/auth/google', googleData);
     
+    console.log('🔑 [AuthService] Получен ответ от сервера:');
+    console.log('  - Access Token:', response.accessToken ? 'Есть (' + response.accessToken.substring(0, 20) + '...)' : 'Нет');
+    console.log('  - Refresh Token:', response.refreshToken ? 'Есть (' + response.refreshToken.substring(0, 20) + '...)' : 'Нет');
+    console.log('  - User ID:', response.user.id);
+    
+    // Проверяем, что refresh token действительно есть
+    if (!response.refreshToken) {
+      console.error('❌ [AuthService] КРИТИЧЕСКАЯ ОШИБКА: Refresh token отсутствует в ответе сервера!');
+      console.error('❌ [AuthService] Полный ответ сервера:', JSON.stringify(response, null, 2));
+    }
+    
     // Сохраняем токены
+    console.log('💾 [AuthService] Сохраняем токены...');
     await ApiService.setAccessToken(response.accessToken);
     await ApiService.setRefreshToken(response.refreshToken);
+    
+    // Проверяем, что токены сохранились
+    const savedAccessToken = await ApiService.getAccessToken();
+    const savedRefreshToken = await ApiService.getRefreshToken();
+    
+    console.log('✅ [AuthService] Проверка сохранения токенов:');
+    console.log('  - Access Token сохранен:', savedAccessToken ? 'Да' : 'Нет');
+    console.log('  - Refresh Token сохранен:', savedRefreshToken ? 'Да' : 'Нет');
+    
+    if (!savedRefreshToken) {
+      console.error('❌ [AuthService] КРИТИЧЕСКАЯ ОШИБКА: Refresh token не сохранился!');
+    }
+    
+    console.log('✅ [AuthService] Токены сохранены');
     
     return response;
   }

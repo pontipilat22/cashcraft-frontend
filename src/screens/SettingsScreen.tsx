@@ -28,6 +28,8 @@ import { LocalDatabaseService } from '../services/localDatabase';
 import { ExchangeRatesManager } from '../components/ExchangeRatesManager';
 import { TestConnection } from '../components/TestConnection';
 import { CurrencyDiagnostics } from '../components/CurrencyDiagnostics';
+import { ApiService } from '../services/api';
+import { AuthService } from '../services/auth';
 
 
 type ExchangeRates = { [accountId: string]: { 
@@ -117,6 +119,43 @@ export const SettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('Logout error:', error);
     }
+  };
+
+  const handleForceLogin = async () => {
+    Alert.alert(
+      t('settings.forceLogin.title'),
+      t('settings.forceLogin.message'),
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('settings.forceLogin.confirm'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Очищаем все токены
+              await ApiService.clearTokens();
+              
+              // Выходим из системы
+              await logout();
+              
+              Alert.alert(
+                t('settings.forceLogin.success.title'),
+                t('settings.forceLogin.success.message')
+              );
+            } catch (error) {
+              console.error('Force login error:', error);
+              Alert.alert(
+                t('common.error'),
+                t('settings.forceLogin.error')
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleCurrencySelect = async (currencyCode: string) => {
@@ -363,6 +402,13 @@ export const SettingsScreen: React.FC = () => {
                 {user.email}
               </Text>
             </View>
+            
+            {renderSettingItem(
+              'refresh-outline',
+              t('settings.forceLogin.title'),
+              t('settings.forceLogin.description'),
+              handleForceLogin
+            )}
           </View>
         )}
 
