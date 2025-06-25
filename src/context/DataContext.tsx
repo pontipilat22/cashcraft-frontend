@@ -726,11 +726,18 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       // Обновляем транзакции в состоянии
       const deletedCategory = categories.find(cat => cat.id === id);
       if (deletedCategory) {
-        const otherId = deletedCategory.type === 'income' ? 'other_income' : 'other_expense';
-        setTransactions(prev => prev.map(trans => 
-          trans.categoryId === id ? { ...trans, categoryId: otherId } : trans
+        const fallbackCategory = categories.find(cat =>
+          cat.type === deletedCategory.type && cat.name.toLowerCase() === 'другое'
+        );
+      
+        if (!fallbackCategory) {
+          throw new Error('Резервная категория "Другое" не найдена');
+        }
+      
+        setTransactions(prev => prev.map(trans =>
+          trans.categoryId === id ? { ...trans, categoryId: fallbackCategory.id } : trans
         ));
-      }
+      }        
       
       // Мгновенная синхронизация с backend
       await syncData();

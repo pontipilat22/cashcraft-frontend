@@ -70,32 +70,33 @@ export class WatermelonDatabaseService {
         console.log('[WatermelonDB] Количество категорий:', categoriesCount);
 
         if (categoriesCount === 0) {
-        const categories = [
-            { name: 'salary',        type: 'income',  icon: 'cash-outline',            color: '#4CAF50' },
-            { name: 'business',      type: 'income',  icon: 'briefcase-outline',       color: '#2196F3' },
-            { name: 'investments',   type: 'income',  icon: 'trending-up-outline',     color: '#FF9800' },
-            { name: 'other_income',  type: 'income',  icon: 'add-circle-outline',      color: '#9C27B0' },
-            { name: 'food',          type: 'expense', icon: 'cart-outline',            color: '#F44336' },
-            { name: 'transport',     type: 'expense', icon: 'car-outline',             color: '#3F51B5' },
-            { name: 'housing',       type: 'expense', icon: 'home-outline',            color: '#009688' },
-            { name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
-            { name: 'health',        type: 'expense', icon: 'fitness-outline',         color: '#4CAF50' },
-            { name: 'shopping',      type: 'expense', icon: 'bag-outline',             color: '#9C27B0' },
-            { name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B' },
-        ];
+          const categories = [
+            { id: uuidv4(), name: 'salary',        type: 'income',  icon: 'cash-outline',            color: '#4CAF50' },
+            { id: uuidv4(), name: 'business',      type: 'income',  icon: 'briefcase-outline',       color: '#2196F3' },
+            { id: uuidv4(), name: 'investments',   type: 'income',  icon: 'trending-up-outline',     color: '#FF9800' },
+            { id: uuidv4(), name: 'other_income',  type: 'income',  icon: 'add-circle-outline',      color: '#9C27B0', isDefault: true },
+          
+            { id: uuidv4(), name: 'food',          type: 'expense', icon: 'cart-outline',            color: '#F44336' },
+            { id: uuidv4(), name: 'transport',     type: 'expense', icon: 'car-outline',             color: '#3F51B5' },
+            { id: uuidv4(), name: 'housing',       type: 'expense', icon: 'home-outline',            color: '#009688' },
+            { id: uuidv4(), name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
+            { id: uuidv4(), name: 'health',        type: 'expense', icon: 'fitness-outline',         color: '#4CAF50' },
+            { id: uuidv4(), name: 'shopping',      type: 'expense', icon: 'bag-outline',             color: '#9C27B0' },
+            { id: uuidv4(), name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B', isDefault: true },
+          ];
 
         await database.write(async () => {
-            await Promise.all(
+          await Promise.all(
             categories.map(cat =>
-                database.get<Category>('categories').create(category => {
-                // id НЕ трогаем — WatermelonDB поставит uuid автоматически
+              database.get<Category>('categories').create(category => {
+                category._raw.id = cat.id; // ⬅️ ЭТО ОБЯЗАТЕЛЬНО
                 category.name  = cat.name;
                 category.type  = cat.type;
                 category.icon  = cat.icon;
                 category.color = cat.color;
-                })
+              })
             )
-            );
+          );          
         });
         console.log('[WatermelonDB] Базовые категории созданы');
       }
