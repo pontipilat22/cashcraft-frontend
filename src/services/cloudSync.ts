@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Account, Transaction, Category, Debt } from '../types';
 import { LocalDatabaseService } from './localDatabase';
+import database from '../database';
 
 // Интерфейс для облачного хранилища
 interface CloudData {
@@ -19,6 +20,9 @@ export class CloudSyncService {
   
   // Для демо используем AsyncStorage как "облако"
   private static DEMO_MODE = false;
+
+  // Защита от множественных вызовов wipeData
+  private static isWiping = false;
 
   static async authenticate(email: string, password: string): Promise<string | null> {
     if (this.DEMO_MODE) {
@@ -111,18 +115,16 @@ export class CloudSyncService {
         return true;
       } else {
         // В реальном приложении отправляем на сервер
-        console.log('[CloudSync] Отправляем данные на сервер:', `${this.API_URL}/api/v1/sync`);
+        console.log('[CloudSync] Отправляем данные на сервер:', `${this.API_URL}/api/v1/sync/upload`);
         
-        const response = await fetch(`${this.API_URL}/api/v1/sync`, {
+        const response = await fetch(`${this.API_URL}/api/v1/sync/upload`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            userId,
             data: localData,
-            lastSyncAt: await LocalDatabaseService.getLastSyncTime(),
           }),
         });
         
@@ -132,14 +134,11 @@ export class CloudSyncService {
           const result = await response.json();
           console.log('[CloudSync] Синхронизация успешна:', result);
           
-          // Применяем изменения с сервера
-          await this.applyCloudChanges(result.changes);
-          
           // Помечаем данные как синхронизированные
           await this.markDataAsSynced(localData);
           
           // Обновляем время синхронизации
-          await LocalDatabaseService.updateSyncTime(result.syncTime, result.syncToken);
+          await LocalDatabaseService.updateSyncTime(result.syncTime);
           
           return true;
         } else {
@@ -183,10 +182,32 @@ export class CloudSyncService {
           });
           
           // Проверяем, что база данных готова перед очисткой
-          if (LocalDatabaseService.isDatabaseReady()) {
-            console.log('🗄️ [CloudSync] База данных готова, очищаем и импортируем...');
-            // Очищаем локальную базу
-            await LocalDatabaseService.resetAllData();
+          const isDatabaseReady = LocalDatabaseService.isDatabaseReady();
+          console.log('🗄️ [CloudSync] Проверка готовности базы данных:', isDatabaseReady);
+          
+          if (isDatabaseReady) {
+            // Проверяем, есть ли новые данные в AsyncStorage
+            const localLastSync = await LocalDatabaseService.getLastSyncTime();
+            console.log('⏰ [CloudSync] Локальное время последней синхронизации:', localLastSync);
+            console.log('⏰ [CloudSync] Время последней синхронизации в AsyncStorage:', cloudData.lastSyncAt);
+            
+            if (cloudData.lastSyncAt === localLastSync) {
+              console.log('✅ [CloudSync] Данных в AsyncStorage нет новых - пропускаем импорт');
+              return true;
+            }
+            
+            console.log('🔄 [CloudSync] Обнаружены новые данные в AsyncStorage, очищаем и импортируем...');
+            // Очищаем локальную базу - НЕ используем resetAllData чтобы избежать цикла!
+            await database.write(async () => {
+              const tables = ['accounts', 'transactions', 'categories', 'debts', 'exchange_rates', 'settings', 'sync_metadata'];
+              for (const table of tables) {
+                const records = await database.get(table).query().fetch();
+                if (records.length > 0) {
+                  await Promise.all(records.map((r: any) => r.destroyPermanently()));
+                }
+              }
+            });
+            
             
             // Загружаем данные из облака
             await this.importCloudData(cloudData);
@@ -216,12 +237,11 @@ export class CloudSyncService {
         
         if (response.ok) {
           const cloudData = await response.json();
-          console.log('📊 [CloudSync] Полный ответ сервера:', JSON.stringify(cloudData, null, 2));
           console.log('📊 [CloudSync] Данные с сервера:', {
             accounts: cloudData.accounts?.length || 0,
             transactions: cloudData.transactions?.length || 0,
             categories: cloudData.categories?.length || 0,
-            debts: cloudData.debts?.length || 0
+            debts: cloudData.debts?.length || 0,
           });
           
           // Проверяем структуру данных
@@ -256,9 +276,27 @@ export class CloudSyncService {
           console.log('🗄️ [CloudSync] Проверка готовности базы данных:', isDatabaseReady);
           
           if (isDatabaseReady) {
-            console.log('🗄️ [CloudSync] База данных готова, очищаем и импортируем...');
-            // Очищаем локальную базу
-            await LocalDatabaseService.resetAllData();
+            // Проверяем, есть ли новые данные на сервере
+            const localLastSync = await LocalDatabaseService.getLastSyncTime();
+            console.log('⏰ [CloudSync] Локальное время последней синхронизации:', localLastSync);
+            console.log('⏰ [CloudSync] Время последней синхронизации на сервере:', cloudData.lastSyncAt);
+            
+            if (cloudData.lastSyncAt === localLastSync) {
+              console.log('✅ [CloudSync] Данных на сервере нет новых - пропускаем импорт');
+              return true;
+            }
+            
+            console.log('🔄 [CloudSync] Обнаружены новые данные на сервере, очищаем и импортируем...');
+            // Очищаем локальную базу - НЕ используем resetAllData чтобы избежать цикла!
+            await database.write(async () => {
+              const tables = ['accounts', 'transactions', 'categories', 'debts', 'exchange_rates', 'settings', 'sync_metadata'];
+              for (const table of tables) {
+                const records = await database.get(table).query().fetch();
+                if (records.length > 0) {
+                  await Promise.all(records.map((r: any) => r.destroyPermanently()));
+                }
+              }
+            });
             
             // Загружаем данные из облака
             await this.importCloudData(cloudData);
@@ -284,6 +322,112 @@ export class CloudSyncService {
         console.log('🌐 [CloudSync] Ошибка сети при загрузке данных - возможно нет интернета или сервер недоступен');
       }
       return false;
+    }
+  }
+
+  static async wipeData(userId: string, token: string): Promise<boolean> {
+    // Защита от множественных вызовов
+    if (this.isWiping) {
+      console.log('⚠️ [CloudSync] Wipe уже выполняется, пропускаем...');
+      return false;
+    }
+    
+    this.isWiping = true;
+    
+    try {
+      console.log('🗑️ [CloudSync] Начинаем полный сброс данных для пользователя:', userId);
+      
+      if (this.DEMO_MODE) {
+        console.log('🎭 [CloudSync] Демо режим - очищаем AsyncStorage');
+        // В демо режиме очищаем AsyncStorage
+        const cloudKey = `cloudData_${userId}`;
+        await AsyncStorage.removeItem(cloudKey);
+        
+        // Очищаем локальную базу
+        if (LocalDatabaseService.isDatabaseReady()) {
+          console.log('🗄️ [CloudSync] Очищаем локальную базу данных...');
+          // Очищаем локальную базу напрямую, не используя resetAllData
+          await database.write(async () => {
+            const tables = ['accounts', 'transactions', 'categories', 'debts', 'exchange_rates', 'settings', 'sync_metadata'];
+            for (const table of tables) {
+              const records = await database.get(table).query().fetch();
+              if (records.length > 0) {
+                await Promise.all(records.map((r: any) => r.destroyPermanently()));
+              }
+            }
+          });
+          
+          // Переинициализируем базу данных с базовыми данными
+          console.log('🔄 [CloudSync] Переинициализируем базу данных с базовыми данными...');
+          await LocalDatabaseService.forceReinitialize('USD');
+          
+          // Устанавливаем флаг сброса данных, чтобы предотвратить синхронизацию
+          await AsyncStorage.setItem(`dataReset_${userId}`, 'true');
+          console.log('🏷️ [CloudSync] Установлен флаг сброса данных');
+        }
+        
+        console.log('✅ [CloudSync] Данные успешно очищены в демо режиме');
+        return true;
+      } else {
+        console.log('🌐 [CloudSync] Реальный режим - отправляем запрос на сброс данных');
+        // В реальном приложении отправляем запрос на сервер
+        const response = await fetch(`${this.API_URL}/api/v1/sync/wipe`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        console.log('📡 [CloudSync] Ответ сервера на wipe:', response.status, response.statusText);
+        
+        if (response.ok) {
+          console.log('✅ [CloudSync] Данные успешно очищены на сервере');
+          
+          // Очищаем локальную базу
+          if (LocalDatabaseService.isDatabaseReady()) {
+            console.log('🗄️ [CloudSync] Очищаем локальную базу данных...');
+            // Очищаем локальную базу напрямую, не используя resetAllData
+            await database.write(async () => {
+              const tables = ['accounts', 'transactions', 'categories', 'debts', 'exchange_rates', 'settings', 'sync_metadata'];
+              for (const table of tables) {
+                const records = await database.get(table).query().fetch();
+                if (records.length > 0) {
+                  await Promise.all(records.map((r: any) => r.destroyPermanently()));
+                }
+              }
+            });
+            
+            // Переинициализируем базу данных с базовыми данными
+            console.log('🔄 [CloudSync] Переинициализируем базу данных с базовыми данными...');
+            await LocalDatabaseService.forceReinitialize('USD');
+            
+            // Устанавливаем флаг сброса данных, чтобы предотвратить синхронизацию
+            await AsyncStorage.setItem(`dataReset_${userId}`, 'true');
+            console.log('🏷️ [CloudSync] Установлен флаг сброса данных');
+          }
+          
+          return true;
+        } else {
+          const errorText = await response.text();
+          console.error('❌ [CloudSync] Ошибка сброса данных:', response.status, errorText);
+          
+          // Если ошибка 401, пробрасываем её для обработки
+          if (response.status === 401) {
+            throw new Error('401 Token expired');
+          }
+          
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error('❌ [CloudSync] Wipe error:', error);
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        console.log('🌐 [CloudSync] Ошибка сети при сбросе данных - возможно нет интернета или сервер недоступен');
+      }
+      return false;
+    } finally {
+      // Снимаем флаг защиты
+      this.isWiping = false;
     }
   }
 
@@ -385,9 +529,22 @@ export class CloudSyncService {
     console.log('📂 [CloudSync] Импортируем категории:', safeData.categories.length);
     for (const category of safeData.categories) {
       try {
-        await LocalDatabaseService.createCategory(category);
+        // Валидация обязательных полей категории
+        if (!category.id) {
+          console.warn('⚠️ [CloudSync] Пропускаем категорию без id:', category);
+          continue;
+        }
+        
+        if (!category.name) {
+          console.warn('⚠️ [CloudSync] Пропускаем категорию без name:', category);
+          continue;
+        }
+        
+        console.log('📝 [CloudSync] Импортируем категорию:', { id: category.id, name: category.name });
+        await LocalDatabaseService.upsertCategory(category);
       } catch (error) {
         console.error('❌ [CloudSync] Error importing category:', error);
+        console.error('❌ [CloudSync] Category data:', category);
       }
     }
 
@@ -395,10 +552,35 @@ export class CloudSyncService {
     console.log('🏦 [CloudSync] Импортируем счета:', safeData.accounts.length);
     for (const account of safeData.accounts) {
       try {
+        // Валидация обязательных полей счета
+        if (!account.id) {
+          console.warn('⚠️ [CloudSync] Пропускаем счет без id:', account);
+          continue;
+        }
+        
+        if (!account.name) {
+          console.warn('⚠️ [CloudSync] Пропускаем счет без name:', account);
+          continue;
+        }
+        
+        if (account.balance === undefined || account.balance === null) {
+          console.warn('⚠️ [CloudSync] Пропускаем счет без balance:', account);
+          continue;
+        }
+        
         const { id, createdAt, updatedAt, ...accountData } = account;
-        await LocalDatabaseService.createAccount(accountData);
+        
+        console.log('📝 [CloudSync] Импортируем счет:', { 
+          id: account.id, 
+          name: account.name, 
+          balance: account.balance,
+          type: account.type 
+        });
+        
+        await LocalDatabaseService.upsertAccount(accountData);
       } catch (error) {
         console.error('❌ [CloudSync] Error importing account:', error);
+        console.error('❌ [CloudSync] Account data:', account);
       }
     }
 
@@ -406,10 +588,52 @@ export class CloudSyncService {
     console.log('💳 [CloudSync] Импортируем транзакции:', safeData.transactions.length);
     for (const transaction of safeData.transactions) {
       try {
+        // Валидация обязательных полей транзакции
+        if (!transaction.account_id && !transaction.accountId) {
+          console.warn('⚠️ [CloudSync] Пропускаем транзакцию без account_id:', transaction);
+          continue;
+        }
+        
+        if (!transaction.amount || transaction.amount <= 0) {
+          console.warn('⚠️ [CloudSync] Пропускаем транзакцию с невалидной суммой:', transaction);
+          continue;
+        }
+        
+        if (!transaction.type || !['income', 'expense'].includes(transaction.type)) {
+          console.warn('⚠️ [CloudSync] Пропускаем транзакцию с невалидным типом:', transaction);
+          continue;
+        }
+        
+        if (!transaction.date) {
+          console.warn('⚠️ [CloudSync] Пропускаем транзакцию без даты:', transaction);
+          continue;
+        }
+        
+        // Подготавливаем данные для импорта
         const { id, ...transactionData } = transaction;
-        await LocalDatabaseService.createTransaction(transactionData);
+        
+        // Нормализуем поля (поддержка разных форматов)
+        const normalizedTransaction = {
+          ...transactionData,
+          accountId: transaction.account_id || transaction.accountId,
+          categoryId: transaction.category_id || transaction.categoryId,
+          amount: parseFloat(transaction.amount),
+          type: transaction.type,
+          date: transaction.date,
+          description: transaction.description || ''
+        };
+        
+        console.log('📝 [CloudSync] Импортируем транзакцию:', {
+          accountId: normalizedTransaction.accountId,
+          amount: normalizedTransaction.amount,
+          type: normalizedTransaction.type,
+          date: normalizedTransaction.date
+        });
+        
+        await LocalDatabaseService.upsertTransaction(normalizedTransaction);
       } catch (error) {
         console.error('❌ [CloudSync] Error importing transaction:', error);
+        console.error('❌ [CloudSync] Transaction data:', transaction);
       }
     }
 
@@ -417,10 +641,40 @@ export class CloudSyncService {
     console.log('💸 [CloudSync] Импортируем долги:', safeData.debts.length);
     for (const debt of safeData.debts) {
       try {
+        // Валидация обязательных полей долга
+        if (!debt.id) {
+          console.warn('⚠️ [CloudSync] Пропускаем долг без id:', debt);
+          continue;
+        }
+        
+        if (!debt.name) {
+          console.warn('⚠️ [CloudSync] Пропускаем долг без name:', debt);
+          continue;
+        }
+        
+        if (debt.amount === undefined || debt.amount === null || debt.amount <= 0) {
+          console.warn('⚠️ [CloudSync] Пропускаем долг с невалидной суммой:', debt);
+          continue;
+        }
+        
+        if (!debt.type || !['owed_to_me', 'owed_by_me'].includes(debt.type)) {
+          console.warn('⚠️ [CloudSync] Пропускаем долг с невалидным типом:', debt);
+          continue;
+        }
+        
         const { id, createdAt, updatedAt, ...debtData } = debt;
-        await LocalDatabaseService.createDebt(debtData);
+        
+        console.log('📝 [CloudSync] Импортируем долг:', { 
+          id: debt.id, 
+          name: debt.name, 
+          amount: debt.amount,
+          type: debt.type 
+        });
+        
+        await LocalDatabaseService.upsertDebt(debtData);
       } catch (error) {
         console.error('❌ [CloudSync] Error importing debt:', error);
+        console.error('❌ [CloudSync] Debt data:', debt);
       }
     }
 
@@ -457,7 +711,7 @@ export class CloudSyncService {
         await AsyncStorage.removeItem(cloudKey);
         return true;
       } else {
-        const response = await fetch(`${this.API_URL}/user/delete`, {
+        const response = await fetch(`${this.API_URL}/api/v1/sync/wipe`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,

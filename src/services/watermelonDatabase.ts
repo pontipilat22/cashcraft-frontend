@@ -8,6 +8,7 @@ import Debt from '../database/models/Debt';
 import ExchangeRate from '../database/models/ExchangeRate';
 import Setting from '../database/models/Setting';
 import SyncMetadata from '../database/models/SyncMetadata';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export class WatermelonDatabaseService {
   private static currentUserId: string | null = null;
@@ -37,69 +38,68 @@ export class WatermelonDatabaseService {
     }
     try {
       console.log('[WatermelonDB] Инициализация базы данных...');
-      // Проверяем, есть ли аккаунты
-        // ─── Проверяем, существует ли уже счёт "Наличные" ─────────────────
-    const cashAccount = await database
-    .get<Account>('accounts')
-    .query(
-    Q.where('name', 'Наличные'),
-    Q.where('type', 'cash')
-    )
-    .fetch();
-
-    if (cashAccount.length === 0) {
-    await database.write(async () => {
-    await database.get<Account>('accounts').create(acc => {
-        acc._raw.id         = uuidv4();
-        acc.name            = 'Наличные';
-        acc.type            = 'cash';
-        acc.balance         = 0;
-        acc.currency        = defaultCurrency;
-        acc.isDefault       = true;
-        acc.isIncludedInTotal = true;
-        acc.savedAmount     = 0;
-    });
-    });
-    console.log('[WatermelonDB] Создан счёт "Наличные"');
-    } else {
-    console.log('[WatermelonDB] Счёт "Наличные" уже существует — пропускаем создание');
-    }
-
-     // ─── Проверяем и добавляем базовые категории ──────────────────────────────
-        const categoriesCount = await database.get<Category>('categories').query().fetchCount();
-        console.log('[WatermelonDB] Количество категорий:', categoriesCount);
-
-        if (categoriesCount === 0) {
-          const categories = [
-            { id: uuidv4(), name: 'salary',        type: 'income',  icon: 'cash-outline',            color: '#4CAF50' },
-            { id: uuidv4(), name: 'business',      type: 'income',  icon: 'briefcase-outline',       color: '#2196F3' },
-            { id: uuidv4(), name: 'investments',   type: 'income',  icon: 'trending-up-outline',     color: '#FF9800' },
-            { id: uuidv4(), name: 'other_income',  type: 'income',  icon: 'add-circle-outline',      color: '#9C27B0', isDefault: true },
-          
-            { id: uuidv4(), name: 'food',          type: 'expense', icon: 'cart-outline',            color: '#F44336' },
-            { id: uuidv4(), name: 'transport',     type: 'expense', icon: 'car-outline',             color: '#3F51B5' },
-            { id: uuidv4(), name: 'housing',       type: 'expense', icon: 'home-outline',            color: '#009688' },
-            { id: uuidv4(), name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
-            { id: uuidv4(), name: 'health',        type: 'expense', icon: 'fitness-outline',         color: '#4CAF50' },
-            { id: uuidv4(), name: 'shopping',      type: 'expense', icon: 'bag-outline',             color: '#9C27B0' },
-            { id: uuidv4(), name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B', isDefault: true },
-          ];
-
-        await database.write(async () => {
-          await Promise.all(
-            categories.map(cat =>
-              database.get<Category>('categories').create(category => {
-                category._raw.id = cat.id; // ⬅️ ЭТО ОБЯЗАТЕЛЬНО
-                category.name  = cat.name;
-                category.type  = cat.type;
-                category.icon  = cat.icon;
-                category.color = cat.color;
-              })
-            )
-          );          
-        });
-        console.log('[WatermelonDB] Базовые категории созданы');
+      
+      // Проверяем, есть ли уже какие-либо данные в базе
+      const accountsCount = await database.get<Account>('accounts').query().fetchCount();
+      const categoriesCount = await database.get<Category>('categories').query().fetchCount();
+      
+      // Если в базе уже есть данные, не создаем дефолтные
+      if (accountsCount > 0 || categoriesCount > 0) {
+        console.log(`[WatermelonDB] База данных уже содержит данные (${accountsCount} счетов, ${categoriesCount} категорий), пропускаем создание дефолтных`);
+        this.isInitialized = true;
+        this.lastInitError = null;
+        console.log('[WatermelonDB] Инициализация завершена (данные уже существуют)');
+        return;
       }
+
+      console.log('[WatermelonDB] База данных пуста, создаем дефолтные данные...');
+
+      // ─── Создаем дефолтный счет "Наличные" только если база пуста ─────────────────
+      await database.write(async () => {
+        await database.get<Account>('accounts').create(acc => {
+          acc._raw.id         = uuidv4();
+          acc.name            = 'Наличные';
+          acc.type            = 'cash';
+          acc.balance         = 0;
+          acc.currency        = defaultCurrency;
+          acc.isDefault       = true;
+          acc.isIncludedInTotal = true;
+          acc.savedAmount     = 0;
+        });
+      });
+      console.log('[WatermelonDB] Создан дефолтный счёт "Наличные"');
+
+      // ─── Создаем базовые категории только если база пуста ──────────────────────────────
+      const categories = [
+        { id: uuidv4(), name: 'salary',        type: 'income',  icon: 'cash-outline',            color: '#4CAF50' },
+        { id: uuidv4(), name: 'business',      type: 'income',  icon: 'briefcase-outline',       color: '#2196F3' },
+        { id: uuidv4(), name: 'investments',   type: 'income',  icon: 'trending-up-outline',     color: '#FF9800' },
+        { id: uuidv4(), name: 'other_income',  type: 'income',  icon: 'add-circle-outline',      color: '#9C27B0', isDefault: true },
+      
+        { id: uuidv4(), name: 'food',          type: 'expense', icon: 'cart-outline',            color: '#F44336' },
+        { id: uuidv4(), name: 'transport',     type: 'expense', icon: 'car-outline',             color: '#3F51B5' },
+        { id: uuidv4(), name: 'housing',       type: 'expense', icon: 'home-outline',            color: '#009688' },
+        { id: uuidv4(), name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
+        { id: uuidv4(), name: 'health',        type: 'expense', icon: 'fitness-outline',         color: '#4CAF50' },
+        { id: uuidv4(), name: 'shopping',      type: 'expense', icon: 'bag-outline',             color: '#9C27B0' },
+        { id: uuidv4(), name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B', isDefault: true },
+      ];
+
+      await database.write(async () => {
+        await Promise.all(
+          categories.map(cat =>
+            database.get<Category>('categories').create(category => {
+              category._raw.id = cat.id; // Используем фиксированный ID для системных категорий
+              category.name  = cat.name;
+              category.type  = cat.type;
+              category.icon  = cat.icon;
+              category.color = cat.color;
+            })
+          )
+        );          
+      });
+      console.log('[WatermelonDB] Базовые категории созданы');
+
       // Инициализируем настройки
       const settingsCount = await database.get<Setting>('settings').query().fetchCount();
       console.log('[WatermelonDB] Количество настроек:', settingsCount);
@@ -173,6 +173,7 @@ export class WatermelonDatabaseService {
         account.creditRate = accountData.creditRate;
         account.creditPaymentType = accountData.creditPaymentType;
         account.creditInitialAmount = accountData.creditInitialAmount;
+        account.syncedAt = undefined;
       });
     });
 
@@ -212,6 +213,7 @@ export class WatermelonDatabaseService {
             (acc as any)[key] = value;
           }
         });
+        acc.syncedAt = undefined;
       });
     });
 
@@ -265,6 +267,7 @@ export class WatermelonDatabaseService {
         transaction.categoryId = transactionData.categoryId;
         transaction.description = transactionData.description;
         transaction.date = transactionData.date;
+        transaction.syncedAt = undefined;
       });
 
       // Обновляем баланс счета
@@ -302,6 +305,7 @@ export class WatermelonDatabaseService {
             (trans as any)[key] = value;
           }
         });
+        trans.syncedAt = undefined;
       });
 
       // Применяем новое изменение баланса
@@ -350,6 +354,7 @@ export class WatermelonDatabaseService {
         category.type = categoryData.type;
         category.icon = categoryData.icon;
         category.color = categoryData.color;
+        category.syncedAt = undefined;
       });
     });
 
@@ -360,14 +365,16 @@ export class WatermelonDatabaseService {
   }
 
   static async updateCategory(id: string, updates: any): Promise<void> {
+    const category = await database.get<Category>('categories').find(id);
+    
     await database.write(async () => {
-      const category = await database.get<Category>('categories').find(id);
       await category.update(cat => {
         Object.entries(updates).forEach(([key, value]) => {
           if (key !== 'id') {
             (cat as any)[key] = value;
           }
         });
+        cat.syncedAt = undefined;
       });
     });
   }
@@ -416,6 +423,7 @@ export class WatermelonDatabaseService {
         debt.amount = debtData.amount;
         debt.isIncludedInTotal = debtData.isIncludedInTotal !== false;
         debt.dueDate = debtData.dueDate;
+        debt.syncedAt = undefined;
       });
     });
 
@@ -428,14 +436,16 @@ export class WatermelonDatabaseService {
   }
 
   static async updateDebt(id: string, updates: any): Promise<void> {
+    const debt = await database.get<Debt>('debts').find(id);
+    
     await database.write(async () => {
-      const debt = await database.get<Debt>('debts').find(id);
       await debt.update(d => {
         Object.entries(updates).forEach(([key, value]) => {
           if (key !== 'id' && key !== 'createdAt') {
             (d as any)[key] = value;
           }
         });
+        d.syncedAt = undefined;
       });
     });
   }
@@ -535,6 +545,44 @@ export class WatermelonDatabaseService {
     });
   }
 
+  // Методы для поиска существующих записей (для предотвращения дублирования)
+  static async findAccountByName(name: string): Promise<any | null> {
+    const accounts = await database.get<Account>('accounts')
+      .query(Q.where('name', name))
+      .fetch();
+    
+    return accounts.length > 0 ? accounts[0] : null;
+  }
+
+  static async findCategoryByName(name: string): Promise<any | null> {
+    const categories = await database.get<Category>('categories')
+      .query(Q.where('name', name))
+      .fetch();
+    
+    return categories.length > 0 ? categories[0] : null;
+  }
+
+  static async findTransactionByUniqueFields(transactionData: any): Promise<any | null> {
+    const transactions = await database.get<Transaction>('transactions')
+      .query(
+        Q.where('account_id', transactionData.accountId),
+        Q.where('amount', transactionData.amount),
+        Q.where('type', transactionData.type),
+        Q.where('date', transactionData.date)
+      )
+      .fetch();
+    
+    return transactions.length > 0 ? transactions[0] : null;
+  }
+
+  static async findDebtByName(name: string): Promise<any | null> {
+    const debts = await database.get<Debt>('debts')
+      .query(Q.where('name', name))
+      .fetch();
+    
+    return debts.length > 0 ? debts[0] : null;
+  }
+
   // Методы для синхронизации
   static async getLastSyncTime(): Promise<string | null> {
     const metadata = await database.get<SyncMetadata>('sync_metadata').query().fetch();
@@ -566,38 +614,69 @@ export class WatermelonDatabaseService {
     /* 1.--- ACCOUNTS  ------------------------------------------------------ */
     const accounts = await database
       .get<Account>('accounts')
-      .query(Q.where('updated_at', Q.gt(lastSyncDate.getTime())))
+      .query(Q.or(
+        Q.where('synced_at', Q.lte(lastSyncDate.getTime())),
+        Q.where('synced_at', Q.eq(null))
+      ))
       .fetch();
   
     /* 2.--- CATEGORIES  ---------------------------------------------------- */
-    const categories = await database.get<Category>('categories').query().fetch();
+    const categories = await database
+      .get<Category>('categories')
+      .query(Q.or(
+        Q.where('synced_at', Q.lte(lastSyncDate.getTime())),
+        Q.where('synced_at', Q.eq(null))
+      ))
+      .fetch();
   
     /* 3.--- TRANSACTIONS  ➜   добавляем   account_id  и  category_id  ------- */
     const transactions = await database
       .get<Transaction>('transactions')
-      .query(Q.where('updated_at', Q.gt(lastSyncDate.getTime())))
+      .query(Q.or(
+        Q.where('synced_at', Q.lte(lastSyncDate.getTime())),
+        Q.where('synced_at', Q.eq(null))
+      ))
       .fetch();
   
-    const txPayload = transactions.map(t => ({
-      id:           t._raw.id,
-      account_id:   t.accountId,     // ←   важные поля
-      category_id:  t.categoryId,    // ←   важные поля
-      amount:       t.amount,
-      type:         t.type,
-      date:         t.date,
-      description:  t.description,
-      created_at:   t.createdAt.toISOString(),
-      updated_at:   t.updatedAt.toISOString(),
-    }));
+    const txPayload = transactions.map(t => {
+      // Проверяем, является ли categoryId валидным UUID
+      const isValidUUID = (str: string) => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(str);
+      };
+      
+      return {
+        id:           t._raw.id,
+        account_id:   t.accountId,     // ←   важные поля
+        category_id:  t.categoryId && isValidUUID(t.categoryId) ? t.categoryId : undefined,    // ←   проверяем UUID
+        amount:       t.amount,
+        type:         t.type,
+        date:         t.date,
+        description:  t.description,
+        created_at:   t.createdAt.toISOString(),
+        updated_at:   t.updatedAt.toISOString(),
+      };
+    });
   
     /* 4.--- DEBTS ---------------------------------------------------------- */
     const debts = await database
       .get<Debt>('debts')
-      .query(Q.where('updated_at', Q.gt(lastSyncDate.getTime())))
+      .query(Q.or(
+        Q.where('synced_at', Q.lte(lastSyncDate.getTime())),
+        Q.where('synced_at', Q.eq(null))
+      ))
       .fetch();
   
     /* 5.--- EXCHANGE RATES ------------------------------------------------- */
     const exchangeRates = await database.get<ExchangeRate>('exchange_rates').query().fetch();
+  
+    console.log('📊 [WatermelonDatabase] Несинхронизированные данные:', {
+      accounts: accounts.length,
+      categories: categories.length,
+      transactions: transactions.length,
+      debts: debts.length,
+      lastSyncDate: lastSyncDate.toISOString()
+    });
   
     /* --- возвращаем всё сразу -------------------------------------------- */
     return {
@@ -617,22 +696,30 @@ export class WatermelonDatabaseService {
   
 
   private static async modelsToObjects(models: any[]): Promise<any[]> {
-    return models.map(model => {
-      const obj: any = { id: model._raw.id };
-      const raw = model._raw;
-      
-      Object.keys(raw).forEach(key => {
-        if (key !== 'id' && key !== '_status' && key !== '_changed') {
-          if (key === 'created_at' || key === 'updated_at' || key === 'synced_at') {
-            obj[this.snakeToCamel(key)] = raw[key] ? new Date(raw[key]).toISOString() : null;
-          } else {
-            obj[this.snakeToCamel(key)] = raw[key];
-          }
-        }
-      });
-      
-      return obj;
-    });
+    return models.map(acc => ({
+      id: acc._raw.id,
+      name: acc.name,
+      type: acc.type,
+      balance: acc.balance,
+      currency: acc.currency,
+      exchangeRate: acc.exchangeRate,
+      cardNumber: acc.cardNumber,
+      color: acc.color,
+      icon: acc.icon,
+      isDefault: acc.isDefault,
+      isIncludedInTotal: acc.isIncludedInTotal,
+      targetAmount: acc.targetAmount,
+      linkedAccountId: acc.linkedAccountId,
+      savedAmount: acc.savedAmount,
+      creditStartDate: acc.creditStartDate,
+      creditTerm: acc.creditTerm,
+      creditRate: acc.creditRate,
+      creditPaymentType: acc.creditPaymentType,
+      creditInitialAmount: acc.creditInitialAmount,
+      createdAt: acc.createdAt ? acc.createdAt.toISOString() : undefined,
+      updatedAt: acc.updatedAt ? acc.updatedAt.toISOString() : undefined,
+      syncedAt: acc.syncedAt ? acc.syncedAt.toISOString() : undefined,
+    }));
   }
 
   private static snakeToCamel(str: string): string {
@@ -654,6 +741,29 @@ export class WatermelonDatabaseService {
   }
 
   static async resetAllData(defaultCurrency: string = 'USD'): Promise<void> {
+    console.log('🔄 [WatermelonDatabase] Начинаем сброс всех данных...');
+    
+    // 1. Сбрасываем данные на сервере используя новый CloudSyncService
+    try {
+      const token = await AsyncStorage.getItem('@cashcraft_access_token');
+      if (token && this.currentUserId) {
+        console.log('🌐 [WatermelonDatabase] Отправляем запрос на сброс данных через CloudSyncService...');
+        const { CloudSyncService } = await import('./cloudSync');
+        const serverResetSuccess = await CloudSyncService.wipeData(this.currentUserId, token);
+        
+        if (serverResetSuccess) {
+          console.log('✅ [WatermelonDatabase] Данные на сервере успешно сброшены через CloudSyncService');
+        } else {
+          console.warn('⚠️ [WatermelonDatabase] Не удалось сбросить данные на сервере через CloudSyncService');
+        }
+      }
+    } catch (serverError) {
+      console.warn('⚠️ [WatermelonDatabase] Ошибка при сбросе данных на сервере:', serverError);
+      // Продолжаем с локальным сбросом даже если сервер недоступен
+    }
+    
+    // 2. Сбрасываем локальные данные
+    console.log('📱 [WatermelonDatabase] Сбрасываем локальные данные...');
     await database.write(async () => {
       // Удаляем все данные
       const tables = ['accounts', 'transactions', 'categories', 'debts', 'exchange_rates', 'settings', 'sync_metadata'];
@@ -666,7 +776,74 @@ export class WatermelonDatabaseService {
 
     // Переинициализируем базу данных
     this.isInitialized = false;
-    await this.initDatabase(defaultCurrency);
+    // НЕ вызываем initDatabase - пользователь сам решит что создавать
+    console.log('🔄 [WatermelonDatabase] База данных очищена, дефолтные данные не создаются');
+    
+    // 3. Устанавливаем флаг сброса данных
+    if (this.currentUserId) {
+      console.log('🏷️ [WatermelonDatabase] Устанавливаем флаг сброса данных...');
+      await AsyncStorage.setItem(`dataReset_${this.currentUserId}`, 'true');
+    }
+    
+    console.log('✅ [WatermelonDatabase] Сброс всех данных завершен успешно');
+  }
+
+  /**
+   * Полностью очищает все данные в локальной базе WatermelonDB
+   * Используется после успешного сброса данных на сервере
+   * @param defaultCurrency - валюта по умолчанию для переинициализации
+   */
+  static async clearAllData(defaultCurrency: string = 'USD'): Promise<void> {
+    console.log('🗑️ [WatermelonDatabase] Начинаем полную очистку локальной базы данных...');
+    
+    try {
+      // 1. Очищаем все таблицы
+      console.log('📊 [WatermelonDatabase] Очищаем все таблицы...');
+      await database.write(async () => {
+        const tables = [
+          'accounts',
+          'transactions', 
+          'categories',
+          'debts',
+          'exchange_rates',
+          'settings',
+          'sync_metadata'
+        ];
+        
+        for (const table of tables) {
+          console.log(`   🗑️ Очищаем таблицу: ${table}`);
+          const records = await database.get(table).query().fetch();
+          const deletedCount = records.length;
+          
+          if (deletedCount > 0) {
+            await Promise.all(records.map(record => record.destroyPermanently()));
+            console.log(`   ✅ Удалено ${deletedCount} записей из ${table}`);
+          } else {
+            console.log(`   ℹ️ Таблица ${table} уже пуста`);
+          }
+        }
+      });
+      
+      // 2. Сбрасываем состояние инициализации
+      console.log('🔄 [WatermelonDatabase] Сбрасываем состояние инициализации...');
+      this.isInitialized = false;
+      this.lastInitError = null;
+      
+      // 3. НЕ переинициализируем базу данных - пользователь сам решит что создавать
+      console.log('🔄 [WatermelonDatabase] База данных очищена, дефолтные данные не создаются');
+      
+      // 4. Устанавливаем флаг сброса данных
+      if (this.currentUserId) {
+        console.log('🏷️ [WatermelonDatabase] Устанавливаем флаг сброса данных...');
+        await AsyncStorage.setItem(`dataReset_${this.currentUserId}`, 'true');
+      }
+      
+      console.log('✅ [WatermelonDatabase] Полная очистка локальной базы данных завершена успешно');
+      
+    } catch (error) {
+      console.error('❌ [WatermelonDatabase] Ошибка при очистке локальной базы данных:', error);
+      throw new Error(`Failed to clear local database: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   static async updateDefaultCurrency(newCurrency: string): Promise<void> {
@@ -755,6 +932,98 @@ export class WatermelonDatabaseService {
     this.isInitialized = false;
     await this.initDatabase(defaultCurrency);
     console.log('[WatermelonDatabase] Переинициализация завершена');
+  }
+
+  // Upsert методы для предотвращения дублирования
+  static async upsertAccount(accountData: any): Promise<any> {
+    // Ищем существующий счет по id
+    let account = null;
+    try {
+      account = await database.get<Account>('accounts').find(accountData.id);
+    } catch (e) {}
+    if (account) {
+      // Обновляем существующий
+      await database.write(async () => {
+        await account.update(acc => {
+          acc.name = accountData.name;
+          acc.type = accountData.type;
+          acc.balance = accountData.balance || 0;
+          acc.currency = accountData.currency || 'USD';
+          acc.exchangeRate = accountData.exchangeRate || 1;
+          acc.cardNumber = accountData.cardNumber;
+          acc.icon = accountData.icon;
+          acc.isDefault = accountData.isDefault || false;
+          acc.isIncludedInTotal = accountData.isIncludedInTotal !== false;
+          acc.targetAmount = accountData.targetAmount;
+          acc.linkedAccountId = accountData.linkedAccountId;
+          acc.savedAmount = accountData.savedAmount || 0;
+          acc.creditStartDate = accountData.creditStartDate;
+          acc.creditTerm = accountData.creditTerm;
+          acc.creditRate = accountData.creditRate;
+          acc.creditPaymentType = accountData.creditPaymentType;
+          acc.creditInitialAmount = accountData.creditInitialAmount;
+        });
+      });
+      return account;
+    } else {
+      // Создаем новый
+      return await this.createAccount(accountData);
+    }
+  }
+
+  static async upsertCategory(categoryData: any): Promise<any> {
+    // Ищем существующую категорию по имени
+    const existingCategory = await this.findCategoryByName(categoryData.name);
+    
+    if (existingCategory) {
+      console.log(`🔄 [WatermelonDB] Обновляем существующую категорию: ${categoryData.name}`);
+      await this.updateCategory(existingCategory._raw.id, categoryData);
+      return {
+        ...categoryData,
+        id: existingCategory._raw.id,
+      };
+    } else {
+      console.log(`➕ [WatermelonDB] Создаем новую категорию: ${categoryData.name}`);
+      return await this.createCategory(categoryData);
+    }
+  }
+
+  static async upsertTransaction(transactionData: any): Promise<any> {
+    // Ищем существующую транзакцию по уникальным полям
+    const existingTransaction = await this.findTransactionByUniqueFields(transactionData);
+    
+    if (existingTransaction) {
+      console.log(`🔄 [WatermelonDB] Обновляем существующую транзакцию: ${transactionData.amount} ${transactionData.type}`);
+      await this.updateTransaction(existingTransaction._raw.id, existingTransaction, transactionData);
+      return {
+        ...transactionData,
+        id: existingTransaction._raw.id,
+        createdAt: existingTransaction.createdAt.toISOString(),
+        updatedAt: existingTransaction.updatedAt.toISOString(),
+      };
+    } else {
+      console.log(`➕ [WatermelonDB] Создаем новую транзакцию: ${transactionData.amount} ${transactionData.type}`);
+      return await this.createTransaction(transactionData);
+    }
+  }
+
+  static async upsertDebt(debtData: any): Promise<any> {
+    // Ищем существующий долг по имени
+    const existingDebt = await this.findDebtByName(debtData.name);
+    
+    if (existingDebt) {
+      console.log(`🔄 [WatermelonDB] Обновляем существующий долг: ${debtData.name}`);
+      await this.updateDebt(existingDebt._raw.id, debtData);
+      return {
+        ...debtData,
+        id: existingDebt._raw.id,
+        createdAt: existingDebt.createdAt.toISOString(),
+        updatedAt: existingDebt.updatedAt.toISOString(),
+      };
+    } else {
+      console.log(`➕ [WatermelonDB] Создаем новый долг: ${debtData.name}`);
+      return await this.createDebt(debtData);
+    }
   }
 }
 

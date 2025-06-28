@@ -119,8 +119,12 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         const isGuest = await AsyncStorage.getItem('isGuest');
         console.log('👤 [DataContext] isGuest:', isGuest);
         
-        if (isGuest !== 'true') {
-          console.log('☁️ [DataContext] Пользователь не гость, пытаемся загрузить данные из облака...');
+        // Проверяем, был ли выполнен сброс данных
+        const wasDataReset = await AsyncStorage.getItem(`dataReset_${userId}`);
+        console.log('🔄 [DataContext] Флаг сброса данных:', wasDataReset);
+        
+        if (isGuest !== 'true' && !wasDataReset) {
+          console.log('☁️ [DataContext] Пользователь не гость и данные не сбрасывались, пытаемся загрузить данные из облака...');
           let token = await ApiService.getAccessToken();
           console.log('🔑 [DataContext] Access token при инициализации:', token ? 'Есть' : 'Нет');
           
@@ -140,20 +144,96 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
           }
           
           if (token) {
-            console.log('☁️ [DataContext] Пытаемся загрузить данные из облака...');
-            // Пытаемся загрузить данные из облака при первом входе
-            const hasCloudData = await CloudSyncService.downloadData(userId, token);
-            console.log('☁️ [DataContext] Результат загрузки из облака:', hasCloudData ? 'Успешно' : 'Неудачно');
+            console.log('☁️ [DataContext] Начинаем правильную синхронизацию...');
             
-            if (hasCloudData) {
-              console.log('📊 [DataContext] Данные загружены из облака, обновляем локальные данные...');
-              await refreshData();
+            // Проверяем, есть ли данные в локальной базе (кроме базовых)
+            const [accountsFromDb, transactionsFromDb, categoriesFromDb, debtsFromDb] = await Promise.all([
+              LocalDatabaseService.getAccounts(),
+              LocalDatabaseService.getTransactions(),
+              LocalDatabaseService.getCategories(),
+              LocalDatabaseService.getDebts()
+            ]);
+            
+            const hasLocalData = accountsFromDb.length > 1 || // Больше 1 (счет "Наличные" остается)
+                                transactionsFromDb.length > 0 ||
+                                categoriesFromDb.length > 11 || // Больше 11 (базовые категории)
+                                debtsFromDb.length > 0;
+            
+            if (hasLocalData) {
+              console.log('📊 [DataContext] Обнаружены локальные данные, используем стандартную синхронизацию');
+              // ПРАВИЛЬНЫЙ ПОРЯДОК: сначала отправляем локальные изменения, потом загружаем с сервера
+              console.log('📤 [DataContext] 1. Отправляем локальные изменения на сервер...');
+              const syncSuccess = await CloudSyncService.syncData(userId, token);
+              console.log('📤 [DataContext] Результат отправки:', syncSuccess ? 'Успешно' : 'Неудачно');
+              
+              console.log('📥 [DataContext] 2. Загружаем обновленные данные с сервера...');
+              const hasCloudData = await CloudSyncService.downloadData(userId, token);
+              console.log('📥 [DataContext] Результат загрузки:', hasCloudData ? 'Успешно' : 'Неудачно');
+              
+              if (hasCloudData) {
+                console.log('📊 [DataContext] Данные загружены с сервера, обновляем локальные данные...');
+                await refreshData();
+              } else {
+                console.log('⚠️ [DataContext] Не удалось загрузить данные с сервера');
+              }
             } else {
-              console.log('⚠️ [DataContext] Не удалось загрузить данные из облака');
+              console.log('📊 [DataContext] Локальная база пустая (перезаход в аккаунт), сначала загружаем с сервера');
+              // ПРИ ПЕРЕЗАХОДЕ: сначала загружаем с сервера, потом синхронизируем
+              console.log('📥 [DataContext] 1. Загружаем данные с сервера...');
+              const hasCloudData = await CloudSyncService.downloadData(userId, token);
+              console.log('📥 [DataContext] Результат загрузки:', hasCloudData ? 'Успешно' : 'Неудачно');
+              
+              if (hasCloudData) {
+                console.log('📊 [DataContext] Данные загружены с сервера, обновляем локальные данные...');
+                await refreshData();
+              } else {
+                console.log('⚠️ [DataContext] Не удалось загрузить данные с сервера');
+              }
+              
+              // После загрузки данных с сервера синхронизируем локальные изменения (если есть)
+              console.log('📤 [DataContext] 2. Синхронизируем локальные изменения (если есть)...');
+              const syncSuccess = await CloudSyncService.syncData(userId, token);
+              console.log('📤 [DataContext] Результат синхронизации:', syncSuccess ? 'Успешно' : 'Неудачно');
             }
           } else {
-            console.log('❌ [DataContext] Нет токена для загрузки данных из облака');
+            console.log('❌ [DataContext] Нет токена для синхронизации');
           }
+        } else if (wasDataReset) {
+          console.log('🔄 [DataContext] Данные были сброшены, проверяем локальную базу...');
+          
+          // Проверяем, есть ли старые данные в локальной базе
+          const [accountsFromDb, transactionsFromDb, categoriesFromDb, debtsFromDb] = await Promise.all([
+            LocalDatabaseService.getAccounts(),
+            LocalDatabaseService.getTransactions(),
+            LocalDatabaseService.getCategories(),
+            LocalDatabaseService.getDebts()
+          ]);
+          
+          const hasOldData = accountsFromDb.length > 1 || // Больше 1 (счет "Наличные" остается)
+                            transactionsFromDb.length > 0 ||
+                            categoriesFromDb.length > 11 || // Больше 11 (базовые категории)
+                            debtsFromDb.length > 0;
+          
+          if (hasOldData) {
+            console.log('🧹 [DataContext] Обнаружены старые данные в локальной базе, очищаем...');
+            console.log('  - Счета:', accountsFromDb.length);
+            console.log('  - Транзакции:', transactionsFromDb.length);
+            console.log('  - Категории:', categoriesFromDb.length);
+            console.log('  - Долги:', debtsFromDb.length);
+            
+            // Полностью очищаем локальную базу
+            await LocalDatabaseService.clearAllData(defaultCurrency);
+            console.log('✅ [DataContext] Локальная база полностью очищена');
+            
+            // Обновляем данные из очищенной базы
+            await refreshData();
+          } else {
+            console.log('✅ [DataContext] Локальная база уже чистая');
+          }
+          
+          // Очищаем флаг сброса данных только после полной очистки
+          await AsyncStorage.removeItem(`dataReset_${userId}`);
+          console.log('🧹 [DataContext] Флаг сброса данных очищен');
         } else {
           console.log('👤 [DataContext] Гостевой режим, пропускаем загрузку из облака');
         }
@@ -188,6 +268,29 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     const isGuest = await AsyncStorage.getItem('isGuest');
     if (isGuest === 'true' || !userId) return;
     
+    // Проверяем, был ли выполнен сброс данных
+    const wasDataReset = await AsyncStorage.getItem(`dataReset_${userId}`);
+    if (wasDataReset) {
+      console.log('🔄 [DataContext] Автосинхронизация отключена - данные были сброшены');
+      return;
+    }
+    
+    // Дополнительная проверка: если есть старые данные после сброса, не запускаем автосинхронизацию
+    try {
+      const [accountsFromDb, transactionsFromDb] = await Promise.all([
+        LocalDatabaseService.getAccounts(),
+        LocalDatabaseService.getTransactions()
+      ]);
+      
+      const hasOldData = accountsFromDb.length > 1 || transactionsFromDb.length > 0;
+      if (hasOldData && wasDataReset) {
+        console.log('🔄 [DataContext] Автосинхронизация отключена - обнаружены старые данные после сброса');
+        return;
+      }
+    } catch (error) {
+      console.log('⚠️ [DataContext] Не удалось проверить локальные данные в startAutoSync:', error);
+    }
+    
     // Синхронизация каждые 5 минут
     const interval = setInterval(() => {
       syncData();
@@ -208,6 +311,29 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     
     const isGuest = await AsyncStorage.getItem('isGuest');
     if (isGuest === 'true') return;
+    
+    // Проверяем, был ли выполнен сброс данных
+    const wasDataReset = await AsyncStorage.getItem(`dataReset_${userId}`);
+    if (wasDataReset) {
+      console.log('🔄 [DataContext] Синхронизация пропущена - данные были сброшены');
+      return;
+    }
+    
+    // Дополнительная проверка: если есть старые данные после сброса, не синхронизируем
+    try {
+      const [accountsFromDb, transactionsFromDb] = await Promise.all([
+        LocalDatabaseService.getAccounts(),
+        LocalDatabaseService.getTransactions()
+      ]);
+      
+      const hasOldData = accountsFromDb.length > 1 || transactionsFromDb.length > 0;
+      if (hasOldData && wasDataReset) {
+        console.log('🔄 [DataContext] Синхронизация пропущена - обнаружены старые данные после сброса');
+        return;
+      }
+    } catch (error) {
+      console.log('⚠️ [DataContext] Не удалось проверить локальные данные:', error);
+    }
     
     setIsSyncing(true);
     
@@ -838,10 +964,48 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         throw new Error('Пользователь не авторизован');
       }
       
-      await LocalDatabaseService.resetAllData(defaultCurrency);
+      console.log('🔄 [DataContext] Начинаем сброс всех данных...');
+      
+      // 1. Сбрасываем данные на сервере используя новый CloudSyncService
+      let serverResetSuccess = false;
+      try {
+        const token = await AsyncStorage.getItem('@cashcraft_access_token');
+        if (token) {
+          console.log('🌐 [DataContext] Отправляем запрос на сброс данных через CloudSyncService...');
+          serverResetSuccess = await CloudSyncService.wipeData(userId, token);
+          
+          if (serverResetSuccess) {
+            console.log('✅ [DataContext] Данные на сервере успешно сброшены через CloudSyncService');
+          } else {
+            console.warn('⚠️ [DataContext] Не удалось сбросить данные на сервере через CloudSyncService');
+          }
+        }
+      } catch (serverError) {
+        console.warn('⚠️ [DataContext] Ошибка при сбросе данных на сервере:', serverError);
+      }
+      
+      // 2. Очищаем локальные данные
+      if (serverResetSuccess) {
+        // Если серверный сброс успешен, используем clearAllData для полной очистки
+        console.log('📱 [DataContext] Серверный сброс успешен, полностью очищаем локальную базу...');
+        await LocalDatabaseService.clearAllData(defaultCurrency);
+      } else {
+        // Если серверный сброс не удался, используем обычный resetAllData
+        console.log('📱 [DataContext] Серверный сброс не удался, используем обычный сброс...');
+        await LocalDatabaseService.resetAllData(defaultCurrency);
+      }
+      
+      // 3. Устанавливаем флаг сброса данных
+      console.log('🏷️ [DataContext] Устанавливаем флаг сброса данных...');
+      await AsyncStorage.setItem(`dataReset_${userId}`, 'true');
+      
+      // 4. Обновляем состояние приложения
+      console.log('🔄 [DataContext] Обновляем состояние приложения...');
       await refreshData();
+      
+      console.log('✅ [DataContext] Сброс всех данных завершен успешно');
     } catch (error) {
-      console.error('Error resetting data:', error);
+      console.error('❌ [DataContext] Ошибка при сбросе данных:', error);
       // Если база данных не инициализирована, пробуем инициализировать заново
       if (error instanceof Error && error.message.includes('База данных не инициализирована')) {
         try {

@@ -30,11 +30,11 @@ export const getLocalizedCategoryName = (categoryId: string, t: (key: string) =>
 
 // Получить категорию с локализованным названием
 export const getLocalizedCategory = (category: Category, t: (key: string) => string): Category => {
-  // Если это системная категория, используем локализованное название
-  if (CATEGORY_NAMES[category.id as keyof typeof CATEGORY_NAMES]) {
+  // Если это системная категория (проверяем по name), используем локализованное название
+  if (CATEGORY_NAMES[category.name as keyof typeof CATEGORY_NAMES]) {
     return {
       ...category,
-      name: getLocalizedCategoryName(category.id, t)
+      name: t(CATEGORY_NAMES[category.name as keyof typeof CATEGORY_NAMES])
     };
   }
   // Для пользовательских категорий возвращаем как есть
