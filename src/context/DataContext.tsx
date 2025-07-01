@@ -110,6 +110,22 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         if (!LocalDatabaseService.isDatabaseReady()) {
           console.log('⚠️ [DataContext] База данных не готова, пытаемся переинициализировать...');
           await LocalDatabaseService.forceReinitialize(defaultCurrency);
+          
+          // Дополнительная проверка после переинициализации
+          if (!LocalDatabaseService.isDatabaseReady()) {
+            console.error('❌ [DataContext] База данных все еще не готова после переинициализации');
+            throw new Error('База данных не может быть инициализирована');
+          }
+        }
+        
+        console.log('✅ [DataContext] База данных успешно инициализирована и готова к работе');
+        
+        // Очищаем fallback данные, так как база данных работает
+        try {
+          await AsyncStorage.removeItem('fallback_cloud_data');
+          console.log('🧹 [DataContext] Fallback данные очищены при инициализации');
+        } catch (clearError) {
+          console.log('⚠️ [DataContext] Не удалось очистить fallback данные при инициализации:', clearError);
         }
         
         console.log('📊 [DataContext] Обновляем данные из базы...');
@@ -291,12 +307,14 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       console.log('⚠️ [DataContext] Не удалось проверить локальные данные в startAutoSync:', error);
     }
     
-    // Синхронизация каждые 5 минут
-    const interval = setInterval(() => {
-      syncData();
-    }, 5 * 60 * 1000);
+    // ОТКЛЮЧАЕМ автоматическую синхронизацию каждые 5 минут
+    // Теперь синхронизация происходит только мгновенно после каждого действия
+    console.log('🔄 [DataContext] Автоматическая синхронизация отключена - используется мгновенная синхронизация');
     
-    setSyncInterval(interval);
+    // const interval = setInterval(() => {
+    //   syncData();
+    // }, 5 * 60 * 1000);
+    // setSyncInterval(interval);
   };
 
   const stopAutoSync = () => {
@@ -306,95 +324,282 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
+  // Функция для мгновенной синхронизации с логированием
+  const instantSync = async (action: string) => {
+    try {
+      console.log(`🔄 [DataContext] Мгновенная синхронизация после ${action}...`);
+      console.log(`📊 [DataContext] Текущее состояние данных:`);
+      console.log(`   - Счета: ${accounts.length}`);
+      console.log(`   - Транзакции: ${transactions.length}`);
+      console.log(`   - Категории: ${categories.length}`);
+      console.log(`   - Долги: ${debts.length}`);
+      
+      await syncData();
+      console.log(`✅ [DataContext] ${action} завершено и синхронизировано`);
+    } catch (error) {
+      console.error(`❌ [DataContext] Ошибка синхронизации после ${action}:`, error);
+      console.log(`⚠️ [DataContext] Детали ошибки:`, {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+  };
+
   const syncData = async () => {
-    if (!userId || isSyncing) return;
+    console.log('🔄 [DataContext] Начинаем синхронизацию данных...');
+    console.log('👤 [DataContext] userId:', userId);
+    console.log('🔄 [DataContext] isSyncing:', isSyncing);
+    
+    if (!userId || isSyncing) {
+      console.log('⚠️ [DataContext] Синхронизация пропущена - нет userId или уже синхронизируемся');
+      return;
+    }
     
     const isGuest = await AsyncStorage.getItem('isGuest');
-    if (isGuest === 'true') return;
+    console.log('👤 [DataContext] isGuest:', isGuest);
+    if (isGuest === 'true') {
+      console.log('⚠️ [DataContext] Синхронизация пропущена - пользователь гость');
+      return;
+    }
     
     // Проверяем, был ли выполнен сброс данных
     const wasDataReset = await AsyncStorage.getItem(`dataReset_${userId}`);
+    console.log('🔄 [DataContext] Флаг сброса данных:', wasDataReset);
     if (wasDataReset) {
       console.log('🔄 [DataContext] Синхронизация пропущена - данные были сброшены');
       return;
     }
     
     // Дополнительная проверка: если есть старые данные после сброса, не синхронизируем
+    console.log('🔍 [DataContext] Проверяем локальные данные...');
     try {
       const [accountsFromDb, transactionsFromDb] = await Promise.all([
         LocalDatabaseService.getAccounts(),
         LocalDatabaseService.getTransactions()
       ]);
       
+      console.log('📊 [DataContext] Данные из локальной базы:');
+      console.log('   - Счета:', accountsFromDb.length);
+      console.log('   - Транзакции:', transactionsFromDb.length);
+      
+      // Проверяем также данные в состоянии React (fallback режим)
+      console.log('📊 [DataContext] Данные в состоянии React:');
+      console.log('   - Счета:', accounts.length);
+      console.log('   - Транзакции:', transactions.length);
+      
       const hasOldData = accountsFromDb.length > 1 || transactionsFromDb.length > 0;
+      const hasFallbackData = accounts.length > 0 || transactions.length > 0;
+      
+      console.log('🔍 [DataContext] hasOldData:', hasOldData, 'hasFallbackData:', hasFallbackData);
+      
       if (hasOldData && wasDataReset) {
         console.log('🔄 [DataContext] Синхронизация пропущена - обнаружены старые данные после сброса');
         return;
+      }
+      
+      // Если есть данные в fallback режиме, сохраняем их перед синхронизацией
+      if (hasFallbackData && !hasOldData) {
+        console.log('💾 [DataContext] Сохраняем fallback данные перед синхронизацией...');
+        try {
+          const fallbackData = {
+            accounts: accounts,
+            transactions: transactions,
+            categories: categories,
+            debts: debts,
+            exchangeRates: [],
+            lastSyncAt: new Date().toISOString(),
+            userId: userId || ''
+          };
+          await AsyncStorage.setItem('fallback_cloud_data', JSON.stringify(fallbackData));
+          console.log('✅ [DataContext] Fallback данные сохранены');
+        } catch (fallbackError) {
+          console.error('❌ [DataContext] Ошибка сохранения fallback данных:', fallbackError);
+        }
       }
     } catch (error) {
       console.log('⚠️ [DataContext] Не удалось проверить локальные данные:', error);
     }
     
+    console.log('🔄 [DataContext] Устанавливаем флаг синхронизации...');
     setIsSyncing(true);
     
     try {
+      console.log('🔑 [DataContext] Получаем токен доступа...');
       let token = await ApiService.getAccessToken();
+      console.log('🔑 [DataContext] Токен получен:', token ? 'Есть' : 'Нет');
       
       // Если токена нет, пытаемся обновить
       if (!token) {
-        console.log('[DataContext] Токен отсутствует, пытаемся обновить...');
+        console.log('🔄 [DataContext] Токен отсутствует, пытаемся обновить...');
         const refreshToken = await ApiService.getRefreshToken();
+        console.log('🔄 [DataContext] Refresh token:', refreshToken ? 'Есть' : 'Нет');
+        
         if (refreshToken) {
+          console.log('🔄 [DataContext] Обновляем токен через AuthService...');
           const newTokens = await AuthService.refreshToken(refreshToken);
           if (newTokens) {
-            console.log('[DataContext] Токен обновлен после ошибки 401');
+            console.log('✅ [DataContext] Токен обновлен после ошибки 401');
             // Повторяем синхронизацию с новым токеном
+            console.log('🔄 [DataContext] Повторяем синхронизацию с новым токеном...');
             const success = await CloudSyncService.syncData(userId, newTokens.accessToken);
-            if (success) {
-              const syncTime = await LocalDatabaseService.getLastSyncTime();
-              setLastSyncTime(syncTime);
-              return; // Успешно обновили токен и синхронизировали
-            }
+            console.log('📤 [DataContext] Результат повторной синхронизации:', success ? 'Успешно' : 'Неудачно');
+            
+                          if (success) {
+                const syncTime = await LocalDatabaseService.getLastSyncTime();
+                setLastSyncTime(syncTime);
+                console.log('✅ [DataContext] Синхронизация завершена успешно');
+                return; // Успешно обновили токен и синхронизировали
+              } else {
+                console.log('❌ [DataContext] Повторная синхронизация не удалась');
+                
+                // Восстанавливаем данные из fallback
+                console.log('🔄 [DataContext] Восстанавливаем данные из fallback после неудачной повторной синхронизации...');
+                const fallbackData = await CloudSyncService.getFallbackData();
+                if (fallbackData) {
+                  console.log('📊 [DataContext] Восстанавливаем данные из fallback хранилища...');
+                  setAccounts(fallbackData.accounts || []);
+                  setTransactions(fallbackData.transactions || []);
+                  setCategories(fallbackData.categories || []);
+                  setDebts(fallbackData.debts || []);
+                  
+                  // Вычисляем общий баланс
+                  const total = (fallbackData.accounts || [])
+                    .filter(account => account.isIncludedInTotal !== false)
+                    .reduce((sum, account) => {
+                      let balance = account.balance;
+                      if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+                        balance = account.balance * (account as any).exchangeRate;
+                      }
+                      return sum + balance;
+                    }, 0);
+                  
+                  setTotalBalance(total);
+                  console.log('✅ [DataContext] Данные восстановлены из fallback');
+                }
+              }
+          } else {
+            console.log('❌ [DataContext] Не удалось обновить токен');
           }
+        } else {
+          console.log('❌ [DataContext] Refresh token не найден');
         }
       }
       
       if (token) {
+        console.log('🔄 [DataContext] Начинаем основную синхронизацию через CloudSyncService...');
         const success = await CloudSyncService.syncData(userId, token);
+        console.log('📤 [DataContext] Результат основной синхронизации:', success ? 'Успешно' : 'Неудачно');
+        
         if (success) {
           const syncTime = await LocalDatabaseService.getLastSyncTime();
           setLastSyncTime(syncTime);
+          console.log('✅ [DataContext] Время синхронизации обновлено:', syncTime);
+        } else {
+          console.log('❌ [DataContext] Синхронизация не удалась');
+          
+          // Если синхронизация не удалась, восстанавливаем данные из fallback
+          console.log('🔄 [DataContext] Восстанавливаем данные из fallback после неудачной синхронизации...');
+          const fallbackData = await CloudSyncService.getFallbackData();
+          if (fallbackData) {
+            console.log('📊 [DataContext] Восстанавливаем данные из fallback хранилища...');
+            setAccounts(fallbackData.accounts || []);
+            setTransactions(fallbackData.transactions || []);
+            setCategories(fallbackData.categories || []);
+            setDebts(fallbackData.debts || []);
+            
+            // Вычисляем общий баланс
+            const total = (fallbackData.accounts || [])
+              .filter(account => account.isIncludedInTotal !== false)
+              .reduce((sum, account) => {
+                let balance = account.balance;
+                if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+                  balance = account.balance * (account as any).exchangeRate;
+                }
+                return sum + balance;
+              }, 0);
+            
+            setTotalBalance(total);
+            console.log('✅ [DataContext] Данные восстановлены из fallback');
+          }
         }
+      } else {
+        console.log('❌ [DataContext] Нет токена для синхронизации');
       }
     } catch (error) {
-      console.error('Sync error:', error);
+      console.error('❌ [DataContext] Ошибка синхронизации:', error);
+      console.log('⚠️ [DataContext] Детали ошибки:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
       // Если ошибка 401, пытаемся обновить токен
       if (error instanceof Error && error.message.includes('401')) {
-        console.log('[DataContext] Ошибка 401, пытаемся обновить токен...');
+        console.log('🔄 [DataContext] Ошибка 401, пытаемся обновить токен...');
         try {
           const refreshToken = await ApiService.getRefreshToken();
+          console.log('🔄 [DataContext] Refresh token для обновления:', refreshToken ? 'Есть' : 'Нет');
+          
           if (refreshToken) {
+            console.log('🔄 [DataContext] Обновляем токен через AuthService...');
             const newTokens = await AuthService.refreshToken(refreshToken);
             if (newTokens) {
-              console.log('[DataContext] Токен обновлен после ошибки 401');
+              console.log('✅ [DataContext] Токен обновлен после ошибки 401');
               // Повторяем синхронизацию с новым токеном
+              console.log('🔄 [DataContext] Повторяем синхронизацию с новым токеном...');
               const success = await CloudSyncService.syncData(userId, newTokens.accessToken);
+              console.log('📤 [DataContext] Результат повторной синхронизации:', success ? 'Успешно' : 'Неудачно');
+              
               if (success) {
                 const syncTime = await LocalDatabaseService.getLastSyncTime();
                 setLastSyncTime(syncTime);
+                console.log('✅ [DataContext] Синхронизация завершена успешно после обновления токена');
                 return; // Успешно обновили токен и синхронизировали
+              } else {
+                console.log('❌ [DataContext] Синхронизация не удалась после обновления токена');
+                
+                // Восстанавливаем данные из fallback
+                console.log('🔄 [DataContext] Восстанавливаем данные из fallback после неудачной синхронизации с обновленным токеном...');
+                const fallbackData = await CloudSyncService.getFallbackData();
+                if (fallbackData) {
+                  console.log('📊 [DataContext] Восстанавливаем данные из fallback хранилища...');
+                  setAccounts(fallbackData.accounts || []);
+                  setTransactions(fallbackData.transactions || []);
+                  setCategories(fallbackData.categories || []);
+                  setDebts(fallbackData.debts || []);
+                  
+                  // Вычисляем общий баланс
+                  const total = (fallbackData.accounts || [])
+                    .filter(account => account.isIncludedInTotal !== false)
+                    .reduce((sum, account) => {
+                      let balance = account.balance;
+                      if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+                        balance = account.balance * (account as any).exchangeRate;
+                      }
+                      return sum + balance;
+                    }, 0);
+                  
+                  setTotalBalance(total);
+                  console.log('✅ [DataContext] Данные восстановлены из fallback');
+                }
               }
+            } else {
+              console.log('❌ [DataContext] Не удалось обновить токен');
             }
+          } else {
+            console.log('❌ [DataContext] Refresh token не найден для обновления');
           }
         } catch (refreshError) {
-          console.error('Failed to refresh token:', refreshError);
+          console.error('❌ [DataContext] Ошибка при обновлении токена:', refreshError);
         }
         // Если не удалось обновить токен, пробрасываем ошибку дальше
+        console.log('❌ [DataContext] Пробрасываем ошибку 401 дальше');
         throw error;
       }
       // Для других ошибок тоже пробрасываем
+      console.log('❌ [DataContext] Пробрасываем ошибку дальше');
       throw error;
     } finally {
+      console.log('🔄 [DataContext] Сбрасываем флаг синхронизации');
       setIsSyncing(false);
     }
   };
@@ -404,60 +609,100 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     
     try {
       // Проверяем готовность базы данных
-      const isDatabaseReady = LocalDatabaseService.isDatabaseReady();
+      let isDatabaseReady = LocalDatabaseService.isDatabaseReady();
       console.log('🗄️ [DataContext] Проверка готовности базы данных в refreshData:', isDatabaseReady);
       
       if (!isDatabaseReady) {
-        console.log('⚠️ [DataContext] База данных не готова, работаем в fallback режиме...');
+        console.log('⚠️ [DataContext] База данных не готова, пытаемся инициализировать...');
         
-        // Пытаемся загрузить данные из fallback хранилища
-        const fallbackData = await CloudSyncService.getFallbackData();
-        if (fallbackData) {
-          console.log('📊 [DataContext] Загружаем данные из fallback хранилища...');
+        try {
+          // Пытаемся инициализировать базу данных
+          await LocalDatabaseService.initDatabase(defaultCurrency);
+          console.log('✅ [DataContext] База данных успешно инициализирована');
+          isDatabaseReady = true;
           
-          // Обновляем данные из fallback
-          const fallbackAccounts = fallbackData.accounts || [];
-          const fallbackTransactions = fallbackData.transactions || [];
-          const fallbackCategories = fallbackData.categories || [];
-          const fallbackDebts = fallbackData.debts || [];
+          // Очищаем fallback данные, так как база данных теперь работает
+          try {
+            await AsyncStorage.removeItem('fallback_cloud_data');
+            console.log('🧹 [DataContext] Fallback данные очищены - база данных работает');
+          } catch (clearError) {
+            console.log('⚠️ [DataContext] Не удалось очистить fallback данные:', clearError);
+          }
+        } catch (initError) {
+          console.error('❌ [DataContext] Не удалось инициализировать базу данных:', initError);
+          console.log('⚠️ [DataContext] Работаем в fallback режиме...');
           
-          setAccounts(fallbackAccounts);
-          setTransactions(fallbackTransactions);
-          setCategories(fallbackCategories);
-          setDebts(fallbackDebts);
-          
-          console.log('📊 [DataContext] Данные из fallback хранилища:');
-          console.log('  - Счета:', fallbackAccounts.length);
-          console.log('  - Транзакции:', fallbackTransactions.length);
-          console.log('  - Категории:', fallbackCategories.length);
-          console.log('  - Долги:', fallbackDebts.length);
-          
-          // Вычисляем общий баланс
-          const total = fallbackAccounts
-            .filter(account => account.isIncludedInTotal !== false)
-            .reduce((sum, account) => {
-              let balance = account.balance;
-              // Если валюта счета отличается от основной и есть курс обмена
-              if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
-                balance = account.balance * (account as any).exchangeRate;
+          // Пытаемся загрузить данные из fallback хранилища
+          const fallbackData = await CloudSyncService.getFallbackData();
+          if (fallbackData) {
+            console.log('📊 [DataContext] Загружаем данные из fallback хранилища...');
+            
+            // Обновляем данные из fallback
+            const fallbackAccounts = fallbackData.accounts || [];
+            const fallbackTransactions = fallbackData.transactions || [];
+            const fallbackCategories = fallbackData.categories || [];
+            const fallbackDebts = fallbackData.debts || [];
+            
+            setAccounts(fallbackAccounts);
+            setTransactions(fallbackTransactions);
+            setCategories(fallbackCategories);
+            setDebts(fallbackDebts);
+            
+            console.log('📊 [DataContext] Данные из fallback хранилища:');
+            console.log('  - Счета:', fallbackAccounts.length);
+            console.log('  - Транзакции:', fallbackTransactions.length);
+            console.log('  - Категории:', fallbackCategories.length);
+            console.log('  - Долги:', fallbackDebts.length);
+            
+            // Вычисляем общий баланс
+            const total = fallbackAccounts
+              .filter(account => account.isIncludedInTotal !== false)
+              .reduce((sum, account) => {
+                let balance = account.balance;
+                // Если валюта счета отличается от основной и есть курс обмена
+                if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+                  balance = account.balance * (account as any).exchangeRate;
+                }
+                return sum + balance;
+              }, 0);
+            
+            setTotalBalance(total);
+            console.log('💰 [DataContext] Общий баланс из fallback:', total);
+            console.log('✅ [DataContext] Данные загружены из fallback хранилища');
+          } else {
+            console.log('❌ [DataContext] Нет данных в fallback хранилище');
+            
+            // Проверяем, есть ли данные в текущем состоянии React
+            if (accounts.length > 0 || transactions.length > 0) {
+              console.log('📊 [DataContext] Обнаружены данные в состоянии React, сохраняем в fallback...');
+              
+              try {
+                const currentData = {
+                  accounts: accounts,
+                  transactions: transactions,
+                  categories: categories,
+                  debts: debts,
+                  exchangeRates: [],
+                  lastSyncAt: new Date().toISOString(),
+                  userId: userId || ''
+                };
+                await AsyncStorage.setItem('fallback_cloud_data', JSON.stringify(currentData));
+                console.log('💾 [DataContext] Текущие данные сохранены в fallback хранилище');
+              } catch (fallbackError) {
+                console.error('❌ [DataContext] Ошибка сохранения в fallback:', fallbackError);
               }
-              return sum + balance;
-            }, 0);
+            }
+            
+            console.log('📊 [DataContext] Текущие данные в состоянии:');
+            console.log('  - Счета:', accounts.length);
+            console.log('  - Транзакции:', transactions.length);
+            console.log('  - Категории:', categories.length);
+            console.log('  - Долги:', debts.length);
+          }
           
-          setTotalBalance(total);
-          console.log('💰 [DataContext] Общий баланс из fallback:', total);
-          console.log('✅ [DataContext] Данные загружены из fallback хранилища');
-        } else {
-          console.log('❌ [DataContext] Нет данных в fallback хранилище');
-          console.log('📊 [DataContext] Текущие данные в состоянии:');
-          console.log('  - Счета:', accounts.length);
-          console.log('  - Транзакции:', transactions.length);
-          console.log('  - Категории:', categories.length);
-          console.log('  - Долги:', debts.length);
+          console.log('✅ [DataContext] RefreshData завершен в fallback режиме');
+          return;
         }
-        
-        console.log('✅ [DataContext] RefreshData завершен в fallback режиме');
-        return;
       }
       
       const [accountsFromDb, transactionsFromDb, categoriesFromDb, debtsFromDb] = await Promise.all([
@@ -541,41 +786,61 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     try {
       // Проверяем готовность базы данных
       if (!LocalDatabaseService.isDatabaseReady()) {
-        console.log('[DataContext] База данных не готова, работаем в fallback режиме...');
+        console.log('[DataContext] База данных не готова, пытаемся инициализировать...');
         
-        // Создаем счет только в локальном состоянии
-        const newAccount: Account = {
-          ...account,
-          id: Date.now().toString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        
-        setAccounts(prev => [newAccount, ...prev]);
-        
-        // Обновляем общий баланс
-        if (newAccount.isIncludedInTotal !== false) {
-          let balanceToAdd = newAccount.balance;
-          if (newAccount.currency && newAccount.currency !== defaultCurrency && 'exchangeRate' in newAccount && (newAccount as any).exchangeRate) {
-            balanceToAdd = newAccount.balance * (newAccount as any).exchangeRate;
-          }
-          setTotalBalance(prev => prev + balanceToAdd);
-        }
-        
-        console.log('[DataContext] Счет создан в fallback режиме:', newAccount);
-        
-        // Пытаемся сохранить в SQLite, если база данных стала доступна
         try {
-          if (LocalDatabaseService.isDatabaseReady()) {
-            console.log('[DataContext] База данных стала доступна, сохраняем счет в SQLite...');
-            await LocalDatabaseService.createAccount(account);
-            console.log('[DataContext] Счет сохранен в SQLite');
+          // Пытаемся инициализировать базу данных
+          await LocalDatabaseService.initDatabase(defaultCurrency);
+          console.log('[DataContext] База данных успешно инициализирована');
+        } catch (initError) {
+          console.error('[DataContext] Не удалось инициализировать базу данных:', initError);
+          console.log('[DataContext] Работаем в fallback режиме...');
+          
+          // Создаем счет только в локальном состоянии
+          const newAccount: Account = {
+            ...account,
+            id: Date.now().toString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          
+          setAccounts(prev => [newAccount, ...prev]);
+          
+          // Обновляем общий баланс
+          if (newAccount.isIncludedInTotal !== false) {
+            let balanceToAdd = newAccount.balance;
+            if (newAccount.currency && newAccount.currency !== defaultCurrency && 'exchangeRate' in newAccount && (newAccount as any).exchangeRate) {
+              balanceToAdd = newAccount.balance * (newAccount as any).exchangeRate;
+            }
+            setTotalBalance(prev => prev + balanceToAdd);
           }
-        } catch (dbError) {
-          console.log('[DataContext] Не удалось сохранить в SQLite:', dbError instanceof Error ? dbError.message : String(dbError));
+          
+          console.log('[DataContext] Счет создан в fallback режиме:', newAccount);
+          
+          // Сохраняем данные в fallback хранилище
+          try {
+            const fallbackData = {
+              accounts: [newAccount, ...accounts],
+              transactions: transactions,
+              categories: categories,
+              debts: debts,
+              exchangeRates: [],
+              lastSyncAt: new Date().toISOString(),
+              userId: userId || ''
+            };
+            await AsyncStorage.setItem('fallback_cloud_data', JSON.stringify(fallbackData));
+            console.log('💾 [DataContext] Данные сохранены в fallback хранилище');
+          } catch (fallbackError) {
+            console.error('❌ [DataContext] Ошибка сохранения в fallback:', fallbackError);
+          }
+          
+          // Мгновенная синхронизация с backend
+          console.log('🔄 [DataContext] Мгновенная синхронизация после создания счета...');
+          await instantSync('создания счета');
+          console.log('✅ [DataContext] Счет создан и синхронизирован');
+          
+          return;
         }
-        
-        return;
       }
       
       const newAccount = await LocalDatabaseService.createAccount(account);
@@ -592,7 +857,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       }
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('создания счета');
     } catch (error) {
       console.error('Error creating account:', error);
       throw error;
@@ -640,7 +905,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       }
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('обновления счета');
     } catch (error) {
       console.error('Error updating account:', error);
       throw error;
@@ -649,27 +914,64 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
 
   const deleteAccount = async (id: string) => {
     try {
-      const accountToDelete = accounts.find(acc => acc.id === id);
-      if (!accountToDelete) return;
+      console.log('🗑️ [DataContext] Начинаем удаление счёта с ID:', id);
       
+      const accountToDelete = accounts.find(acc => acc.id === id);
+      if (!accountToDelete) {
+        console.log('❌ [DataContext] Счёт с ID', id, 'не найден в локальном состоянии');
+        return;
+      }
+      
+      console.log('📋 [DataContext] Найден счёт для удаления:', {
+        id: accountToDelete.id,
+        name: accountToDelete.name,
+        balance: accountToDelete.balance,
+        type: accountToDelete.type
+      });
+      
+      // Сначала удаляем с сервера
+      console.log('🌐 [DataContext] Пытаемся удалить счёт с сервера...');
+      try {
+        const token = await ApiService.getAccessToken();
+        if (token) {
+          console.log('🔑 [DataContext] Токен получен, отправляем DELETE запрос на сервер...');
+          await ApiService.delete(`/accounts/${id}`);
+          console.log('✅ [DataContext] Счёт успешно удалён с сервера');
+        } else {
+          console.log('⚠️ [DataContext] Токен не найден, пропускаем удаление с сервера');
+        }
+      } catch (serverError) {
+        console.error('❌ [DataContext] Ошибка удаления счёта с сервера:', serverError);
+        console.log('⚠️ [DataContext] Продолжаем с локальным удалением даже если сервер недоступен');
+      }
+      
+      // Затем удаляем локально
+      console.log('📱 [DataContext] Удаляем счёт из локальной базы данных...');
       await LocalDatabaseService.deleteAccount(id);
+      console.log('✅ [DataContext] Счёт удалён из локальной базы данных');
+      
+      // Обновляем состояние
+      console.log('🔄 [DataContext] Обновляем локальное состояние...');
       setAccounts(prev => prev.filter(acc => acc.id !== id));
       setTransactions(prev => prev.filter(trans => trans.accountId !== id));
+      console.log('✅ [DataContext] Локальное состояние обновлено');
       
       // Обновляем общий баланс если счет был включен в него
       if (accountToDelete.isIncludedInTotal !== false) {
+        console.log('💰 [DataContext] Обновляем общий баланс...');
         let balanceToRemove = accountToDelete.balance;
         // Конвертируем баланс если валюта отличается от основной
         if (accountToDelete.currency && accountToDelete.currency !== defaultCurrency && 'exchangeRate' in accountToDelete && (accountToDelete as any).exchangeRate) {
           balanceToRemove = accountToDelete.balance * (accountToDelete as any).exchangeRate;
+          console.log('💱 [DataContext] Конвертированный баланс для удаления:', balanceToRemove);
         }
         setTotalBalance(prev => prev - balanceToRemove);
+        console.log('✅ [DataContext] Общий баланс обновлён');
       }
       
-      // Мгновенная синхронизация с backend
-      await syncData();
+      console.log('✅ [DataContext] Счёт успешно удалён локально и с сервера');
     } catch (error) {
-      console.error('Error deleting account:', error);
+      console.error('❌ [DataContext] Критическая ошибка при удалении счёта:', error);
       throw error;
     }
   };
@@ -739,7 +1041,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       }
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('создания транзакции');
     } catch (error) {
       console.error('Error creating transaction:', error);
       throw error;
@@ -764,7 +1066,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       }
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('обновления транзакции');
     } catch (error) {
       console.error('Error updating transaction:', error);
       throw error;
@@ -773,39 +1075,81 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
 
   const deleteTransaction = async (id: string) => {
     try {
-      const transaction = transactions.find(t => t.id === id);
-      if (!transaction) return;
+      console.log('🗑️ [DataContext] Начинаем удаление транзакции с ID:', id);
       
+      const transaction = transactions.find(t => t.id === id);
+      if (!transaction) {
+        console.log('❌ [DataContext] Транзакция с ID', id, 'не найдена в локальном состоянии');
+        return;
+      }
+      
+      console.log('📋 [DataContext] Найдена транзакция для удаления:', {
+        id: transaction.id,
+        amount: transaction.amount,
+        type: transaction.type,
+        accountId: transaction.accountId,
+        description: transaction.description
+      });
+      
+      // Сначала удаляем с сервера
+      console.log('🌐 [DataContext] Пытаемся удалить транзакцию с сервера...');
+      try {
+        const token = await ApiService.getAccessToken();
+        if (token) {
+          console.log('🔑 [DataContext] Токен получен, отправляем DELETE запрос на сервер...');
+          await ApiService.delete(`/transactions/${id}`);
+          console.log('✅ [DataContext] Транзакция успешно удалена с сервера');
+        } else {
+          console.log('⚠️ [DataContext] Токен не найден, пропускаем удаление с сервера');
+        }
+      } catch (serverError) {
+        console.error('❌ [DataContext] Ошибка удаления транзакции с сервера:', serverError);
+        console.log('⚠️ [DataContext] Продолжаем с локальным удалением даже если сервер недоступен');
+      }
+      
+      // Затем удаляем локально
+      console.log('📱 [DataContext] Удаляем транзакцию из локальной базы данных...');
       await LocalDatabaseService.deleteTransaction(transaction);
+      console.log('✅ [DataContext] Транзакция удалена из локальной базы данных');
       
       // Удаляем транзакцию из состояния
+      console.log('🔄 [DataContext] Обновляем локальное состояние...');
       setTransactions(prev => prev.filter(trans => trans.id !== id));
+      console.log('✅ [DataContext] Транзакция удалена из локального состояния');
       
       // Обновляем баланс счета
       const account = accounts.find(acc => acc.id === transaction.accountId);
       if (account) {
+        console.log('💰 [DataContext] Обновляем баланс счёта:', account.name);
         const balanceChange = transaction.type === 'income' ? -transaction.amount : transaction.amount;
+        console.log('📊 [DataContext] Изменение баланса:', balanceChange, '(тип транзакции:', transaction.type, ')');
+        
         setAccounts(prev => prev.map(acc => 
           acc.id === transaction.accountId 
             ? { ...acc, balance: acc.balance + balanceChange }
             : acc
         ));
+        console.log('✅ [DataContext] Баланс счёта обновлён');
         
         // Обновляем общий баланс если счет включен в него
         if (account.isIncludedInTotal !== false) {
+          console.log('💰 [DataContext] Обновляем общий баланс...');
           let convertedBalanceChange = balanceChange;
           // Конвертируем изменение баланса если валюта счета отличается от основной
           if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
             convertedBalanceChange = balanceChange * (account as any).exchangeRate;
+            console.log('💱 [DataContext] Конвертированное изменение баланса:', convertedBalanceChange);
           }
           setTotalBalance(prev => prev + convertedBalanceChange);
+          console.log('✅ [DataContext] Общий баланс обновлён');
         }
+      } else {
+        console.log('⚠️ [DataContext] Счёт для транзакции не найден, пропускаем обновление баланса');
       }
       
-      // Мгновенная синхронизация с backend
-      await syncData();
+      console.log('✅ [DataContext] Транзакция успешно удалена локально и с сервера');
     } catch (error) {
-      console.error('Error deleting transaction:', error);
+      console.error('❌ [DataContext] Критическая ошибка при удалении транзакции:', error);
       throw error;
     }
   };
@@ -817,7 +1161,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       setCategories(prev => [newCategory, ...prev]);
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('создания категории');
     } catch (error) {
       console.error('Error creating category:', error);
       throw error;
@@ -832,7 +1176,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       ));
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('обновления категории');
     } catch (error) {
       console.error('Error updating category:', error);
       throw error;
@@ -841,15 +1185,54 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
 
   const deleteCategory = async (id: string) => {
     try {
+      console.log('🗑️ [DataContext] Начинаем удаление категории с ID:', id);
+      
       // Проверяем, что это не базовая категория "Другое"
       if (id === 'other_income' || id === 'other_expense') {
+        console.log('❌ [DataContext] Попытка удалить базовую категорию:', id);
         throw new Error('Нельзя удалить базовую категорию');
       }
       
+      const categoryToDelete = categories.find(cat => cat.id === id);
+      if (!categoryToDelete) {
+        console.log('❌ [DataContext] Категория с ID', id, 'не найдена в локальном состоянии');
+        return;
+      }
+      
+      console.log('📋 [DataContext] Найдена категория для удаления:', {
+        id: categoryToDelete.id,
+        name: categoryToDelete.name,
+        type: categoryToDelete.type
+      });
+      
+      // Сначала удаляем с сервера
+      console.log('🌐 [DataContext] Пытаемся удалить категорию с сервера...');
+      try {
+        const token = await ApiService.getAccessToken();
+        if (token) {
+          console.log('🔑 [DataContext] Токен получен, отправляем DELETE запрос на сервер...');
+          await ApiService.delete(`/categories/${id}`);
+          console.log('✅ [DataContext] Категория успешно удалена с сервера');
+        } else {
+          console.log('⚠️ [DataContext] Токен не найден, пропускаем удаление с сервера');
+        }
+      } catch (serverError) {
+        console.error('❌ [DataContext] Ошибка удаления категории с сервера:', serverError);
+        console.log('⚠️ [DataContext] Продолжаем с локальным удалением даже если сервер недоступен');
+      }
+      
+      // Затем удаляем локально
+      console.log('📱 [DataContext] Удаляем категорию из локальной базы данных...');
       await LocalDatabaseService.deleteCategory(id);
+      console.log('✅ [DataContext] Категория удалена из локальной базы данных');
+      
+      // Обновляем состояние
+      console.log('🔄 [DataContext] Обновляем локальное состояние...');
       setCategories(prev => prev.filter(cat => cat.id !== id));
+      console.log('✅ [DataContext] Категория удалена из локального состояния');
       
       // Обновляем транзакции в состоянии
+      console.log('🔄 [DataContext] Обновляем транзакции с удалённой категорией...');
       const deletedCategory = categories.find(cat => cat.id === id);
       if (deletedCategory) {
         const fallbackCategory = categories.find(cat =>
@@ -857,18 +1240,22 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
         );
       
         if (!fallbackCategory) {
+          console.log('❌ [DataContext] Резервная категория "Другое" не найдена');
           throw new Error('Резервная категория "Другое" не найдена');
         }
       
+        console.log('🔄 [DataContext] Переназначаем транзакции на категорию "Другое":', fallbackCategory.name);
         setTransactions(prev => prev.map(trans =>
           trans.categoryId === id ? { ...trans, categoryId: fallbackCategory.id } : trans
         ));
-      }        
+        console.log('✅ [DataContext] Транзакции обновлены');
+      } else {
+        console.log('⚠️ [DataContext] Удалённая категория не найдена в состоянии, пропускаем обновление транзакций');
+      }
       
-      // Мгновенная синхронизация с backend
-      await syncData();
+      console.log('✅ [DataContext] Категория успешно удалена локально и с сервера');
     } catch (error) {
-      console.error('Error deleting category:', error);
+      console.error('❌ [DataContext] Критическая ошибка при удалении категории:', error);
       throw error;
     }
   };
@@ -892,7 +1279,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       ));
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('добавления накопления');
     } catch (error) {
       console.error('Error adding to savings:', error);
       throw error;
@@ -923,7 +1310,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       ));
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('снятия с накопления');
     } catch (error) {
       console.error('Error withdrawing from savings:', error);
       throw error;
@@ -1024,7 +1411,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       setDebts(prev => [newDebt, ...prev]);
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('создания долга');
     } catch (error) {
       console.error('Error creating debt:', error);
       throw error;
@@ -1039,7 +1426,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       ));
       
       // Мгновенная синхронизация с backend
-      await syncData();
+      await instantSync('обновления долга');
     } catch (error) {
       console.error('Error updating debt:', error);
       throw error;
@@ -1048,13 +1435,50 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
 
   const deleteDebt = async (id: string) => {
     try {
-      await LocalDatabaseService.deleteDebt(id);
-      setDebts(prev => prev.filter(debt => debt.id !== id));
+      console.log('🗑️ [DataContext] Начинаем удаление долга с ID:', id);
       
-      // Мгновенная синхронизация с backend
-      await syncData();
+      const debtToDelete = debts.find(debt => debt.id === id);
+      if (!debtToDelete) {
+        console.log('❌ [DataContext] Долг с ID', id, 'не найден в локальном состоянии');
+        return;
+      }
+      
+      console.log('📋 [DataContext] Найден долг для удаления:', {
+        id: debtToDelete.id,
+        name: debtToDelete.name,
+        amount: debtToDelete.amount,
+        type: debtToDelete.type
+      });
+      
+      // Сначала удаляем с сервера
+      console.log('🌐 [DataContext] Пытаемся удалить долг с сервера...');
+      try {
+        const token = await ApiService.getAccessToken();
+        if (token) {
+          console.log('🔑 [DataContext] Токен получен, отправляем DELETE запрос на сервер...');
+          await ApiService.delete(`/debts/${id}`);
+          console.log('✅ [DataContext] Долг успешно удален с сервера');
+        } else {
+          console.log('⚠️ [DataContext] Токен не найден, пропускаем удаление с сервера');
+        }
+      } catch (serverError) {
+        console.error('❌ [DataContext] Ошибка удаления долга с сервера:', serverError);
+        console.log('⚠️ [DataContext] Продолжаем с локальным удалением даже если сервер недоступен');
+      }
+      
+      // Затем удаляем локально
+      console.log('📱 [DataContext] Удаляем долг из локальной базы данных...');
+      await LocalDatabaseService.deleteDebt(id);
+      console.log('✅ [DataContext] Долг удален из локальной базы данных');
+      
+      // Обновляем состояние
+      console.log('🔄 [DataContext] Обновляем локальное состояние...');
+      setDebts(prev => prev.filter(debt => debt.id !== id));
+      console.log('✅ [DataContext] Долг удален из локального состояния');
+      
+      console.log('✅ [DataContext] Долг успешно удален локально и с сервера');
     } catch (error) {
-      console.error('Error deleting debt:', error);
+      console.error('❌ [DataContext] Критическая ошибка при удалении долга:', error);
       throw error;
     }
   };

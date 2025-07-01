@@ -376,6 +376,7 @@ export const AuthScreen: React.FC = () => {
               </View>
 
               <GoogleSignInButton
+                forceAccountSelection={true}
                 onSuccess={() => {
                   // Авторизация прошла успешно, AuthContext обработает навигацию
                 }}

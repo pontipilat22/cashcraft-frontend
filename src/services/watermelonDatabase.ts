@@ -10,6 +10,10 @@ import Setting from '../database/models/Setting';
 import SyncMetadata from '../database/models/SyncMetadata';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Константы для дефолтного счёта и флага инициализации
+const DEFAULT_CASH_ACCOUNT_ID = 'DEFAULT_CASH_ACCOUNT'
+const INIT_FLAG = '@hasInitDefaultAccount'
+
 export class WatermelonDatabaseService {
   private static currentUserId: string | null = null;
   private static isInitialized: boolean = false;
@@ -28,6 +32,12 @@ export class WatermelonDatabaseService {
     }
     const ready = this.isInitialized && this.currentUserId !== null;
     console.log('[WatermelonDB] isDatabaseReady:', ready, 'isInitialized:', this.isInitialized, 'currentUserId:', this.currentUserId);
+    
+    // Дополнительная проверка: если база не готова, но есть userId, попробуем инициализировать
+    if (!ready && this.currentUserId !== null && !this.isInitialized) {
+      console.log('[WatermelonDB] База данных не готова, но есть userId - можно попробовать инициализировать');
+    }
+    
     return ready;
   }
 
@@ -39,35 +49,35 @@ export class WatermelonDatabaseService {
     try {
       console.log('[WatermelonDB] Инициализация базы данных...');
       
-      // Проверяем, есть ли уже какие-либо данные в базе
-      const accountsCount = await database.get<Account>('accounts').query().fetchCount();
-      const categoriesCount = await database.get<Category>('categories').query().fetchCount();
-      
-      // Если в базе уже есть данные, не создаем дефолтные
-      if (accountsCount > 0 || categoriesCount > 0) {
-        console.log(`[WatermelonDB] База данных уже содержит данные (${accountsCount} счетов, ${categoriesCount} категорий), пропускаем создание дефолтных`);
-        this.isInitialized = true;
-        this.lastInitError = null;
-        console.log('[WatermelonDB] Инициализация завершена (данные уже существуют)');
-        return;
+      // ─── Создаём дефолтный счёт "Наличные" только один раз ────────────────────────────
+      // Считаем, сколько сейчас записей в таблице accounts
+      const accountsCount = await database.get<Account>('accounts').query().fetchCount()
+
+      // Проверяем, создавали ли мы уже дефолтный счёт
+      const hasInitDefault = await AsyncStorage.getItem(INIT_FLAG)
+
+      // Если таблица пуста и дефолт ещё не создавали — создаём
+      if (accountsCount === 0 && !hasInitDefault) {
+        console.log('[WatermelonDB] Создаем дефолтный счёт "Наличные"...');
+        await database.write(async () => {
+          await database.get<Account>('accounts').create(acc => {
+            acc._raw.id            = DEFAULT_CASH_ACCOUNT_ID // фиксированный ID
+            acc.name               = 'Наличные'
+            acc.type               = 'cash'
+            acc.balance            = 0
+            acc.currency           = defaultCurrency
+            acc.isDefault          = true
+            acc.isIncludedInTotal  = true
+            acc.savedAmount        = 0
+            // остальные поля можно не трогать
+          })
+        })
+        // Ставим флаг, чтобы не создавать счёт повторно
+        await AsyncStorage.setItem(INIT_FLAG, 'true')
+        console.log('[WatermelonDB] Дефолтный счёт создан и флаг установлен')
+      } else {
+        console.log('[WatermelonDB] Пропускаем создание дефолтного счёта (либо уже есть, либо флаг установлен)')
       }
-
-      console.log('[WatermelonDB] База данных пуста, создаем дефолтные данные...');
-
-      // ─── Создаем дефолтный счет "Наличные" только если база пуста ─────────────────
-      await database.write(async () => {
-        await database.get<Account>('accounts').create(acc => {
-          acc._raw.id         = uuidv4();
-          acc.name            = 'Наличные';
-          acc.type            = 'cash';
-          acc.balance         = 0;
-          acc.currency        = defaultCurrency;
-          acc.isDefault       = true;
-          acc.isIncludedInTotal = true;
-          acc.savedAmount     = 0;
-        });
-      });
-      console.log('[WatermelonDB] Создан дефолтный счёт "Наличные"');
 
       // ─── Создаем базовые категории только если база пуста ──────────────────────────────
       const categories = [
@@ -154,7 +164,7 @@ export class WatermelonDatabaseService {
   static async createAccount(accountData: any): Promise<any> {
     const account = await database.write(async () => {
       return await database.get<Account>('accounts').create(account => {
-        const id = uuidv4();
+        const id = accountData.id || uuidv4();
         account._raw.id = id;
         account.name = accountData.name;
         account.type = accountData.type;
@@ -259,7 +269,7 @@ export class WatermelonDatabaseService {
   static async createTransaction(transactionData: any): Promise<any> {
     const transaction = await database.write(async () => {
       const trans = await database.get<Transaction>('transactions').create(transaction => {
-        const id = uuidv4();
+        const id = transactionData.id || uuidv4();
         transaction._raw.id = id;
         transaction.amount = transactionData.amount;
         transaction.type = transactionData.type;
@@ -348,13 +358,12 @@ export class WatermelonDatabaseService {
   static async createCategory(categoryData: any): Promise<any> {
     const category = await database.write(async () => {
       return await database.get<Category>('categories').create(category => {
-        const id = uuidv4();
+        const id = categoryData.id || uuidv4();
         category._raw.id = id;
         category.name = categoryData.name;
         category.type = categoryData.type;
         category.icon = categoryData.icon;
         category.color = categoryData.color;
-        category.syncedAt = undefined;
       });
     });
 
@@ -416,11 +425,11 @@ export class WatermelonDatabaseService {
   static async createDebt(debtData: any): Promise<any> {
     const debt = await database.write(async () => {
       return await database.get<Debt>('debts').create(debt => {
-        const id = uuidv4();
+        const id = debtData.id || uuidv4();
         debt._raw.id = id;
-        debt.type = debtData.type;
         debt.name = debtData.name;
         debt.amount = debtData.amount;
+        debt.type = debtData.type;
         debt.isIncludedInTotal = debtData.isIncludedInTotal !== false;
         debt.dueDate = debtData.dueDate;
         debt.syncedAt = undefined;
@@ -653,8 +662,10 @@ export class WatermelonDatabaseService {
         type:         t.type,
         date:         t.date,
         description:  t.description,
+        // to_account_id отсутствует в локальной модели Transaction
         created_at:   t.createdAt.toISOString(),
         updated_at:   t.updatedAt.toISOString(),
+        synced_at:    t.syncedAt ? t.syncedAt.toISOString() : undefined,
       };
     });
   
@@ -680,10 +691,10 @@ export class WatermelonDatabaseService {
   
     /* --- возвращаем всё сразу -------------------------------------------- */
     return {
-      accounts: await this.modelsToObjects(accounts),
-      categories: await this.modelsToObjects(categories),
+      accounts: await this.accountsToObjects(accounts),
+      categories: await this.categoriesToObjects(categories),
       transactions: txPayload,                 // ←  теперь с полями-ссылками
-      debts: await this.modelsToObjects(debts),
+      debts: await this.debtsToObjects(debts),
       exchangeRates: exchangeRates.map(er => ({
         id: `${er.fromCurrency}_${er.toCurrency}`,
         fromCurrency: er.fromCurrency,
@@ -696,29 +707,62 @@ export class WatermelonDatabaseService {
   
 
   private static async modelsToObjects(models: any[]): Promise<any[]> {
-    return models.map(acc => ({
+    // Этот метод больше не используется, так как у нас есть отдельные методы для каждого типа
+    console.warn('modelsToObjects is deprecated, use specific methods instead');
+    return [];
+  }
+
+  private static async accountsToObjects(accounts: any[]): Promise<any[]> {
+    return accounts.map(acc => ({
       id: acc._raw.id,
       name: acc.name,
       type: acc.type,
       balance: acc.balance,
       currency: acc.currency,
-      exchangeRate: acc.exchangeRate,
-      cardNumber: acc.cardNumber,
+      exchange_rate: acc.exchangeRate,
+      card_number: acc.cardNumber,
       color: acc.color,
       icon: acc.icon,
-      isDefault: acc.isDefault,
-      isIncludedInTotal: acc.isIncludedInTotal,
-      targetAmount: acc.targetAmount,
-      linkedAccountId: acc.linkedAccountId,
-      savedAmount: acc.savedAmount,
-      creditStartDate: acc.creditStartDate,
-      creditTerm: acc.creditTerm,
-      creditRate: acc.creditRate,
-      creditPaymentType: acc.creditPaymentType,
-      creditInitialAmount: acc.creditInitialAmount,
-      createdAt: acc.createdAt ? acc.createdAt.toISOString() : undefined,
-      updatedAt: acc.updatedAt ? acc.updatedAt.toISOString() : undefined,
-      syncedAt: acc.syncedAt ? acc.syncedAt.toISOString() : undefined,
+      is_default: acc.isDefault,
+      is_included_in_total: acc.isIncludedInTotal,
+      target_amount: acc.targetAmount,
+      // linked_account_id и saved_amount отсутствуют в серверной модели
+      credit_start_date: acc.creditStartDate,
+      credit_term: acc.creditTerm,
+      credit_rate: acc.creditRate,
+      credit_payment_type: acc.creditPaymentType,
+      credit_initial_amount: acc.creditInitialAmount,
+      created_at: acc.createdAt ? acc.createdAt.toISOString() : undefined,
+      updated_at: acc.updatedAt ? acc.updatedAt.toISOString() : undefined,
+      synced_at: acc.syncedAt ? acc.syncedAt.toISOString() : undefined,
+    }));
+  }
+
+  private static async categoriesToObjects(categories: any[]): Promise<any[]> {
+    return categories.map(cat => ({
+      id: cat._raw.id,
+      name: cat.name,
+      type: cat.type,
+      icon: cat.icon,
+      color: cat.color,
+      is_system: false, // Поле isSystem отсутствует в локальной модели Category
+      created_at: cat.createdAt ? cat.createdAt.toISOString() : undefined,
+      updated_at: cat.updatedAt ? cat.updatedAt.toISOString() : undefined,
+      synced_at: cat.syncedAt ? cat.syncedAt.toISOString() : undefined,
+    }));
+  }
+
+  private static async debtsToObjects(debts: any[]): Promise<any[]> {
+    return debts.map(debt => ({
+      id: debt._raw.id,
+      type: debt.type,
+      name: debt.name,
+      amount: debt.amount,
+      is_included_in_total: debt.isIncludedInTotal,
+      due_date: debt.dueDate,
+      created_at: debt.createdAt ? debt.createdAt.toISOString() : undefined,
+      updated_at: debt.updatedAt ? debt.updatedAt.toISOString() : undefined,
+      synced_at: debt.syncedAt ? debt.syncedAt.toISOString() : undefined,
     }));
   }
 
@@ -829,10 +873,15 @@ export class WatermelonDatabaseService {
       this.isInitialized = false;
       this.lastInitError = null;
       
-      // 3. НЕ переинициализируем базу данных - пользователь сам решит что создавать
-      console.log('🔄 [WatermelonDatabase] База данных очищена, дефолтные данные не создаются');
+      // 3. ПЕРЕИНИЦИАЛИЗИРУЕМ базу данных после очистки
+      console.log('🔄 [WatermelonDatabase] Переинициализируем базу данных после очистки...');
+      await this.initDatabase(defaultCurrency);
+      console.log('✅ [WatermelonDatabase] База данных переинициализирована');
       
-      // 4. Устанавливаем флаг сброса данных
+      // 4. Очищаем флаг инициализации и устанавливаем флаг сброса данных
+      console.log('🧹 [WatermelonDatabase] Очищаем флаг инициализации...');
+      await AsyncStorage.removeItem(INIT_FLAG);
+      
       if (this.currentUserId) {
         console.log('🏷️ [WatermelonDatabase] Устанавливаем флаг сброса данных...');
         await AsyncStorage.setItem(`dataReset_${this.currentUserId}`, 'true');

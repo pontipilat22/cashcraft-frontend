@@ -1,67 +1,74 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const fs = require('fs');
 const path = require('path');
+const { CloudSyncService } = require('../src/services/cloudSync');
+const { ApiService } = require('../src/services/api');
+const { LocalDatabaseService } = require('../src/services/localDatabase');
 
 /**
  * Тестовый скрипт для проверки синхронизации
  */
 const testSync = async () => {
+  console.log('🧪 Testing data synchronization...');
+  
   try {
-    console.log('🧪 [TestSync] Начинаем тестирование синхронизации...');
-    
-    // 1. Проверяем токен
-    const token = await AsyncStorage.getItem('@cashcraft_access_token');
-    console.log('🔑 [TestSync] Токен:', token ? 'Найден' : 'Не найден');
-    
-    // 2. Проверяем userId
-    const userId = await AsyncStorage.getItem('@cashcraft_user_id');
-    console.log('👤 [TestSync] User ID:', userId || 'Не найден');
-    
-    // 3. Проверяем время последней синхронизации
-    const lastSyncTime = await AsyncStorage.getItem('@cashcraft_last_sync_time');
-    console.log('⏰ [TestSync] Последняя синхронизация:', lastSyncTime || 'Не найдена');
-    
-    // 4. Проверяем флаг сброса данных
-    const resetFlag = userId ? await AsyncStorage.getItem(`dataReset_${userId}`) : null;
-    console.log('🏷️ [TestSync] Флаг сброса данных:', resetFlag || 'Не установлен');
-    
-    // 5. Проверяем fallback данные
-    const fallbackData = await AsyncStorage.getItem('fallback_cloud_data');
-    console.log('💾 [TestSync] Fallback данные:', fallbackData ? 'Есть' : 'Нет');
-    
-    // 6. Проверяем готовность базы данных
-    const { WatermelonDatabaseService } = await import('../src/services/watermelonDatabase');
-    const isDatabaseReady = WatermelonDatabaseService.isDatabaseReady();
-    console.log('🗄️ [TestSync] База данных готова:', isDatabaseReady);
-    
-    if (isDatabaseReady) {
-      // 7. Проверяем несинхронизированные данные
-      const unsyncedData = await WatermelonDatabaseService.getUnsyncedData();
-      console.log('📊 [TestSync] Несинхронизированные данные:', {
-        accounts: unsyncedData.accounts?.length || 0,
-        categories: unsyncedData.categories?.length || 0,
-        transactions: unsyncedData.transactions?.length || 0,
-        debts: unsyncedData.debts?.length || 0,
-      });
-      
-      // 8. Проверяем общие данные
-      const accounts = await WatermelonDatabaseService.getAccounts();
-      const transactions = await WatermelonDatabaseService.getTransactions();
-      const categories = await WatermelonDatabaseService.getCategories();
-      const debts = await WatermelonDatabaseService.getDebts();
-      
-      console.log('📊 [TestSync] Общие данные в базе:', {
-        accounts: accounts.length,
-        transactions: transactions.length,
-        categories: categories.length,
-        debts: debts.length,
-      });
+    // Получаем токен
+    const token = await ApiService.getAccessToken();
+    if (!token) {
+      console.log('❌ No access token found');
+      return;
     }
     
-    console.log('✅ [TestSync] Тестирование завершено');
+    console.log('✅ Access token found');
+    
+    // Получаем userId
+    const currentUser = await AsyncStorage.getItem('currentUser');
+    if (!currentUser) {
+      console.log('❌ No current user found');
+      return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    console.log('✅ Current user:', user.id);
+    
+    // Проверяем локальные данные
+    const accounts = await LocalDatabaseService.getAccounts();
+    const transactions = await LocalDatabaseService.getTransactions();
+    const categories = await LocalDatabaseService.getCategories();
+    const debts = await LocalDatabaseService.getDebts();
+    
+    console.log('📊 Local data:');
+    console.log('  - Accounts:', accounts.length);
+    console.log('  - Transactions:', transactions.length);
+    console.log('  - Categories:', categories.length);
+    console.log('  - Debts:', debts.length);
+    
+    // Синхронизируем данные
+    console.log('🔄 Syncing data to cloud...');
+    const syncSuccess = await CloudSyncService.syncData(user.id, token);
+    console.log('📤 Sync result:', syncSuccess ? 'Success' : 'Failed');
+    
+    // Загружаем данные обратно
+    console.log('📥 Downloading data from cloud...');
+    const downloadSuccess = await CloudSyncService.downloadData(user.id, token);
+    console.log('📥 Download result:', downloadSuccess ? 'Success' : 'Failed');
+    
+    // Проверяем данные после синхронизации
+    const accountsAfter = await LocalDatabaseService.getAccounts();
+    const transactionsAfter = await LocalDatabaseService.getTransactions();
+    const categoriesAfter = await LocalDatabaseService.getCategories();
+    const debtsAfter = await LocalDatabaseService.getDebts();
+    
+    console.log('📊 Data after sync:');
+    console.log('  - Accounts:', accountsAfter.length);
+    console.log('  - Transactions:', transactionsAfter.length);
+    console.log('  - Categories:', categoriesAfter.length);
+    console.log('  - Debts:', debtsAfter.length);
+    
+    console.log('✅ Sync test completed');
     
   } catch (error) {
-    console.error('❌ [TestSync] Ошибка при тестировании:', error);
+    console.error('❌ Sync test failed:', error);
   }
 };
 

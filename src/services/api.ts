@@ -239,7 +239,15 @@ export class ApiService {
     });
   }
 
-  static delete<T = any>(endpoint: string, options?: RequestInit): Promise<T> {
-    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+  static async delete<T = any>(endpoint: string, options?: RequestInit): Promise<T> {
+    console.log('🗑️ [ApiService] DELETE запрос:', endpoint);
+    try {
+      const result = await this.request<T>(endpoint, { ...options, method: 'DELETE' });
+      console.log('✅ [ApiService] DELETE запрос успешен:', endpoint);
+      return result;
+    } catch (error) {
+      console.error('❌ [ApiService] DELETE запрос неудачен:', endpoint, error);
+      throw error;
+    }
   }
 }

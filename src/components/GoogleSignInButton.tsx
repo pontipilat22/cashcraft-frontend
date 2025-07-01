@@ -23,12 +23,14 @@ interface GoogleSignInButtonProps {
   onSuccess?: () => void;
   onError?: (error: Error) => void;
   showSignOut?: boolean;
+  forceAccountSelection?: boolean;
 }
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   onSuccess,
   onError,
   showSignOut = false,
+  forceAccountSelection = false,
 }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -48,6 +50,33 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     setLoading(true);
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      
+      // Если нужно принудительно показать выбор аккаунта, сначала выходим
+      if (forceAccountSelection) {
+        try {
+          const currentUser = await GoogleSignin.getCurrentUser();
+          if (currentUser) {
+            console.log('Force account selection: signing out current user...');
+            await GoogleSignin.signOut();
+          }
+        } catch (error) {
+          console.log('No current user found, proceeding with sign in...');
+        }
+      } else {
+        // Проверяем, есть ли уже авторизованный пользователь
+        try {
+          const currentUser = await GoogleSignin.getCurrentUser();
+          if (currentUser) {
+            // Если пользователь уже авторизован, сначала выходим, чтобы показать выбор аккаунта
+            console.log('User already signed in, signing out to show account selection...');
+            await GoogleSignin.signOut();
+          }
+        } catch (error) {
+          // Если getCurrentUser выбросил ошибку, значит пользователь не авторизован
+          console.log('No current user found, proceeding with sign in...');
+        }
+      }
+      
       const response = await GoogleSignin.signIn();
 
       console.log('Google Sign-In Response:', JSON.stringify(response, null, 2));

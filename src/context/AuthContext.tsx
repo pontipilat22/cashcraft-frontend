@@ -36,9 +36,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsPreparing(true);
     try {
       await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
-      
+      await AsyncStorage.setItem('isGuest', authUser.isGuest ? 'true' : 'false');
       LocalDatabaseService.setUserId(authUser.id);
+      await LocalDatabaseService.clearAllData(defaultCurrency);
       await LocalDatabaseService.initDatabase(defaultCurrency);
+      
+      if (!authUser.isGuest) {
+        try {
+          console.log('📥 Downloading user data from cloud...');
+          const { CloudSyncService } = await import('../services/cloudSync');
+          const tokens = await ApiService.getTokens();
+          
+          if (tokens.accessToken) {
+            const downloadSuccess = await CloudSyncService.downloadData(authUser.id, tokens.accessToken);
+            console.log('📥 Data download:', downloadSuccess ? 'success' : 'failed');
+          }
+        } catch (downloadError) {
+          console.error('❌ Failed to download user data:', downloadError);
+          // Не критично, продолжаем работу с локальными данными
+        }
+      }
       
       // Инициализируем курсы валют с backend
       try {
@@ -131,10 +148,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     const isGuest = user?.isGuest;
+    
+    // Синхронизируем данные перед выходом (только для не-гостевых пользователей)
+    if (!isGuest && user) {
+      try {
+        console.log('🔄 Syncing data before logout...');
+        const { CloudSyncService } = await import('../services/cloudSync');
+        const tokens = await ApiService.getTokens();
+        
+        if (tokens.accessToken) {
+          const syncSuccess = await CloudSyncService.syncData(user.id, tokens.accessToken);
+          console.log('📤 Data sync before logout:', syncSuccess ? 'success' : 'failed');
+        }
+      } catch (syncError) {
+        console.error('❌ Failed to sync data before logout:', syncError);
+      }
+    }
+    
+    // Выходим из Google аккаунта (если пользователь не гость)
+    if (!isGuest) {
+      try {
+        console.log('🔓 Signing out from Google...');
+        const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
+        await GoogleSignin.signOut();
+        console.log('✅ Successfully signed out from Google');
+      } catch (googleSignOutError) {
+        console.error('❌ Failed to sign out from Google:', googleSignOutError);
+      }
+    }
+    
     setUser(null);
     LocalDatabaseService.setUserId(null);
     await ApiService.clearTokens();
     await AsyncStorage.removeItem('currentUser');
+    await AsyncStorage.removeItem('isGuest'); // Очищаем флаг гостевого режима
+    
     if (!isGuest) {
       try {
         await AuthService.logout();
