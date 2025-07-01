@@ -295,7 +295,10 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              {t('accounts.addAccount')}
+              {accountType === 'credit' ? t('accounts.addCredit') || 'Добавить кредит' :
+               accountType === 'savings' ? t('accounts.addSavings') || 'Добавить накопление' :
+               accountType === 'debt' ? t('accounts.addDebt') || 'Добавить долг' :
+               t('accounts.addAccount')}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={colors.text} />

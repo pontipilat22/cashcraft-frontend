@@ -56,7 +56,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
 
   // Используем useCallback чтобы избежать бесконечного цикла
   const checkSubscription = React.useCallback(async () => {
-    if (!userId || isGuest) {
+    if (!userId) {
       setSubscription(null);
       setIsPremium(false);
       return;
@@ -90,21 +90,21 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
     } catch (error) {
       console.error('Error checking subscription:', error);
     }
-  }, [userId, isGuest]);
+  }, [userId]);
 
   useEffect(() => {
-    // Подписка активна только для зарегистрированных пользователей
-    if (userId && !isGuest) {
+    // Подписка доступна для всех пользователей (включая гостей) для тестирования
+    if (userId) {
       checkSubscription();
       // Проверяем подписку каждые 5 минут
       const interval = setInterval(checkSubscription, 5 * 60 * 1000);
       return () => clearInterval(interval);
     } else {
-      // Если пользователь не авторизован или гость, сбрасываем подписку
+      // Если пользователь не авторизован, сбрасываем подписку
       setSubscription(null);
       setIsPremium(false);
     }
-  }, [userId, isGuest, checkSubscription]);
+  }, [userId, checkSubscription]);
 
   const hasFeature = (feature: string): boolean => {
     if (isPremium) {

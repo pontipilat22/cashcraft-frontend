@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 import { AuthService, User, AuthResponse } from '../services/auth';
 import { ApiService } from '../services/api';
 import { LocalDatabaseService } from '../services/localDatabase';
@@ -22,6 +23,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loginAsGuest: () => Promise<void>;
   loginWithGoogle: (googleData: { idToken: string; email: string; name: string; googleId: string }) => Promise<void>;
+  forceReauth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,33 +32,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [hasShownOfflineNotification, setHasShownOfflineNotification] = useState(false);
   const { defaultCurrency } = useCurrency();
 
-  const setupUserSession = useCallback(async (authUser: AuthUser) => {
+  const setupUserSession = useCallback(async (authUser: AuthUser, preserveLocalData: boolean = false) => {
     setIsPreparing(true);
     try {
       await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
       await AsyncStorage.setItem('isGuest', authUser.isGuest ? 'true' : 'false');
       LocalDatabaseService.setUserId(authUser.id);
-      await LocalDatabaseService.clearAllData(defaultCurrency);
-      await LocalDatabaseService.initDatabase(defaultCurrency);
-      
-      if (!authUser.isGuest) {
-        try {
-          console.log('📥 Downloading user data from cloud...');
-          const { CloudSyncService } = await import('../services/cloudSync');
-          const tokens = await ApiService.getTokens();
-          
-          if (tokens.accessToken) {
-            const downloadSuccess = await CloudSyncService.downloadData(authUser.id, tokens.accessToken);
-            console.log('📥 Data download:', downloadSuccess ? 'success' : 'failed');
-          }
-        } catch (downloadError) {
-          console.error('❌ Failed to download user data:', downloadError);
-          // Не критично, продолжаем работу с локальными данными
-        }
+      if (!preserveLocalData) {
+        await LocalDatabaseService.clearAllData(defaultCurrency);
+        await LocalDatabaseService.initDatabase(defaultCurrency);
       }
-      
       // Инициализируем курсы валют с backend
       try {
         console.log('Initializing exchange rates...');
@@ -67,7 +55,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error('Failed to initialize exchange rates:', rateError);
         // Не критично, продолжаем работу
       }
-      
       setUser(authUser);
     } catch (error) {
       console.error("Failed to setup user session", error);
@@ -94,26 +81,83 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const tokens = await ApiService.getTokens();
       if (tokens.accessToken && tokens.refreshToken) {
         ApiService.setAccessToken(tokens.accessToken);
-        const isValid = await AuthService.isAuthenticated();
-        if (isValid) {
-          await setupUserSession(savedUser);
-        } else {
-          try {
-            const newTokens = await AuthService.refreshToken(tokens.refreshToken);
-            if (newTokens) {
-              await ApiService.saveTokens(newTokens.accessToken, newTokens.refreshToken);
-              await setupUserSession(savedUser);
-            } else {
-              await logout();
-            }
-          } catch (e) {
-            await logout();
+        
+        // Проверяем валидность токена
+        try {
+          const isValid = await AuthService.isAuthenticated();
+          if (isValid) {
+            await setupUserSession(savedUser);
+            return;
           }
+        } catch (error) {
+          console.log('🔍 [AuthContext] Токен недействителен, пытаемся обновить...');
         }
-      }
+        
+        // Если токен недействителен, пытаемся обновить
+        try {
+          console.log('🔄 [AuthContext] Обновляем токен...');
+          const newTokens = await AuthService.refreshToken(tokens.refreshToken);
+          if (newTokens) {
+            console.log('✅ [AuthContext] Токен успешно обновлен');
+            await ApiService.saveTokens(newTokens.accessToken, newTokens.refreshToken);
+            await setupUserSession(savedUser);
+            return;
+          } else {
+            console.log('⚠️ [AuthContext] Не удалось обновить токен, но пользователь остается в системе');
+            // НЕ выходим из системы, пользователь остается авторизованным
+            await setupUserSession(savedUser);
+            
+            // Показываем уведомление только один раз
+            if (!hasShownOfflineNotification && !savedUser.isGuest) {
+              setHasShownOfflineNotification(true);
+              Alert.alert(
+                'Режим офлайн',
+                'Соединение с сервером временно недоступно. Вы можете продолжать работать с приложением. Данные будут синхронизированы при восстановлении соединения.',
+                [{ text: 'Понятно', style: 'default' }]
+              );
+            }
+            return;
+          }
+                 } catch (refreshError) {
+           console.log('⚠️ [AuthContext] Ошибка обновления токена, но пользователь остается в системе:', refreshError);
+           // НЕ выходим из системы, пользователь остается авторизованным
+           await setupUserSession(savedUser);
+           
+           // Показываем уведомление только один раз
+           if (!hasShownOfflineNotification && !savedUser.isGuest) {
+             setHasShownOfflineNotification(true);
+             Alert.alert(
+               'Режим офлайн',
+               'Соединение с сервером временно недоступно. Вы можете продолжать работать с приложением. Данные будут синхронизированы при восстановлении соединения.',
+               [{ text: 'Понятно', style: 'default' }]
+             );
+           }
+           return;
+         }
+             } else {
+         console.log('⚠️ [AuthContext] Токены отсутствуют, но пользователь остается в системе');
+         // НЕ выходим из системы, пользователь остается авторизованным
+         await setupUserSession(savedUser);
+         
+         // Показываем уведомление только один раз
+         if (!hasShownOfflineNotification && !savedUser.isGuest) {
+           setHasShownOfflineNotification(true);
+           Alert.alert(
+             'Режим офлайн',
+             'Соединение с сервером временно недоступно. Вы можете продолжать работать с приложением. Данные будут синхронизированы при восстановлении соединения.',
+             [{ text: 'Понятно', style: 'default' }]
+           );
+         }
+       }
     } catch (error) {
-      console.error('Auth state check error:', error);
-      await logout();
+      console.error('❌ [AuthContext] Критическая ошибка проверки состояния авторизации:', error);
+      // Даже при критической ошибке НЕ выходим из системы
+      // Пользователь может продолжать работать с локальными данными
+      const savedUserStr = await AsyncStorage.getItem('currentUser');
+      if (savedUserStr) {
+        const savedUser: AuthUser = JSON.parse(savedUserStr);
+        await setupUserSession(savedUser);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -123,8 +167,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     checkAuthState();
   }, [checkAuthState]);
 
+  // Периодическая проверка и обновление токенов в фоне
+  useEffect(() => {
+    if (!user || user.isGuest) return;
 
-  const handleAuthResponse = async (response: AuthResponse) => {
+    const checkAndRefreshTokens = async () => {
+      try {
+        const tokens = await ApiService.getTokens();
+        if (tokens.accessToken && tokens.refreshToken) {
+          // Проверяем валидность токена каждые 30 минут
+          const isValid = await AuthService.isAuthenticated();
+          if (!isValid) {
+            console.log('🔄 [AuthContext] Токен истек, обновляем в фоне...');
+            const newTokens = await AuthService.refreshToken(tokens.refreshToken);
+            if (newTokens) {
+              console.log('✅ [AuthContext] Токен обновлен в фоне');
+              await ApiService.saveTokens(newTokens.accessToken, newTokens.refreshToken);
+            }
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ [AuthContext] Ошибка фонового обновления токена:', error);
+        // Не критично, пользователь продолжает работать
+      }
+    };
+
+    // Проверяем токены каждые 30 минут
+    const interval = setInterval(checkAndRefreshTokens, 30 * 60 * 1000);
+    
+    // Также проверяем при возвращении приложения в активное состояние
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        checkAndRefreshTokens();
+      }
+    };
+
+    // Добавляем слушатель состояния приложения
+    const { AppState } = require('react-native');
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      clearInterval(interval);
+      subscription?.remove();
+    };
+  }, [user]);
+
+
+  const handleAuthResponse = async (response: AuthResponse, preserveLocalData: boolean = false) => {
     await ApiService.saveTokens(response.accessToken, response.refreshToken);
     const authUser: AuthUser = {
       id: response.user.id,
@@ -133,7 +222,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isGuest: response.user.isGuest,
       isPremium: response.user.isPremium,
     };
-    await setupUserSession(authUser);
+    await setupUserSession(authUser, preserveLocalData);
+    
+    // Сбрасываем флаг уведомления при успешном входе
+    setHasShownOfflineNotification(false);
   }
 
   const login = async (email: string, password: string) => {
@@ -148,23 +240,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     const isGuest = user?.isGuest;
-    
-    // Синхронизируем данные перед выходом (только для не-гостевых пользователей)
-    if (!isGuest && user) {
-      try {
-        console.log('🔄 Syncing data before logout...');
-        const { CloudSyncService } = await import('../services/cloudSync');
-        const tokens = await ApiService.getTokens();
-        
-        if (tokens.accessToken) {
-          const syncSuccess = await CloudSyncService.syncData(user.id, tokens.accessToken);
-          console.log('📤 Data sync before logout:', syncSuccess ? 'success' : 'failed');
-        }
-      } catch (syncError) {
-        console.error('❌ Failed to sync data before logout:', syncError);
-      }
-    }
-    
     // Выходим из Google аккаунта (если пользователь не гость)
     if (!isGuest) {
       try {
@@ -176,13 +251,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error('❌ Failed to sign out from Google:', googleSignOutError);
       }
     }
-    
     setUser(null);
-    LocalDatabaseService.setUserId(null);
+    // LocalDatabaseService.setUserId(null); // УБРАНО, чтобы не терять локальные данные
     await ApiService.clearTokens();
     await AsyncStorage.removeItem('currentUser');
     await AsyncStorage.removeItem('isGuest'); // Очищаем флаг гостевого режима
-    
     if (!isGuest) {
       try {
         await AuthService.logout();
@@ -206,11 +279,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const loginWithGoogle = async (googleData: { idToken: string; email: string; name: string; googleId: string }) => {
     const response = await AuthService.loginWithGoogle(googleData);
-    await handleAuthResponse(response);
+    // Если текущий пользователь гость — не очищаем локальные данные
+    const wasGuest = user?.isGuest;
+    await handleAuthResponse(response, !!wasGuest);
+  };
+
+  const forceReauth = async () => {
+    console.log('🔄 [AuthContext] Принудительная переавторизация...');
+    await logout();
+    // Пользователь будет перенаправлен на экран входа
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isPreparing, login, register, logout, loginAsGuest, loginWithGoogle }}>
+    <AuthContext.Provider value={{ user, isLoading, isPreparing, login, register, logout, loginAsGuest, loginWithGoogle, forceReauth }}>
       {children}
     </AuthContext.Provider>
   );

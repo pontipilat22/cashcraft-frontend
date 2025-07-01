@@ -187,8 +187,12 @@ export class ApiService {
 
   private static async refreshAccessToken(): Promise<string | null> {
     try {
+      console.log('🔄 [ApiService] Начинаем обновление access token...');
       const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-      if (!refreshToken) return null;
+      if (!refreshToken) {
+        console.log('⚠️ [ApiService] Refresh token отсутствует');
+        return null;
+      }
 
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
@@ -197,15 +201,18 @@ export class ApiService {
       });
 
       if (!response.ok) {
-        await this.clearTokens();
+        console.log('⚠️ [ApiService] Не удалось обновить токен, но НЕ очищаем токены');
+        console.log('⚠️ [ApiService] Пользователь остается в системе');
         return null;
       }
 
       const data = await response.json();
+      console.log('✅ [ApiService] Токен успешно обновлен');
       await this.saveTokens(data.accessToken, data.refreshToken);
       return data.accessToken;
     } catch (error) {
-      console.error('Ошибка обновления токена:', error);
+      console.error('❌ [ApiService] Ошибка обновления токена:', error);
+      console.log('⚠️ [ApiService] Пользователь остается в системе');
       return null;
     }
   }

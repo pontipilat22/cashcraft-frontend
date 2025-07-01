@@ -312,55 +312,12 @@ export class UserDataService {
   static async resetAllData(): Promise<void> {
     console.log('🔄 [UserDataService] Начинаем сброс всех данных...');
     
-    // 1. Сбрасываем данные на сервере используя новый CloudSyncService
-    let serverResetSuccess = false;
-    try {
-      const token = await AsyncStorage.getItem('@cashcraft_access_token');
-      if (token && this.currentUserId) {
-        console.log('🌐 [UserDataService] Отправляем запрос на сброс данных через CloudSyncService...');
-        const { CloudSyncService } = await import('./cloudSync');
-        serverResetSuccess = await CloudSyncService.wipeData(this.currentUserId, token);
-        
-        if (serverResetSuccess) {
-          console.log('✅ [UserDataService] Данные на сервере успешно сброшены через CloudSyncService');
-        } else {
-          console.warn('⚠️ [UserDataService] Не удалось сбросить данные на сервере через CloudSyncService');
-        }
-      }
-    } catch (serverError) {
-      console.warn('⚠️ [UserDataService] Ошибка при сбросе данных на сервере:', serverError);
-    }
+    // Сбрасываем локальные данные
+    console.log('📱 [UserDataService] Сбрасываем локальные данные...');
+    const { WatermelonDatabaseService } = await import('./watermelonDatabase');
+    await WatermelonDatabaseService.clearAllData('USD');
     
-    // 2. Сбрасываем локальные данные
-    if (serverResetSuccess) {
-      // Если серверный сброс успешен, используем clearAllData для полной очистки WatermelonDB
-      console.log('📱 [UserDataService] Серверный сброс успешен, полностью очищаем WatermelonDB...');
-      const { WatermelonDatabaseService } = await import('./watermelonDatabase');
-      await WatermelonDatabaseService.clearAllData('USD');
-    } else {
-      // Если серверный сброс не удался, используем обычный сброс AsyncStorage
-      console.log('📱 [UserDataService] Серверный сброс не удался, сбрасываем AsyncStorage...');
-      const userData = await this.getUserData();
-      
-      // Оставляем только базовые категории и счет "Наличные"
-      userData.accounts = [{
-        id: '1',
-        name: 'Наличные',
-        type: 'cash',
-        balance: 0,
-        isDefault: true,
-        isIncludedInTotal: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }];
-      userData.transactions = [];
-      userData.categories = DEFAULT_CATEGORIES;
-      userData.debts = [];
-      
-      await this.saveUserData(userData);
-    }
-    
-    // 3. Устанавливаем флаг сброса данных
+    // Устанавливаем флаг сброса данных
     if (this.currentUserId) {
       console.log('🏷️ [UserDataService] Устанавливаем флаг сброса данных...');
       await AsyncStorage.setItem(`dataReset_${this.currentUserId}`, 'true');

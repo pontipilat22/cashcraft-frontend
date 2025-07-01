@@ -329,18 +329,37 @@ export class WatermelonDatabaseService {
   }
 
   static async deleteTransaction(transaction: any): Promise<void> {
-    await database.write(async () => {
-      // Отменяем изменение баланса
-      const account = await database.get<Account>('accounts').find(transaction.accountId);
-      await account.update(acc => {
-        const balanceChange = transaction.type === 'income' ? -transaction.amount : transaction.amount;
-        acc.balance = acc.balance + balanceChange;
-      });
+    try {
+      console.log('🗑️ [WatermelonDB] Начинаем удаление транзакции:', transaction.id);
+      
+      await database.write(async () => {
+        // Отменяем изменение баланса
+        const account = await database.get<Account>('accounts').find(transaction.accountId);
+        if (account) {
+          await account.update(acc => {
+            const balanceChange = transaction.type === 'income' ? -transaction.amount : transaction.amount;
+            acc.balance = acc.balance + balanceChange;
+            console.log('💰 [WatermelonDB] Обновлен баланс счета:', transaction.accountId, 'на', balanceChange);
+          });
+        } else {
+          console.warn('⚠️ [WatermelonDB] Счет не найден для транзакции:', transaction.accountId);
+        }
 
-      // Удаляем транзакцию
-      const trans = await database.get<Transaction>('transactions').find(transaction.id);
-      await trans.destroyPermanently();
-    });
+        // Удаляем транзакцию
+        const trans = await database.get<Transaction>('transactions').find(transaction.id);
+        if (trans) {
+          await trans.destroyPermanently();
+          console.log('✅ [WatermelonDB] Транзакция успешно удалена из базы данных');
+        } else {
+          console.warn('⚠️ [WatermelonDB] Транзакция не найдена в базе данных:', transaction.id);
+        }
+      });
+      
+      console.log('✅ [WatermelonDB] Удаление транзакции завершено успешно');
+    } catch (error) {
+      console.error('❌ [WatermelonDB] Ошибка удаления транзакции:', error);
+      throw error;
+    }
   }
 
   // Методы для работы с категориями
@@ -787,24 +806,7 @@ export class WatermelonDatabaseService {
   static async resetAllData(defaultCurrency: string = 'USD'): Promise<void> {
     console.log('🔄 [WatermelonDatabase] Начинаем сброс всех данных...');
     
-    // 1. Сбрасываем данные на сервере используя новый CloudSyncService
-    try {
-      const token = await AsyncStorage.getItem('@cashcraft_access_token');
-      if (token && this.currentUserId) {
-        console.log('🌐 [WatermelonDatabase] Отправляем запрос на сброс данных через CloudSyncService...');
-        const { CloudSyncService } = await import('./cloudSync');
-        const serverResetSuccess = await CloudSyncService.wipeData(this.currentUserId, token);
-        
-        if (serverResetSuccess) {
-          console.log('✅ [WatermelonDatabase] Данные на сервере успешно сброшены через CloudSyncService');
-        } else {
-          console.warn('⚠️ [WatermelonDatabase] Не удалось сбросить данные на сервере через CloudSyncService');
-        }
-      }
-    } catch (serverError) {
-      console.warn('⚠️ [WatermelonDatabase] Ошибка при сбросе данных на сервере:', serverError);
-      // Продолжаем с локальным сбросом даже если сервер недоступен
-    }
+
     
     // 2. Сбрасываем локальные данные
     console.log('📱 [WatermelonDatabase] Сбрасываем локальные данные...');

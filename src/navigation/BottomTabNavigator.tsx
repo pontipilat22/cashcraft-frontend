@@ -51,7 +51,7 @@ export const BottomTabNavigator: React.FC = () => {
           if (route.name === 'Accounts') {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Transactions') {
-            iconName = focused ? 'receipt' : 'receipt-outline';
+            iconName = focused ? 'swap-horizontal' : 'swap-horizontal-outline';
           } else if (route.name === 'More') {
             iconName = focused ? 'menu' : 'menu-outline';
           } else {
@@ -99,11 +99,7 @@ export const BottomTabNavigator: React.FC = () => {
         component={MoreNavigator}
         options={{ 
           title: t('navigation.more'),
-          headerTitle: t('navigation.more'),
-          headerTitleStyle: {
-            fontSize: 20,
-            fontWeight: '600',
-          },
+          headerShown: false,
         }}
       />
     </Tab.Navigator>

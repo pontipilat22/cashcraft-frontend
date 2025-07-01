@@ -87,10 +87,9 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
   const loadSubscriptionStatus = async () => {
     try {
       const userId = await AsyncStorage.getItem('currentUser');
-      const isGuest = await AsyncStorage.getItem('isGuest');
       
-      // Подписка доступна только для зарегистрированных пользователей
-      if (!userId || isGuest === 'true') {
+      // Подписка доступна для всех пользователей (включая гостей) для тестирования
+      if (!userId) {
         return;
       }
       
@@ -112,7 +111,8 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       const userId = await AsyncStorage.getItem('currentUser');
       const isGuest = await AsyncStorage.getItem('isGuest');
       
-      if (!userId || isGuest === 'true') {
+      // Разрешаем покупку подписки всем пользователям (включая гостей) для тестирования
+      if (!userId) {
         Alert.alert(
           t('premium.loginRequired'),
           t('premium.loginRequiredMessage'),
@@ -206,6 +206,40 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
     );
   };
 
+  const handleDeleteSubscription = async () => {
+    Alert.alert(
+      'Удалить подписку',
+      'Вы уверены, что хотите полностью удалить подписку? Это действие нельзя отменить.',
+      [
+        {
+          text: 'Отмена',
+          style: 'cancel',
+        },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const userId = await AsyncStorage.getItem('currentUser');
+              if (!userId) return;
+              
+              const subscriptionKey = `subscription_${userId}`;
+              await AsyncStorage.removeItem(subscriptionKey);
+              setCurrentSubscription(null);
+              
+              // Обновляем статус подписки в контексте
+              await checkSubscription();
+              
+              Alert.alert('Подписка удалена', 'Ваша подписка была успешно удалена.');
+            } catch (error) {
+              Alert.alert(t('common.error'), 'Ошибка при удалении подписки');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (currentSubscription?.isActive) {
     const endDate = new Date(currentSubscription.endDate);
     const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -258,6 +292,15 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
                 </Text>
               </TouchableOpacity>
             )}
+
+            <TouchableOpacity
+              style={[styles.deleteButton, { borderColor: colors.danger, backgroundColor: colors.danger + '10' }]}
+              onPress={handleDeleteSubscription}
+            >
+              <Text style={[styles.deleteButtonText, { color: colors.danger }]}>
+                Удалить подписку
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -543,5 +586,16 @@ const styles = StyleSheet.create({
   warningText: {
     fontSize: 14,
     marginLeft: 8,
+  },
+  deleteButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

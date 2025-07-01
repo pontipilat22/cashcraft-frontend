@@ -44,7 +44,7 @@ export const SettingsScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
   const { t, currentLanguage, setLanguage, languages } = useLocalization();
   const { defaultCurrency, setDefaultCurrency, currencies, formatAmount } = useCurrency();
-  const { user, logout, login } = useAuth();
+  const { user, logout, login, forceReauth } = useAuth();
   const { accounts, updateAccount } = useData();
   const navigation = useNavigation();
   
@@ -135,12 +135,7 @@ export const SettingsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Очищаем все токены
-              await ApiService.clearTokens();
-              
-              // Выходим из системы
-              await logout();
-              
+              await forceReauth();
               Alert.alert(
                 t('settings.forceLogin.success.title'),
                 t('settings.forceLogin.success.message')

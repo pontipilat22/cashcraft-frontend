@@ -385,13 +385,6 @@ export const AuthScreen: React.FC = () => {
                 }}
               />
 
-              <GoogleSignInButton
-                showSignOut={true}
-                onError={(error) => {
-                  Alert.alert(t('common.error'), error.message || 'Failed to sign out from Google');
-                }}
-              />
-
               <TouchableOpacity
                 style={[styles.guestButton, { borderColor: colors.border }]}
                 onPress={handleGuestLogin}

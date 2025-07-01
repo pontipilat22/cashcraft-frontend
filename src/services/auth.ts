@@ -103,14 +103,18 @@ export class AuthService {
   // Обновление access токена
   static async refreshToken(token: string): Promise<{accessToken: string, refreshToken: string} | null> {
     try {
+      console.log('🔄 [AuthService] Начинаем обновление токена...');
       const response = await ApiService.post<{ accessToken: string, refreshToken: string }>('/auth/refresh', {
         refreshToken: token
       });
 
+      console.log('✅ [AuthService] Токен успешно обновлен');
       await ApiService.saveTokens(response.accessToken, response.refreshToken);
       return response;
     } catch (error) {
-      await ApiService.clearTokens();
+      console.log('⚠️ [AuthService] Не удалось обновить токен, но НЕ очищаем токены');
+      console.log('⚠️ [AuthService] Пользователь остается в системе');
+      // НЕ очищаем токены, пользователь остается в системе
       return null;
     }
   }

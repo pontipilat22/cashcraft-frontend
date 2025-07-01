@@ -83,6 +83,9 @@ export default {
     title: 'Счета',
     totalBalance: 'Общий баланс',
     addAccount: 'Добавить счёт',
+    addCredit: 'Добавить кредит',
+    addSavings: 'Добавить накопление',
+    addDebt: 'Добавить долг',
     editAccount: 'Изменить счёт',
     deleteAccount: 'Удалить счёт',
     deleteAccountConfirm: 'Вы уверены, что хотите удалить',
@@ -228,6 +231,7 @@ export default {
     // Placeholders
     exampleIncome: 'Например: Зарплата',
     exampleExpense: 'Например: Продукты',
+    deleteError: 'Не удалось удалить транзакцию',
   },
   categories: {
     // Income categories

@@ -82,6 +82,9 @@ export default {
     title: 'Accounts',
     totalBalance: 'Total Balance',
     addAccount: 'Add Account',
+    addCredit: 'Add Credit',
+    addSavings: 'Add Savings',
+    addDebt: 'Add Debt',
     editAccount: 'Edit Account',
     deleteAccount: 'Delete Account',
     deleteAccountConfirm: 'Are you sure you want to delete',
@@ -227,6 +230,7 @@ export default {
     // Placeholders
     exampleIncome: 'E.g.: Salary',
     exampleExpense: 'E.g.: Groceries',
+    deleteError: 'Failed to delete transaction',
   },
   categories: {
     // Income categories

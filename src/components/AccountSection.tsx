@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
@@ -19,6 +19,11 @@ export const AccountSection: React.FC<AccountSectionProps> = ({
   // Определяем начальное состояние: если счетов больше 0, секция открыта
   const [isExpanded, setIsExpanded] = useState(count > 0);
   const { colors } = useTheme();
+
+  // Обновляем состояние при изменении количества элементов
+  useEffect(() => {
+    setIsExpanded(count > 0);
+  }, [count]);
 
   return (
     <View style={styles.container}>

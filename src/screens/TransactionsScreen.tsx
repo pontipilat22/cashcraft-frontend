@@ -362,12 +362,19 @@ export const TransactionsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('🗑️ [TransactionsScreen] Начинаем удаление выбранных транзакций:', Array.from(selectedIds));
               for (const id of selectedIds) {
+                console.log('🗑️ [TransactionsScreen] Удаляем транзакцию:', id);
                 await deleteTransaction(id);
               }
+              console.log('✅ [TransactionsScreen] Все транзакции успешно удалены');
               exitSelectionMode();
             } catch (error) {
-              console.error('Error deleting transactions:', error);
+              console.error('❌ [TransactionsScreen] Ошибка удаления транзакций:', error);
+              Alert.alert(
+                t('common.error'),
+                t('transactions.deleteError') || 'Ошибка при удалении транзакций'
+              );
             }
           },
         },
@@ -395,9 +402,16 @@ export const TransactionsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('🗑️ [TransactionsScreen] Удаляем транзакцию:', selectedTransaction.id);
               await deleteTransaction(selectedTransaction.id);
+              console.log('✅ [TransactionsScreen] Транзакция успешно удалена');
+              setShowActionsModal(false);
             } catch (error) {
-              console.error('Error deleting transaction:', error);
+              console.error('❌ [TransactionsScreen] Ошибка удаления транзакции:', error);
+              Alert.alert(
+                t('common.error'),
+                t('transactions.deleteError') || 'Ошибка при удалении транзакции'
+              );
             }
           },
         },

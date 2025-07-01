@@ -15,7 +15,7 @@ import { getCurrentLanguage } from '../services/i18n';
 
 export const MoreScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
-  const { resetAllData, syncData, isSyncing, lastSyncTime } = useData();
+  const { resetAllData } = useData();
   const { user, logout } = useAuth();
   const { isPremium, checkSubscription } = useSubscription();
   const [showCategories, setShowCategories] = useState(false);
@@ -185,38 +185,7 @@ export const MoreScreen: React.FC = () => {
           {menuItems.map(renderMenuItem)}
         </View>
 
-        {/* Синхронизация */}
-        {!user?.isGuest && (
-          <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              activeOpacity={0.7}
-              onPress={() => syncData()}
-              disabled={isSyncing}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
-                  {isSyncing ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons name="cloud-outline" size={24} color={colors.primary} />
-                  )}
-                </View>
-                <View style={{ marginLeft: 16, flex: 1 }}>
-                  <Text style={[styles.menuItemTitle, { color: colors.text }]}>
-                    {isSyncing ? t('common.synchronizing') : t('common.synchronize')}
-                  </Text>
-                  {lastSyncTime && (
-                    <Text style={[styles.syncTimeText, { color: colors.textSecondary }]}>
-                      {t('common.lastSync')}: {new Date(lastSyncTime).toLocaleString(currentLanguage === 'ru' ? 'ru' : 'en')}
-                    </Text>
-                  )}
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        )}
+
 
         {/* Опасная зона */}
         <View style={[styles.section, { backgroundColor: colors.card, marginTop: 20 }]}>
