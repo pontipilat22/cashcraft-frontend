@@ -16,7 +16,7 @@ export const StatisticsCard: React.FC<StatisticsCardProps> = ({ onPeriodPress })
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const { formatAmount } = useCurrency();
-  const { getStatistics } = useData();
+  const { getStatistics, transactions } = useData();
   
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
   const [showPeriodModal, setShowPeriodModal] = useState(false);
@@ -31,7 +31,7 @@ export const StatisticsCard: React.FC<StatisticsCardProps> = ({ onPeriodPress })
   useEffect(() => {
     const newStats = getStatistics(startDate, endDate);
     setStats(newStats);
-  }, [startDate, endDate, getStatistics]);
+  }, [startDate, endDate, getStatistics, transactions]);
 
   const updateDatesForPeriod = (period: PeriodType) => {
     const now = new Date();

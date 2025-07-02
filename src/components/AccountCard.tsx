@@ -391,7 +391,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                   </View>
                   {account.type === 'card' && account.cardNumber && (
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}> 
-                      {account.cardNumber}
+                      •••• {account.cardNumber}
                     </Text>
                   )}
                   {account.type === 'credit' && account.creditTerm && account.creditRate !== undefined && account.creditPaymentType && (

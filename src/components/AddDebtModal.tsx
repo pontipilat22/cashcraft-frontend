@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { Debt } from '../types';
 
 interface AddDebtModalProps {
@@ -33,19 +34,53 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
 }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { defaultCurrency, currencies, formatAmount } = useCurrency();
   
   const [type, setType] = useState<'owed_to_me' | 'owed_by_me'>('owed_to_me');
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState(defaultCurrency);
+  const [exchangeRate, setExchangeRate] = useState('1');
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [isIncludedInTotal, setIsIncludedInTotal] = useState(true);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Загружаем предложенный курс при изменении валюты
+  useEffect(() => {
+    const loadSuggestedRate = async () => {
+      if (selectedCurrency !== defaultCurrency) {
+        try {
+          // Используем безопасный метод ExchangeRateService
+          const { ExchangeRateService } = await import('../services/exchangeRate');
+          
+          // Пытаемся найти сохраненный курс
+          const rate = await ExchangeRateService.getRate(selectedCurrency, defaultCurrency);
+          if (rate) {
+            setExchangeRate(rate.toString());
+          } else {
+            // Если курса нет, устанавливаем 1:1
+            setExchangeRate('1');
+          }
+        } catch (error) {
+          console.error('Error loading exchange rate:', error);
+          setExchangeRate('1');
+        }
+      } else {
+        setExchangeRate('1');
+      }
+    };
+    
+    loadSuggestedRate();
+  }, [selectedCurrency, defaultCurrency]);
 
   useEffect(() => {
     if (editingDebt) {
       setType(editingDebt.type);
       setName(editingDebt.name);
       setAmount(editingDebt.amount.toString());
+      setSelectedCurrency(editingDebt.currency || defaultCurrency);
+      setExchangeRate(editingDebt.exchangeRate?.toString() || '1');
       setIsIncludedInTotal(editingDebt.isIncludedInTotal !== false);
       setDueDate(editingDebt.dueDate ? new Date(editingDebt.dueDate) : undefined);
     } else {
@@ -53,10 +88,12 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       setType('owed_to_me');
       setName('');
       setAmount('');
+      setSelectedCurrency(defaultCurrency);
+      setExchangeRate('1');
       setIsIncludedInTotal(true);
       setDueDate(undefined);
     }
-  }, [editingDebt, visible]);
+  }, [editingDebt, visible, defaultCurrency]);
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -74,6 +111,8 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       type,
       name: name.trim(),
       amount: numAmount,
+      currency: selectedCurrency,
+      exchangeRate: selectedCurrency !== defaultCurrency ? parseFloat(exchangeRate) : undefined,
       isIncludedInTotal,
       dueDate: dueDate?.toISOString(),
     });
@@ -189,9 +228,39 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />
-                <Text style={[styles.currency, { color: colors.textSecondary }]}>₽</Text>
+                <TouchableOpacity
+                  style={styles.currencyButton}
+                  onPress={() => setShowCurrencyPicker(true)}
+                >
+                  <Text style={[styles.currency, { color: colors.textSecondary }]}>
+                    {selectedCurrency}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
             </View>
+
+            {/* Курс обмена (если валюта отличается от основной) */}
+            {selectedCurrency !== defaultCurrency && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Курс обмена ({selectedCurrency}/{defaultCurrency})
+                </Text>
+                <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                  <TextInput
+                    style={[styles.input, { color: colors.text }]}
+                    value={exchangeRate}
+                    onChangeText={setExchangeRate}
+                    placeholder="1"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="numeric"
+                  />
+                  <Text style={[styles.currency, { color: colors.textSecondary }]}>
+                    {defaultCurrency}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Дата возврата */}
             <View style={styles.section}>
@@ -255,6 +324,50 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             minimumDate={new Date()}
           />
         )}
+
+        {/* Модальное окно выбора валюты */}
+        <Modal
+          visible={showCurrencyPicker}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowCurrencyPicker(false)}
+        >
+          <View style={styles.currencyModalOverlay}>
+            <View style={[styles.currencyModal, { backgroundColor: colors.background }]}>
+              <View style={[styles.currencyModalHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.currencyModalTitle, { color: colors.text }]}>
+                  Выберите валюту
+                </Text>
+                <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.currencyList}>
+                {Object.keys(currencies).map((currency) => (
+                  <TouchableOpacity
+                    key={currency}
+                    style={[
+                      styles.currencyItem,
+                      { backgroundColor: colors.card },
+                      selectedCurrency === currency && { backgroundColor: colors.primary }
+                    ]}
+                    onPress={() => {
+                      setSelectedCurrency(currency);
+                      setShowCurrencyPicker(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.currencyItemText,
+                      { color: selectedCurrency === currency ? '#fff' : colors.text }
+                    ]}>
+                      {currency}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -330,6 +443,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 8,
   },
+  currencyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -363,5 +481,39 @@ const styles = StyleSheet.create({
   switchSubtitle: {
     fontSize: 14,
     marginTop: 4,
+  },
+  currencyModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currencyModal: {
+    width: '80%',
+    maxHeight: '70%',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  currencyModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  currencyModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  currencyList: {
+    maxHeight: 300,
+  },
+  currencyItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  currencyItemText: {
+    fontSize: 16,
   },
 }); 

@@ -17,7 +17,7 @@ export const MoreScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
   const { resetAllData } = useData();
   const { user, logout } = useAuth();
-  const { isPremium, checkSubscription } = useSubscription();
+  const { isPremium, checkIfPremium } = useSubscription();
   const [showCategories, setShowCategories] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const navigation = useNavigation<any>();
@@ -28,7 +28,7 @@ export const MoreScreen: React.FC = () => {
 
   useEffect(() => {
     // Проверяем статус подписки при загрузке
-    checkSubscription();
+    checkIfPremium();
   }, []);
 
   const handleResetData = () => {
@@ -71,10 +71,25 @@ export const MoreScreen: React.FC = () => {
       onPress: () => setShowCategories(true),
     },
     {
+      id: 'export-import',
+      title: t('export.title') || 'Экспорт и импорт',
+      icon: 'sync-outline',
+      onPress: () => navigation.navigate('ExportImport'),
+    },
+    {
       id: 'help',
       title: t('common.help'),
       icon: 'help-circle-outline',
       onPress: () => navigation.navigate('Help'),
+    },
+    {
+      id: 'refresh-subscription',
+      title: 'Обновить статус подписки',
+      icon: 'refresh-outline',
+      onPress: async () => {
+        const hasPremium = await checkIfPremium();
+        Alert.alert('Готово', `Статус подписки обновлен. Premium: ${hasPremium ? 'Да' : 'Нет'}`);
+      },
     },
   ];
 
@@ -234,11 +249,13 @@ export const MoreScreen: React.FC = () => {
         visible={showSubscription}
         animationType="slide"
         presentationStyle="pageSheet"
-        onDismiss={checkSubscription}
+        onDismiss={() => {
+          checkIfPremium();
+        }}
       >
         <SubscriptionScreen onClose={() => {
           setShowSubscription(false);
-          checkSubscription();
+          checkIfPremium();
         }} />
       </Modal>
     </SafeAreaView>

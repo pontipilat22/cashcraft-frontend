@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar, TouchableOpacity, Modal } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useSubscription } from '../context/SubscriptionContext';
@@ -25,6 +25,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { TransferModal } from '../components/TransferModal';
 import { SavingsActionModal } from '../components/SavingsActionModal';
 import { StatisticsCard } from '../components/StatisticsCard';
+import { SubscriptionScreen } from './SubscriptionScreen';
 
 type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
 
@@ -35,7 +36,7 @@ interface AccountsScreenProps {
 export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
   const { accounts, isLoading, createAccount, updateAccount, deleteAccount, addToSavings, withdrawFromSavings } = useData();
-  const { isPremium } = useSubscription();
+  const { checkIfPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
   const { formatAmount } = useCurrency();
@@ -56,6 +57,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [showSavingsActionModal, setShowSavingsActionModal] = useState(false);
   const [savingsAction, setSavingsAction] = useState<'add' | 'withdraw'>('add');
   const [selectedSavings, setSelectedSavings] = useState<Account | null>(null);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   // Загружаем долги при фокусе экрана
   useFocusEffect(
@@ -82,6 +84,17 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     }
   }, [accounts]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      checkIfPremium();
+      // Добавляем небольшую задержку для гарантии обновления состояния
+      const timer = setTimeout(() => {
+        checkIfPremium();
+      }, 500);
+      return () => clearTimeout(timer);
+    }, [checkIfPremium])
+  );
+
   const loadDebts = async () => {
     const allDebts = await LocalDatabaseService.getDebts();
     setDebts(allDebts);
@@ -102,76 +115,65 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     credits: accounts.filter(a => a.type === 'credit'),
   };
 
-  const handleAddAccount = (section: 'cards' | 'savings' | 'debts' | 'credits') => {
-    // Проверка лимита для бесплатных пользователей
-    if (!isPremium) {
-      let limitReached = false;
-      let accountLimit = 0;
-      let currentCount = 0;
+  const handleAddAccount = async (section: 'cards' | 'savings' | 'debts' | 'credits') => {
+    console.log('🎯 [AccountsScreen] handleAddAccount called for section:', section);
+    
+    // Всегда проверяем актуальный статус подписки
+    const hasPremium = await checkIfPremium();
+    
+    console.log('📊 [AccountsScreen] Current state:');
+    console.log('  - hasPremium:', hasPremium);
+    console.log('  - total accounts:', accounts.length);
+    console.log('  - user:', user);
+    console.log('  - isGuest:', user?.isGuest);
+    
+    // Простая логика: без подписки - максимум 2 счета ВСЕГО
+    const MAX_FREE_ACCOUNTS = 2;
+    
+    if (!hasPremium && accounts.length >= MAX_FREE_ACCOUNTS) {
+      console.log('⚠️ [AccountsScreen] Account limit reached!');
+      console.log('  - Current accounts:', accounts.length);
+      console.log('  - Limit:', MAX_FREE_ACCOUNTS);
       
-      // Определяем лимиты и считаем текущее количество для каждого типа
-      switch (section) {
-        case 'cards':
-          accountLimit = 2; // Лимит 2 для карт и счетов
-          currentCount = groupedAccounts.cards.length;
-          limitReached = currentCount >= accountLimit;
-          break;
-        case 'savings':
-          accountLimit = 1; // Лимит 1 для накоплений
-          currentCount = groupedAccounts.savings.length;
-          limitReached = currentCount >= accountLimit;
-          break;
-        case 'debts':
-        case 'credits':
-          // Долги и кредиты без ограничений
-          limitReached = false;
-          break;
+      if (user?.isGuest) {
+        Alert.alert(
+          'Требуется авторизация',
+          `Гостевые пользователи могут создать только ${MAX_FREE_ACCOUNTS} счета. Войдите в аккаунт и оформите подписку для неограниченного количества счетов.`,
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: 'Войти в аккаунт',
+              onPress: () => {
+                navigation.navigate('More' as any);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Требуется подписка Premium',
+          `Бесплатная версия позволяет создать только ${MAX_FREE_ACCOUNTS} счета. Оформите подписку для неограниченного количества счетов.`,
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: 'Оформить подписку',
+              onPress: () => {
+                setShowSubscriptionModal(true);
+              },
+            },
+          ]
+        );
       }
-      
-      if (limitReached) {
-        const isGuest = user?.isGuest;
-        
-        if (isGuest) {
-          Alert.alert(
-            t('accounts.authRequired'),
-            t('accounts.guestLimitMessage'),
-            [
-              {
-                text: t('common.cancel'),
-                style: 'cancel',
-              },
-              {
-                text: t('accounts.signIn'),
-                onPress: () => {
-                  // Выходим из гостевого режима
-                  navigation.navigate('More' as any);
-                },
-              },
-            ]
-          );
-        } else {
-          Alert.alert(
-            t('accounts.limitReached'),
-            t('accounts.freeLimitMessage'),
-            [
-              {
-                text: t('common.cancel'),
-                style: 'cancel',
-              },
-              {
-                text: t('accounts.getPremium'),
-                onPress: () => {
-                  // Открываем экран подписки через MoreScreen
-                  navigation.navigate('More' as any);
-                },
-              },
-            ]
-          );
-        }
-        return;
-      }
+      return;
     }
 
+    // Если проверка пройдена, продолжаем создание счета
     setSectionToAdd(section);
     
     if (section === 'cards') {
@@ -459,7 +461,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   shadowRadius: 15,
                   elevation: 12,
                 }]}
-                onPress={() => navigation.navigate('DebtList')}
+                onPress={() => navigation.navigate('DebtList', { type: 'owed_to_me' })}
               >
                 <View style={[styles.debtIconContainer, {
                   backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
@@ -488,7 +490,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   shadowRadius: 15,
                   elevation: 12,
                 }]}
-                onPress={() => navigation.navigate('DebtList')}
+                onPress={() => navigation.navigate('DebtList', { type: 'owed_by_me' })}
               >
                 <View style={[styles.debtIconContainer, {
                   backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
@@ -606,6 +608,20 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
           linkedAccount={accounts.find(acc => acc.id === selectedSavings.linkedAccountId)}
         />
       )}
+
+      <Modal
+        visible={showSubscriptionModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onDismiss={() => {
+          checkIfPremium();
+        }}
+      >
+        <SubscriptionScreen onClose={() => {
+          setShowSubscriptionModal(false);
+          checkIfPremium();
+        }} />
+      </Modal>
     </View>
   );
 };

@@ -6,6 +6,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { CategoriesScreen } from '../screens/CategoriesScreen';
 import { PrivacyPolicyScreen } from '../screens/PrivacyPolicyScreen';
 import { HelpScreen } from '../screens/HelpScreen';
+import { ExportImportScreen } from '../screens/ExportImportScreen';
 
 export type MoreStackParamList = {
   MoreMain: undefined;
@@ -14,6 +15,7 @@ export type MoreStackParamList = {
   Statistics: undefined;
   PrivacyPolicy: undefined;
   Help: undefined;
+  ExportImport: undefined;
 };
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -54,6 +56,11 @@ export const MoreNavigator: React.FC = () => {
       <Stack.Screen
         name="Help"
         component={HelpScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ExportImport"
+        component={ExportImportScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

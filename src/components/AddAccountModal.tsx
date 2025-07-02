@@ -483,7 +483,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
             {accountType === 'card' && (
               <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.cardNumber')}</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.cardNumber')} (необязательно)</Text>
                 <TextInput
                   style={[styles.input, { 
                     backgroundColor: colors.background,
@@ -491,11 +491,17 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                     borderColor: colors.border,
                   }]}
                   value={cardNumber}
-                  onChangeText={setCardNumber}
-                  placeholder="XXXX XXXX XXXX XXXX"
+                  onChangeText={(text) => {
+                    // Разрешаем только цифры и максимум 4 символа
+                    const cleaned = text.replace(/[^0-9]/g, '');
+                    if (cleaned.length <= 4) {
+                      setCardNumber(cleaned);
+                    }
+                  }}
+                  placeholder="Последние 4 цифры"
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
-                  maxLength={19}
+                  maxLength={4}
                 />
               </View>
             )}

@@ -35,16 +35,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [hasShownOfflineNotification, setHasShownOfflineNotification] = useState(false);
   const { defaultCurrency } = useCurrency();
 
-  const setupUserSession = useCallback(async (authUser: AuthUser, preserveLocalData: boolean = false) => {
+  const setupUserSession = useCallback(async (authUser: AuthUser, preserveLocalData: boolean = true) => {
     setIsPreparing(true);
     try {
+      console.log('🔍 [AuthContext] setupUserSession called:');
+      console.log('  - authUser:', authUser);
+      console.log('  - preserveLocalData:', preserveLocalData);
+      
       await AsyncStorage.setItem('currentUser', JSON.stringify(authUser));
       await AsyncStorage.setItem('isGuest', authUser.isGuest ? 'true' : 'false');
       LocalDatabaseService.setUserId(authUser.id);
-      if (!preserveLocalData) {
-        await LocalDatabaseService.clearAllData(defaultCurrency);
-        await LocalDatabaseService.initDatabase(defaultCurrency);
-      }
+      
+      // НЕ очищаем данные при входе в аккаунт - данные всегда сохраняются
+      // if (!preserveLocalData) {
+      //   await LocalDatabaseService.clearAllData(defaultCurrency);
+      //   await LocalDatabaseService.initDatabase(defaultCurrency);
+      // }
+      
       // Инициализируем курсы валют с backend
       try {
         console.log('Initializing exchange rates...');
@@ -229,17 +236,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }
 
   const login = async (email: string, password: string) => {
+    console.log('🔍 [AuthContext] login called');
     const response = await AuthService.login({ email, password });
-    await handleAuthResponse(response);
+    // Всегда сохраняем локальные данные при входе
+    await handleAuthResponse(response, true);
   };
 
   const register = async (email: string, password: string, displayName?: string) => {
+    console.log('🔍 [AuthContext] register called');
     const response = await AuthService.register({ email, password, display_name: displayName });
-    await handleAuthResponse(response);
+    // Всегда сохраняем локальные данные при регистрации
+    await handleAuthResponse(response, true);
   };
 
   const logout = async () => {
+    console.log('🔍 [AuthContext] logout called');
     const isGuest = user?.isGuest;
+    
     // Выходим из Google аккаунта (если пользователь не гость)
     if (!isGuest) {
       try {
@@ -251,11 +264,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error('❌ Failed to sign out from Google:', googleSignOutError);
       }
     }
+    
     setUser(null);
+    // НЕ очищаем локальные данные при выходе - они остаются на устройстве
     // LocalDatabaseService.setUserId(null); // УБРАНО, чтобы не терять локальные данные
+    
     await ApiService.clearTokens();
     await AsyncStorage.removeItem('currentUser');
     await AsyncStorage.removeItem('isGuest'); // Очищаем флаг гостевого режима
+    
     if (!isGuest) {
       try {
         await AuthService.logout();
@@ -263,6 +280,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('Logout network error (ignored):', error);
       }
     }
+    
+    console.log('✅ [AuthContext] Logout completed, local data preserved');
   };
 
   const loginAsGuest = async () => {
@@ -278,10 +297,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginWithGoogle = async (googleData: { idToken: string; email: string; name: string; googleId: string }) => {
+    console.log('🔍 [AuthContext] loginWithGoogle called');
     const response = await AuthService.loginWithGoogle(googleData);
-    // Если текущий пользователь гость — не очищаем локальные данные
-    const wasGuest = user?.isGuest;
-    await handleAuthResponse(response, !!wasGuest);
+    // Всегда сохраняем локальные данные при входе через Google
+    await handleAuthResponse(response, true);
   };
 
   const forceReauth = async () => {

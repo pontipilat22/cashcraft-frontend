@@ -15,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useNavigation } from '@react-navigation/native';
 import { useLocalization } from '../context/LocalizationContext';
+import { useAuth } from '../context/AuthContext';
 
 interface SubscriptionPlan {
   id: string;
@@ -34,10 +35,11 @@ interface SubscriptionScreenProps {
 
 export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose }) => {
   const { colors, isDark } = useTheme();
-  const { checkSubscription } = useSubscription();
+  const { user } = useAuth();
+  const { subscription, checkIfPremium, activateSubscription, cancelSubscription } = useSubscription();
   const navigation = useNavigation();
   const { t } = useLocalization();
-  const [selectedPlan, setSelectedPlan] = useState<string>('yearly');
+  const [selectedPlan, setSelectedPlan] = useState<string>('monthly');
   const [isLoading, setIsLoading] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
 
@@ -73,6 +75,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
   ];
 
   useEffect(() => {
+    console.log('🔍 [SubscriptionScreen] useEffect triggered');
     loadSubscriptionStatus();
   }, []);
 
@@ -85,54 +88,15 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
   };
 
   const loadSubscriptionStatus = async () => {
-    try {
-      const userId = await AsyncStorage.getItem('currentUser');
-      
-      // Подписка доступна для всех пользователей (включая гостей) для тестирования
-      if (!userId) {
-        return;
-      }
-      
-      const subscriptionKey = `subscription_${userId}`;
-      const subscription = await AsyncStorage.getItem(subscriptionKey);
-      if (subscription) {
-        setCurrentSubscription(JSON.parse(subscription));
-      }
-    } catch (error) {
-      console.error('Error loading subscription:', error);
+    const hasPremium = await checkIfPremium();
+    if (hasPremium && subscription) {
+      setCurrentSubscription(subscription);
     }
   };
 
   const handleSubscribe = async () => {
-    setIsLoading(true);
-    
     try {
-      // Проверяем авторизацию
-      const userId = await AsyncStorage.getItem('currentUser');
-      const isGuest = await AsyncStorage.getItem('isGuest');
-      
-      // Разрешаем покупку подписки всем пользователям (включая гостей) для тестирования
-      if (!userId) {
-        Alert.alert(
-          t('premium.loginRequired'),
-          t('premium.loginRequiredMessage'),
-          [
-            {
-              text: t('common.cancel'),
-              style: 'cancel',
-            },
-            {
-              text: t('auth.login'),
-              onPress: handleGoBack,
-            },
-          ]
-        );
-        setIsLoading(false);
-        return;
-      }
-      
-      // В реальном приложении здесь был бы вызов API для обработки платежа
-      // Для демо просто сохраняем подписку локально
+      setIsLoading(true);
       
       const plan = plans.find(p => p.id === selectedPlan);
       if (!plan) return;
@@ -140,23 +104,9 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       // Симуляция процесса оплаты
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const subscription = {
-        planId: selectedPlan,
-        planName: plan.name,
-        price: plan.price,
-        startDate: new Date().toISOString(),
-        endDate: selectedPlan === 'monthly' 
-          ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        isActive: true,
-        userId: userId, // Привязываем к пользователю
-      };
-
-      const subscriptionKey = `subscription_${userId}`;
-      await AsyncStorage.setItem(subscriptionKey, JSON.stringify(subscription));
-      
-      // Обновляем статус подписки в контексте
-      await checkSubscription();
+      // Активируем подписку
+      const days = selectedPlan === 'monthly' ? 30 : 365;
+      await activateSubscription(plan.id, plan.name, plan.price, days);
       
       Alert.alert(
         t('premium.subscribeSuccess'),
@@ -169,7 +119,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
         ]
       );
     } catch (error) {
-      Alert.alert(t('common.error'), t('premium.subscribeError'));
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('premium.subscribeError'));
     } finally {
       setIsLoading(false);
     }
@@ -189,13 +139,17 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
           style: 'destructive',
           onPress: async () => {
             try {
-              const userId = await AsyncStorage.getItem('currentUser');
-              if (!userId) return;
+              if (!currentSubscription) return;
               
-              const subscription = { ...currentSubscription, willRenew: false };
-              const subscriptionKey = `subscription_${userId}`;
-              await AsyncStorage.setItem(subscriptionKey, JSON.stringify(subscription));
-              setCurrentSubscription(subscription);
+              // Обновляем подписку с флагом willRenew: false
+              const updatedSubscription = { ...currentSubscription, willRenew: false };
+              
+              if (user?.id) {
+                const subscriptionKey = `subscription_${user.id}`;
+                await AsyncStorage.setItem(subscriptionKey, JSON.stringify(updatedSubscription));
+                setCurrentSubscription(updatedSubscription);
+              }
+              
               Alert.alert(t('premium.subscriptionCancelled'), t('premium.subscriptionCancelledMessage'));
             } catch (error) {
               Alert.alert(t('common.error'), t('premium.cancelError'));
@@ -220,16 +174,8 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
           style: 'destructive',
           onPress: async () => {
             try {
-              const userId = await AsyncStorage.getItem('currentUser');
-              if (!userId) return;
-              
-              const subscriptionKey = `subscription_${userId}`;
-              await AsyncStorage.removeItem(subscriptionKey);
+              await cancelSubscription();
               setCurrentSubscription(null);
-              
-              // Обновляем статус подписки в контексте
-              await checkSubscription();
-              
               Alert.alert('Подписка удалена', 'Ваша подписка была успешно удалена.');
             } catch (error) {
               Alert.alert(t('common.error'), 'Ошибка при удалении подписки');

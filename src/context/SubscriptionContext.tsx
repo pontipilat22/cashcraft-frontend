@@ -14,17 +14,18 @@ interface Subscription {
 interface SubscriptionContextType {
   subscription: Subscription | null;
   isPremium: boolean;
-  checkSubscription: () => Promise<void>;
+  checkIfPremium: () => Promise<boolean>;
+  activateSubscription: (planId: string, planName: string, price: string, days: number) => Promise<void>;
+  cancelSubscription: () => Promise<void>;
   hasFeature: (feature: string) => boolean;
-  reloadUser: () => Promise<void>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 const FREE_FEATURES = [
-  'basic_accounts', // До 3 счетов
-  'basic_transactions', // До 100 транзакций в месяц
-  'basic_categories', // Базовые категории
+  'basic_accounts', // До 2 счетов
+  'basic_transactions',
+  'basic_categories',
 ];
 
 const PREMIUM_FEATURES = [
@@ -54,58 +55,96 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isPremium, setIsPremium] = useState(false);
 
-  // Используем useCallback чтобы избежать бесконечного цикла
-  const checkSubscription = React.useCallback(async () => {
-    if (!userId) {
-      setSubscription(null);
+  // Простая функция проверки подписки
+  const checkIfPremium = async (): Promise<boolean> => {
+    console.log('🔍 [SubscriptionContext] checkIfPremium called');
+    
+    // Гости не могут иметь подписку
+    if (isGuest || !userId) {
+      console.log('❌ [SubscriptionContext] Guest or no user - no premium');
       setIsPremium(false);
-      return;
+      setSubscription(null);
+      return false;
     }
 
     try {
-      // Ключ подписки привязан к пользователю
       const subscriptionKey = `subscription_${userId}`;
       const stored = await AsyncStorage.getItem(subscriptionKey);
       
-      if (stored) {
-        const sub = JSON.parse(stored);
-        const endDate = new Date(sub.endDate);
-        const now = new Date();
-        
-        // Проверяем, активна ли подписка
-        if (endDate > now) {
-          setSubscription({ ...sub, isActive: true });
-          setIsPremium(true);
-        } else {
-          // Подписка истекла
-          setSubscription({ ...sub, isActive: false });
-          setIsPremium(false);
-          // Удаляем истекшую подписку
-          await AsyncStorage.removeItem(subscriptionKey);
-        }
-      } else {
-        setSubscription(null);
+      if (!stored) {
+        console.log('❌ [SubscriptionContext] No subscription found');
         setIsPremium(false);
+        setSubscription(null);
+        return false;
       }
+
+      const sub = JSON.parse(stored);
+      const endDate = new Date(sub.endDate);
+      const now = new Date();
+      
+      const isActive = endDate > now;
+      console.log('📋 [SubscriptionContext] Subscription check:', {
+        endDate: endDate.toISOString(),
+        now: now.toISOString(),
+        isActive
+      });
+
+      setSubscription({ ...sub, isActive });
+      setIsPremium(isActive);
+      
+      if (!isActive) {
+        // Удаляем истекшую подписку
+        await AsyncStorage.removeItem(subscriptionKey);
+      }
+      
+      return isActive;
     } catch (error) {
-      console.error('Error checking subscription:', error);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    // Подписка доступна для всех пользователей (включая гостей) для тестирования
-    if (userId) {
-      checkSubscription();
-      // Проверяем подписку каждые 5 минут
-      const interval = setInterval(checkSubscription, 5 * 60 * 1000);
-      return () => clearInterval(interval);
-    } else {
-      // Если пользователь не авторизован, сбрасываем подписку
-      setSubscription(null);
+      console.error('❌ [SubscriptionContext] Error checking subscription:', error);
       setIsPremium(false);
+      setSubscription(null);
+      return false;
     }
-  }, [userId, checkSubscription]);
+  };
 
+  // Активация подписки
+  const activateSubscription = async (planId: string, planName: string, price: string, days: number) => {
+    if (!userId || isGuest) {
+      throw new Error('Подписка доступна только авторизованным пользователям');
+    }
+
+    const subscription = {
+      planId,
+      planName,
+      price,
+      startDate: new Date().toISOString(),
+      endDate: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      userId,
+    };
+
+    const subscriptionKey = `subscription_${userId}`;
+    await AsyncStorage.setItem(subscriptionKey, JSON.stringify(subscription));
+    
+    setSubscription(subscription);
+    setIsPremium(true);
+    
+    console.log('✅ [SubscriptionContext] Subscription activated:', subscription);
+  };
+
+  // Отмена подписки
+  const cancelSubscription = async () => {
+    if (!userId) return;
+    
+    const subscriptionKey = `subscription_${userId}`;
+    await AsyncStorage.removeItem(subscriptionKey);
+    
+    setSubscription(null);
+    setIsPremium(false);
+    
+    console.log('✅ [SubscriptionContext] Subscription cancelled');
+  };
+
+  // Проверка фичи
   const hasFeature = (feature: string): boolean => {
     if (isPremium) {
       return PREMIUM_FEATURES.includes(feature);
@@ -113,18 +152,27 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
     return FREE_FEATURES.includes(feature);
   };
 
-  const reloadUser = async () => {
-    // При изменении userId компонент автоматически обновится через useEffect
-    await checkSubscription();
-  };
+  // Проверяем подписку при загрузке и изменении userId
+  useEffect(() => {
+    if (userId && !isGuest) {
+      checkIfPremium();
+      // Проверяем каждую минуту
+      const interval = setInterval(checkIfPremium, 60 * 1000);
+      return () => clearInterval(interval);
+    } else {
+      setSubscription(null);
+      setIsPremium(false);
+    }
+  }, [userId, isGuest]);
 
   return (
     <SubscriptionContext.Provider value={{
       subscription,
       isPremium,
-      checkSubscription,
+      checkIfPremium,
+      activateSubscription,
+      cancelSubscription,
       hasFeature,
-      reloadUser,
     }}>
       {children}
     </SubscriptionContext.Provider>

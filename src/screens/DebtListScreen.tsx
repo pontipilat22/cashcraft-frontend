@@ -48,6 +48,11 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
   };
 
   const renderDebt = ({ item }: { item: Debt }) => {
+    // Конвертируем сумму если валюта отличается от основной
+    const convertedAmount = item.currency && item.exchangeRate && item.currency !== 'RUB' 
+      ? item.amount * item.exchangeRate 
+      : item.amount;
+
     return (
       <TouchableOpacity 
         style={[styles.debtItem, { backgroundColor: colors.card }]}
@@ -64,9 +69,14 @@ export const DebtListScreen: React.FC<DebtListScreenProps> = ({ route, navigatio
                 year: 'numeric',
               }) : ''}
             </Text>
+            {item.currency && item.currency !== 'RUB' && (
+              <Text style={[styles.debtCurrency, { color: colors.textSecondary }]}>
+                {item.currency} • {formatAmount(item.amount)} = {formatAmount(convertedAmount)} RUB
+              </Text>
+            )}
           </View>
           <Text style={[styles.debtAmount, { color: colors.primary }]}>
-            {formatAmount(item.amount)}
+            {formatAmount(convertedAmount)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -181,6 +191,10 @@ const styles = StyleSheet.create({
   debtDate: {
     fontSize: 12,
     marginTop: 4,
+  },
+  debtCurrency: {
+    fontSize: 11,
+    marginTop: 2,
   },
   debtAmount: {
     fontSize: 18,

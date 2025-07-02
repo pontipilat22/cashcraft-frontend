@@ -1,12 +1,12 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AccountsScreen } from '../screens/AccountsScreen';
-import { DebtsScreen } from '../screens/DebtsScreen';
+import { DebtListScreen } from '../screens/DebtListScreen';
 import { BalanceHeader } from './BottomTabNavigator';
 
 export type AccountsStackParamList = {
   AccountsMain: undefined;
-  DebtList: undefined;
+  DebtList: { type: 'owed_to_me' | 'owed_by_me' };
 };
 
 const Stack = createStackNavigator<AccountsStackParamList>();
@@ -23,7 +23,7 @@ export const AccountsNavigator: React.FC = () => {
       />
       <Stack.Screen 
         name="DebtList" 
-        component={DebtsScreen}
+        component={DebtListScreen}
         options={{ 
           headerShown: false
         }}

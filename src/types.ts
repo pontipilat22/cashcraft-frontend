@@ -62,6 +62,8 @@ export interface Debt {
   type: 'owed_to_me' | 'owed_by_me'; // 'owed_to_me' — мне должны, 'owed_by_me' — я должен
   name: string;
   amount: number;
+  currency?: string; // Валюта долга
+  exchangeRate?: number; // Курс обмена к основной валюте
   isIncludedInTotal?: boolean;
   dueDate?: string; // Дата возврата долга
   createdAt: string;

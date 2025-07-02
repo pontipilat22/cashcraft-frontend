@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 1,
+  version: 2,
   tables: [
     tableSchema({
       name: 'accounts',
@@ -59,6 +59,8 @@ export default appSchema({
         { name: 'type', type: 'string' },
         { name: 'name', type: 'string' },
         { name: 'amount', type: 'number' },
+        { name: 'currency', type: 'string', isOptional: true },
+        { name: 'exchange_rate', type: 'number', isOptional: true },
         { name: 'is_included_in_total', type: 'boolean' },
         { name: 'due_date', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },

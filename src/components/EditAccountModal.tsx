@@ -141,7 +141,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
 
             {Boolean(account.type === 'card' || account.type === 'credit') && (
               <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.cardNumber')}</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.cardNumber')} (необязательно)</Text>
                 <TextInput
                   style={[styles.input, { 
                     backgroundColor: colors.background,
@@ -149,8 +149,14 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     borderColor: colors.border,
                   }]}
                   value={cardNumber}
-                  onChangeText={setCardNumber}
-                  placeholder="0000"
+                  onChangeText={(text) => {
+                    // Разрешаем только цифры и максимум 4 символа
+                    const cleaned = text.replace(/[^0-9]/g, '');
+                    if (cleaned.length <= 4) {
+                      setCardNumber(cleaned);
+                    }
+                  }}
+                  placeholder="Последние 4 цифры"
                   placeholderTextColor={colors.textSecondary}
                   maxLength={4}
                   keyboardType="numeric"

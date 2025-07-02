@@ -80,35 +80,43 @@ export class WatermelonDatabaseService {
       }
 
       // ─── Создаем базовые категории только если база пуста ──────────────────────────────
-      const categories = [
-        { id: uuidv4(), name: 'salary',        type: 'income',  icon: 'cash-outline',            color: '#4CAF50' },
-        { id: uuidv4(), name: 'business',      type: 'income',  icon: 'briefcase-outline',       color: '#2196F3' },
-        { id: uuidv4(), name: 'investments',   type: 'income',  icon: 'trending-up-outline',     color: '#FF9800' },
-        { id: uuidv4(), name: 'other_income',  type: 'income',  icon: 'add-circle-outline',      color: '#9C27B0', isDefault: true },
+      const categoriesCount = await database.get<Category>('categories').query().fetchCount();
       
-        { id: uuidv4(), name: 'food',          type: 'expense', icon: 'cart-outline',            color: '#F44336' },
-        { id: uuidv4(), name: 'transport',     type: 'expense', icon: 'car-outline',             color: '#3F51B5' },
-        { id: uuidv4(), name: 'housing',       type: 'expense', icon: 'home-outline',            color: '#009688' },
-        { id: uuidv4(), name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
-        { id: uuidv4(), name: 'health',        type: 'expense', icon: 'fitness-outline',         color: '#4CAF50' },
-        { id: uuidv4(), name: 'shopping',      type: 'expense', icon: 'bag-outline',             color: '#9C27B0' },
-        { id: uuidv4(), name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B', isDefault: true },
-      ];
+      if (categoriesCount === 0) {
+        console.log('[WatermelonDB] База категорий пуста, создаем базовые категории...');
+        
+        const categories = [
+          { id: uuidv4(), name: 'salary',        type: 'income',  icon: 'cash-outline',            color: '#4CAF50' },
+          { id: uuidv4(), name: 'business',      type: 'income',  icon: 'briefcase-outline',       color: '#2196F3' },
+          { id: uuidv4(), name: 'investments',   type: 'income',  icon: 'trending-up-outline',     color: '#FF9800' },
+          { id: uuidv4(), name: 'other_income',  type: 'income',  icon: 'add-circle-outline',      color: '#9C27B0', isDefault: true },
+        
+          { id: uuidv4(), name: 'food',          type: 'expense', icon: 'cart-outline',            color: '#F44336' },
+          { id: uuidv4(), name: 'transport',     type: 'expense', icon: 'car-outline',             color: '#3F51B5' },
+          { id: uuidv4(), name: 'housing',       type: 'expense', icon: 'home-outline',            color: '#009688' },
+          { id: uuidv4(), name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
+          { id: uuidv4(), name: 'health',        type: 'expense', icon: 'fitness-outline',         color: '#4CAF50' },
+          { id: uuidv4(), name: 'shopping',      type: 'expense', icon: 'bag-outline',             color: '#9C27B0' },
+          { id: uuidv4(), name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B', isDefault: true },
+        ];
 
-      await database.write(async () => {
-        await Promise.all(
-          categories.map(cat =>
-            database.get<Category>('categories').create(category => {
-              category._raw.id = cat.id; // Используем фиксированный ID для системных категорий
-              category.name  = cat.name;
-              category.type  = cat.type;
-              category.icon  = cat.icon;
-              category.color = cat.color;
-            })
-          )
-        );          
-      });
-      console.log('[WatermelonDB] Базовые категории созданы');
+        await database.write(async () => {
+          await Promise.all(
+            categories.map(cat =>
+              database.get<Category>('categories').create(category => {
+                category._raw.id = cat.id; // Используем фиксированный ID для системных категорий
+                category.name  = cat.name;
+                category.type  = cat.type;
+                category.icon  = cat.icon;
+                category.color = cat.color;
+              })
+            )
+          );          
+        });
+        console.log('[WatermelonDB] Базовые категории созданы');
+      } else {
+        console.log('[WatermelonDB] Категории уже существуют, пропускаем создание базовых категорий');
+      }
 
       // Инициализируем настройки
       const settingsCount = await database.get<Setting>('settings').query().fetchCount();
@@ -122,6 +130,10 @@ export class WatermelonDatabaseService {
         });
         console.log('[WatermelonDB] Настройки созданы');
       }
+      
+      // Очищаем дублированные категории (для пользователей с существующей проблемой)
+      await this.removeDuplicateCategories();
+      
       this.isInitialized = true;
       this.lastInitError = null;
       console.log('[WatermelonDB] Инициализация завершена успешно');
@@ -449,6 +461,8 @@ export class WatermelonDatabaseService {
         debt.name = debtData.name;
         debt.amount = debtData.amount;
         debt.type = debtData.type;
+        debt.currency = debtData.currency;
+        debt.exchangeRate = debtData.exchangeRate;
         debt.isIncludedInTotal = debtData.isIncludedInTotal !== false;
         debt.dueDate = debtData.dueDate;
         debt.syncedAt = undefined;
@@ -1059,21 +1073,54 @@ export class WatermelonDatabaseService {
   }
 
   static async upsertDebt(debtData: any): Promise<any> {
-    // Ищем существующий долг по имени
     const existingDebt = await this.findDebtByName(debtData.name);
     
     if (existingDebt) {
-      console.log(`🔄 [WatermelonDB] Обновляем существующий долг: ${debtData.name}`);
-      await this.updateDebt(existingDebt._raw.id, debtData);
-      return {
-        ...debtData,
-        id: existingDebt._raw.id,
-        createdAt: existingDebt.createdAt.toISOString(),
-        updatedAt: existingDebt.updatedAt.toISOString(),
-      };
+      await this.updateDebt(existingDebt.id, debtData);
+      return { ...debtData, id: existingDebt.id };
     } else {
-      console.log(`➕ [WatermelonDB] Создаем новый долг: ${debtData.name}`);
       return await this.createDebt(debtData);
+    }
+  }
+
+  // Метод для удаления дублированных категорий
+  static async removeDuplicateCategories(): Promise<void> {
+    console.log('🔍 [WatermelonDB] Начинаем удаление дублированных категорий...');
+    
+    try {
+      const allCategories = await database.get<Category>('categories').query().fetch();
+      const categoriesByName: { [key: string]: any[] } = {};
+      
+      // Группируем категории по имени и типу
+      allCategories.forEach(cat => {
+        const key = `${cat.name}_${cat.type}`;
+        if (!categoriesByName[key]) {
+          categoriesByName[key] = [];
+        }
+        categoriesByName[key].push(cat);
+      });
+      
+      // Находим и удаляем дубликаты
+      let duplicatesCount = 0;
+      await database.write(async () => {
+        for (const key in categoriesByName) {
+          const categories = categoriesByName[key];
+          if (categories.length > 1) {
+            console.log(`📋 [WatermelonDB] Найдены дубликаты для ${key}: ${categories.length} штук`);
+            
+            // Оставляем первую категорию, удаляем остальные
+            for (let i = 1; i < categories.length; i++) {
+              await categories[i].destroyPermanently();
+              duplicatesCount++;
+            }
+          }
+        }
+      });
+      
+      console.log(`✅ [WatermelonDB] Удалено дубликатов категорий: ${duplicatesCount}`);
+    } catch (error) {
+      console.error('❌ [WatermelonDB] Ошибка при удалении дублированных категорий:', error);
+      throw error;
     }
   }
 }

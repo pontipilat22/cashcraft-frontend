@@ -142,16 +142,61 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       console.log('  - Категории:', categoriesFromDb.length);
       console.log('  - Долги:', debtsFromDb.length);
 
+      console.log('📊 [DataContext] Счета из базы:', accountsFromDb);
+
+      // Обновляем курсы валют для счетов с другой валютой
+      const accountsWithRates = await Promise.all(
+        accountsFromDb.map(async (account: Account) => {
+          if (account.currency && account.currency !== defaultCurrency) {
+            try {
+              // Пробуем получить прямой курс
+              let rate = await ExchangeRateService.getRate(account.currency, defaultCurrency);
+              
+              // Если прямого курса нет, пробуем через USD
+              if (!rate && account.currency !== 'USD' && defaultCurrency !== 'USD') {
+                console.log(`No direct rate ${account.currency}->${defaultCurrency}, trying through USD`);
+                const toUsd = await ExchangeRateService.getRate(account.currency, 'USD');
+                const fromUsd = await ExchangeRateService.getRate('USD', defaultCurrency);
+                
+                if (toUsd && fromUsd) {
+                  rate = toUsd * fromUsd;
+                  console.log(`Cross rate ${account.currency}->${defaultCurrency} = ${rate} (via USD)`);
+                }
+              }
+              
+              if (rate) {
+                return { ...account, exchangeRate: rate };
+              }
+            } catch (error) {
+              console.error(`Failed to get rate for ${account.currency}:`, error);
+            }
+          }
+          return account;
+        })
+      );
+
+      console.log('📊 [DataContext] Счета с курсами валют:', accountsWithRates);
+
       // Обновляем состояние
-      setAccounts(accountsFromDb);
+      setAccounts(accountsWithRates);
       setTransactions(transactionsFromDb);
       setCategories(categoriesFromDb);
       setDebts(debtsFromDb);
 
-      // Обновляем общий баланс
-      const total = accountsFromDb.reduce((sum, account) => sum + account.balance, 0);
-      setTotalBalance(total);
+      // Вычисляем общий баланс с конвертацией валют
+      const total = accountsWithRates
+        .filter(account => account.isIncludedInTotal !== false)
+        .reduce((sum, account) => {
+          let balance = account.balance;
+          // Если валюта счета отличается от основной и есть курс обмена
+          if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+            balance = account.balance * (account as any).exchangeRate;
+          }
+          return sum + balance;
+        }, 0);
+
       console.log('💰 [DataContext] Общий баланс:', total);
+      setTotalBalance(total);
 
       console.log('✅ [DataContext] RefreshData завершен успешно');
     } catch (error) {
@@ -215,12 +260,6 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       console.log('🔄 [DataContext] Обновляем локальное состояние...');
       await refreshData();
       console.log('✅ [DataContext] Локальное состояние обновлено');
-      
-      // Обновляем общий баланс
-      console.log('💰 [DataContext] Обновляем общий баланс...');
-      const newTotal = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-      setTotalBalance(newTotal);
-      console.log('✅ [DataContext] Общий баланс обновлён');
       
       console.log('✅ [DataContext] Счёт успешно удалён локально');
     } catch (error) {
