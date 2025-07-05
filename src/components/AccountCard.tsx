@@ -244,7 +244,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             }
           ]} />
           
-          {account.type === 'savings' && account.targetAmount ? (
+          {account.type === 'savings' && ((account as any).isTargetedSavings !== false) && account.targetAmount ? (
             <>
               <LinearGradient
                 colors={isDark ? ['#FF9800', '#FFD600'] : ['#3B82F6', '#00E0FF']}
@@ -262,13 +262,17 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                   <View style={[
                     styles.iconCircle,
                     {
-                      backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
+                      backgroundColor: account.isDefault 
+                        ? (isDark ? '#FF9800' : '#3B82F6') // Оранжевый в темной теме, синий в светлой для счета по умолчанию
+                        : (isDark ? '#4a4a4a' : '#9e9e9e'), // Серый для остальных счетов
                       // Неоморфные тени для иконки - усиленные
-                      shadowColor: isDark ? '#000' : '#a0a0a0',
-                      shadowOffset: { width: 4, height: 4 },
-                      shadowOpacity: isDark ? 0.6 : 0.3,
-                      shadowRadius: 6,
-                      elevation: 5,
+                      shadowColor: account.isDefault 
+                        ? (isDark ? '#FF9800' : '#3B82F6')
+                        : (isDark ? '#4a4a4a' : '#9e9e9e'),
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.4,
+                      shadowRadius: 8,
+                      elevation: 6,
                     },
                   ]}>
                     {/* Внутренняя светлая тень */}
@@ -285,7 +289,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     <Ionicons
                       name={getIcon()}
                       size={24}
-                      color={isDark ? '#fff' : '#232323'}
+                      color="#fff"
                     />
                   </View>
                   <View style={styles.textBlock}>
@@ -372,16 +376,24 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 <View style={[
                   styles.iconCircle, 
                   { 
-                    backgroundColor: colors.primary,
+                    backgroundColor: account.isDefault 
+                      ? (isDark ? '#FF9800' : '#3B82F6') // Оранжевый в темной теме, синий в светлой для счета по умолчанию
+                      : (isDark ? '#4a4a4a' : '#9e9e9e'), // Серый для остальных счетов
                     // Неоморфные тени для иконки - усиленные
-                    shadowColor: colors.primary,
+                    shadowColor: account.isDefault 
+                      ? (isDark ? '#FF9800' : '#3B82F6')
+                      : (isDark ? '#4a4a4a' : '#9e9e9e'),
                     shadowOffset: { width: 0, height: 4 },
                     shadowOpacity: 0.4,
                     shadowRadius: 8,
                     elevation: 6,
                   }
                 ]}> 
-                  <Ionicons name={getIcon()} size={24} color="#fff" />
+                  <Ionicons
+                    name={getIcon()}
+                    size={24}
+                    color="#fff"
+                  />
                 </View>
                 <View style={styles.textBlock}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>

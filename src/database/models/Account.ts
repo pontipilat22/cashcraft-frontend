@@ -14,6 +14,7 @@ export default class Account extends Model {
   @field('icon') icon?: string;
   @field('is_default') isDefault!: boolean;
   @field('is_included_in_total') isIncludedInTotal!: boolean;
+  @field('is_targeted_savings') isTargetedSavings?: boolean;
   @field('target_amount') targetAmount?: number;
   @field('linked_account_id') linkedAccountId?: string;
   @field('saved_amount') savedAmount!: number;

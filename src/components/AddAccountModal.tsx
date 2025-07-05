@@ -44,6 +44,7 @@ interface AddAccountModalProps {
     creditRate?: number;
     creditPaymentType?: 'annuity' | 'differentiated';
     creditInitialAmount?: number;
+    isTargetedSavings?: boolean;
   }) => void;
 }
 
@@ -110,6 +111,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   // Для накоплений - связанный счет
   const [linkedAccountId, setLinkedAccountId] = useState<string>('');
   const [showAccountPicker, setShowAccountPicker] = useState(false);
+  const [isTargetedSavings, setIsTargetedSavings] = useState(true); // Новое состояние для типа накопления
   
   // Состояние для валидации
   const [errors, setErrors] = useState<{
@@ -120,6 +122,36 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     targetAmount?: boolean;
   }>({});
   const [showErrors, setShowErrors] = useState(false);
+
+  // Устанавливаем счет по умолчанию при открытии модального окна для накоплений
+  useEffect(() => {
+    if (visible && accountType === 'savings') {
+      // Находим счет по умолчанию
+      const defaultAccount = accounts.find(acc => acc.isDefault && acc.type !== 'savings' && acc.type !== 'debt' && acc.type !== 'credit');
+      if (defaultAccount) {
+        setLinkedAccountId(defaultAccount.id);
+        // Устанавливаем валюту от привязанного счета
+        setSelectedCurrency(defaultAccount.currency || defaultCurrency);
+      } else {
+        // Если нет счета по умолчанию, берем первый подходящий
+        const firstAccount = accounts.find(acc => acc.type !== 'savings' && acc.type !== 'debt' && acc.type !== 'credit');
+        if (firstAccount) {
+          setLinkedAccountId(firstAccount.id);
+          setSelectedCurrency(firstAccount.currency || defaultCurrency);
+        }
+      }
+    }
+  }, [visible, accountType, accounts, defaultCurrency]);
+
+  // Обновляем валюту при изменении привязанного счета
+  useEffect(() => {
+    if (accountType === 'savings' && linkedAccountId) {
+      const linkedAccount = accounts.find(acc => acc.id === linkedAccountId);
+      if (linkedAccount) {
+        setSelectedCurrency(linkedAccount.currency || defaultCurrency);
+      }
+    }
+  }, [linkedAccountId, accounts, accountType, defaultCurrency]);
 
   // Загружаем предложенный курс при изменении валюты
   useEffect(() => {
@@ -213,8 +245,11 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     if (accountType === 'savings') {
       accountData.icon = selectedIcon;
       accountData.savedAmount = 0; // Начальная сумма накоплений всегда 0
-      if (targetAmount) {
+      accountData.isTargetedSavings = isTargetedSavings; // Добавляем тип накопления
+      if (isTargetedSavings && targetAmount) {
         accountData.targetAmount = parseFloat(targetAmount);
+      } else if (!isTargetedSavings) {
+        accountData.targetAmount = undefined; // Для нецелевых накоплений нет целевой суммы
       }
       if (linkedAccountId) {
         accountData.linkedAccountId = linkedAccountId;
@@ -248,6 +283,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     setSelectedIcon(SAVINGS_ICONS[0]);
     setTargetAmount('');
     setLinkedAccountId('');
+    setIsTargetedSavings(true);
     setInterestRate('');
     setOpenDate('');
     setInterestDay('');
@@ -377,85 +413,104 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
               </View>
             )}
 
-            {/* Выбор валюты */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.currency')}</Text>
-              <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => setShowCurrencyPicker(true)}
-              >
-                <View style={styles.selectorContent}>
-                  <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {currencies[selectedCurrency]?.symbol} {selectedCurrency} - {currencies[selectedCurrency]?.name}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Курс конвертации */}
-            {selectedCurrency !== defaultCurrency && (
-              <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.exchangeRate')}</Text>
-                <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                  1 {selectedCurrency} = ? {defaultCurrency}
-                </Text>
-                <View style={styles.rateInputWrapper}>
-                  <TextInput
-                    style={[styles.input, { 
-                      backgroundColor: colors.background,
-                      color: suggestedRate && parseFloat(exchangeRate) === suggestedRate ? colors.primary : colors.text,
-                      borderColor: suggestedRate && parseFloat(exchangeRate) === suggestedRate ? colors.primary : colors.border,
-                    }]}
-                    value={exchangeRate}
-                    onChangeText={setExchangeRate}
-                    placeholder="1"
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="decimal-pad"
-                  />
-                  {suggestedRate && (
-                    <View style={styles.rateIndicator}>
-                      <Ionicons 
-                        name="checkmark-circle" 
-                        size={20} 
-                        color={colors.primary} 
-                      />
-                      <Text style={[styles.rateIndicatorText, { color: colors.textSecondary }]}>
-                        {t('accounts.savedRate')}
+            {/* Выбор валюты - не показываем для накоплений */}
+            {accountType !== 'savings' && (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.currency')}</Text>
+                  <TouchableOpacity
+                    style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                    onPress={() => setShowCurrencyPicker(true)}
+                  >
+                    <View style={styles.selectorContent}>
+                      <Text style={[styles.selectorText, { color: colors.text }]}>
+                        {currencies[selectedCurrency]?.symbol} {selectedCurrency} - {currencies[selectedCurrency]?.name}
                       </Text>
                     </View>
-                  )}
+                    <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
                 </View>
-              </View>
+
+                {/* Курс конвертации */}
+                {selectedCurrency !== defaultCurrency && (
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.exchangeRate')}</Text>
+                    <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                      1 {selectedCurrency} = ? {defaultCurrency}
+                    </Text>
+                    <View style={styles.rateInputWrapper}>
+                      <TextInput
+                        style={[styles.input, { 
+                          backgroundColor: colors.background,
+                          color: suggestedRate && parseFloat(exchangeRate) === suggestedRate ? colors.primary : colors.text,
+                          borderColor: suggestedRate && parseFloat(exchangeRate) === suggestedRate ? colors.primary : colors.border,
+                        }]}
+                        value={exchangeRate}
+                        onChangeText={setExchangeRate}
+                        placeholder="1"
+                        placeholderTextColor={colors.textSecondary}
+                        keyboardType="decimal-pad"
+                      />
+                      {suggestedRate && (
+                        <View style={styles.rateIndicator}>
+                          <Ionicons 
+                            name="checkmark-circle" 
+                            size={20} 
+                            color={colors.primary} 
+                          />
+                          <Text style={[styles.rateIndicatorText, { color: colors.textSecondary }]}>
+                            {t('accounts.savedRate')}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+              </>
             )}
 
             {accountType === 'savings' && (
               <>
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.targetAmount')}</Text>
-                  <TextInput
-                    style={[styles.input, { 
-                      backgroundColor: colors.background,
-                      color: colors.text,
-                      borderColor: showErrors && errors.targetAmount ? '#FF4444' : colors.border,
-                    }]}
-                    value={targetAmount}
-                    onChangeText={(text) => {
-                      setTargetAmount(text);
-                      if (showErrors && errors.targetAmount && text && parseFloat(text) > 0) {
-                        setErrors(prev => ({ ...prev, targetAmount: false }));
-                      }
-                    }}
-                    placeholder="0"
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="numeric"
+                {/* Переключатель типа накопления */}
+                <View style={styles.switchContainer}>
+                  <Text style={[styles.switchLabel, { color: colors.text }]}>
+                    {t('accounts.targetedSavings') || 'Целевое накопление'}
+                  </Text>
+                  <Switch
+                    value={isTargetedSavings}
+                    onValueChange={setIsTargetedSavings}
+                    trackColor={{ false: '#767577', true: colors.primary }}
                   />
-                  {showErrors && errors.targetAmount && (
-                    <Text style={[styles.errorText, { color: '#FF4444' }]}>
-                      {t('validation.targetAmountInvalid')}
-                    </Text>
-                  )}
                 </View>
+                
+                {/* Показываем поле целевой суммы только для целевых накоплений */}
+                {isTargetedSavings && (
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.targetAmount')}</Text>
+                    <TextInput
+                      style={[styles.input, { 
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderColor: showErrors && errors.targetAmount ? '#FF4444' : colors.border,
+                      }]}
+                      value={targetAmount}
+                      onChangeText={(text) => {
+                        setTargetAmount(text);
+                        if (showErrors && errors.targetAmount && text && parseFloat(text) > 0) {
+                          setErrors(prev => ({ ...prev, targetAmount: false }));
+                        }
+                      }}
+                      placeholder="0"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                    />
+                    {showErrors && errors.targetAmount && (
+                      <Text style={[styles.errorText, { color: '#FF4444' }]}>
+                        {t('validation.targetAmountInvalid')}
+                      </Text>
+                    )}
+                  </View>
+                )}
                 
                 {/* Выбор связанного счета */}
                 <View style={styles.inputContainer}>

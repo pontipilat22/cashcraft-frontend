@@ -16,6 +16,7 @@ export default appSchema({
         { name: 'icon', type: 'string', isOptional: true },
         { name: 'is_default', type: 'boolean' },
         { name: 'is_included_in_total', type: 'boolean' },
+        { name: 'is_targeted_savings', type: 'boolean', isOptional: true },
         { name: 'target_amount', type: 'number', isOptional: true },
         { name: 'linked_account_id', type: 'string', isOptional: true },
         { name: 'saved_amount', type: 'number' },

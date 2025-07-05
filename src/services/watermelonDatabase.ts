@@ -163,6 +163,7 @@ export class WatermelonDatabaseService {
       targetAmount: acc.targetAmount,
       linkedAccountId: acc.linkedAccountId,
       savedAmount: acc.savedAmount,
+      isTargetedSavings: acc.isTargetedSavings,
       creditStartDate: acc.creditStartDate,
       creditTerm: acc.creditTerm,
       creditRate: acc.creditRate,
@@ -190,6 +191,7 @@ export class WatermelonDatabaseService {
         account.targetAmount = accountData.targetAmount;
         account.linkedAccountId = accountData.linkedAccountId;
         account.savedAmount = accountData.savedAmount || 0;
+        account.isTargetedSavings = accountData.isTargetedSavings;
         account.creditStartDate = accountData.creditStartDate;
         account.creditTerm = accountData.creditTerm;
         account.creditRate = accountData.creditRate;
@@ -1022,6 +1024,7 @@ export class WatermelonDatabaseService {
           acc.targetAmount = accountData.targetAmount;
           acc.linkedAccountId = accountData.linkedAccountId;
           acc.savedAmount = accountData.savedAmount || 0;
+          acc.isTargetedSavings = accountData.isTargetedSavings;
           acc.creditStartDate = accountData.creditStartDate;
           acc.creditTerm = accountData.creditTerm;
           acc.creditRate = accountData.creditRate;

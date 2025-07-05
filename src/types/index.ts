@@ -13,6 +13,21 @@ export interface Account {
   createdAt: string;
   updatedAt: string;
   syncedAt?: string;
+  // Поля для накоплений
+  isTargetedSavings?: boolean;
+  targetAmount?: number;
+  savedAmount?: number;
+  linkedAccountId?: string;
+  // Поля для кредитов
+  creditStartDate?: string;
+  creditTerm?: number;
+  creditRate?: number;
+  creditPaymentType?: 'annuity' | 'differentiated';
+  creditInitialAmount?: number;
+  // Поля для банковских счетов
+  interestRate?: number;
+  openDate?: string;
+  interestDay?: number;
 }
 
 export interface Transaction {
