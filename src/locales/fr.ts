@@ -517,12 +517,15 @@ export default {
       useCategories: 'Utilisez les catégories pour analyser où va la majeure partie de votre argent',
       setGoals: 'Fixez-vous des objectifs financiers et suivez vos progrès avec les comptes d\'épargne',
       backup: 'Connectez-vous à votre compte pour une sauvegarde automatique des données',
+      savingsHelp: 'Utilisez l\'épargne pour mettre de l\'argent de côté depuis n\'importe quel compte pour des objectifs spécifiques',
+      debtTracking: 'Suivez les dettes et les prêts pour toujours savoir qui vous doit et à qui vous devez',
     },
     contactTitle: 'Contacts du support',
     emailSupport: 'E-mail du support',
+    emailSubject: 'Support de l\'application Cashcraft',
     responseTime: 'Nous répondons généralement en 24-48 heures',
     aboutTitle: 'À propos de l\'application',
-    aboutText: 'Cashcraft est une application simple et pratique pour le suivi des finances personnelles. Nous travaillons constamment à l\'amélioration des fonctionnalités et aimerions recevoir vos suggestions.',
+    aboutText: 'Cashcraft est une application puissante et pratique pour le suivi des finances personnelles. Nous travaillons constamment à l\'amélioration des fonctionnalités et aimerions recevoir vos suggestions. L\'application prend en charge différents types de comptes, l\'épargne, les dettes, les crédits, le multi-devises et bien plus encore.',
     version: 'Version de l\'application :',
     questions: {
       addAccount: {
@@ -571,7 +574,31 @@ export default {
       },
       exportData: {
         question: 'Comment exporter des données ?',
-        answer: 'La fonctionnalité d\'exportation de données est en cours de développement et sera ajoutée dans les futures mises à jour de l\'application.',
+        answer: 'Allez dans "Plus" → "Exporter et importer des données". Vous pouvez exporter des données au format JSON pour la sauvegarde ou le transfert vers un autre appareil. L\'importation de données précédemment exportées est également prise en charge.',
+      },
+      savings: {
+        question: 'Comment fonctionnent les épargnes ?',
+        answer: 'Créez un compte d\'épargne et liez-le à n\'importe quel compte régulier. L\'argent sera réservé du compte principal mais restera physiquement là. Vous pouvez ajouter à l\'épargne ou retirer de l\'argent à tout moment.',
+      },
+      debts: {
+        question: 'Comment suivre les dettes ?',
+        answer: 'Sur l\'écran principal, appuyez sur "+" et sélectionnez l\'opération de dette. Vous pouvez prêter de l\'argent, emprunter de l\'argent, recouvrer une dette ou rembourser une dette. Toutes les dettes sont affichées sur un onglet séparé divisé en "On me doit" et "Je dois".',
+      },
+      credits: {
+        question: 'Comment ajouter un crédit ?',
+        answer: 'Lors de la création d\'un nouveau compte, sélectionnez le type "Crédit". Entrez le montant du crédit, le taux d\'intérêt, la durée et le type de paiement (annuité ou différencié). L\'application calculera automatiquement le paiement mensuel.',
+      },
+      multiCurrency: {
+        question: 'Comment travailler avec différentes devises ?',
+        answer: 'Lors de la création d\'un compte, sélectionnez la devise souhaitée. Chaque compte peut avoir son propre taux de change par rapport à la devise principale. L\'écran principal affiche le solde total avec conversion de toutes les devises.',
+      },
+      premium: {
+        question: 'Qu\'offre l\'abonnement Premium ?',
+        answer: 'Premium supprime la limite sur le nombre de comptes (version gratuite - 2 comptes), donne accès à des statistiques avancées, à la synchronisation entre appareils et au support prioritaire.',
+      },
+      security: {
+        question: 'Mes données sont-elles sécurisées ?',
+        answer: 'Toutes les données financières sont stockées localement sur votre appareil dans une base de données chiffrée. Une connexion sécurisée est utilisée pour la synchronisation. Nous n\'avons pas accès au contenu de vos transactions.',
       },
     },
   },

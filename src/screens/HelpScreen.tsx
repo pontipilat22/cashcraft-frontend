@@ -69,6 +69,30 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
       question: t('help.questions.exportData.question'),
       answer: t('help.questions.exportData.answer'),
     },
+    {
+      question: t('help.questions.savings.question'),
+      answer: t('help.questions.savings.answer'),
+    },
+    {
+      question: t('help.questions.debts.question'),
+      answer: t('help.questions.debts.answer'),
+    },
+    {
+      question: t('help.questions.credits.question'),
+      answer: t('help.questions.credits.answer'),
+    },
+    {
+      question: t('help.questions.multiCurrency.question'),
+      answer: t('help.questions.multiCurrency.answer'),
+    },
+    {
+      question: t('help.questions.premium.question'),
+      answer: t('help.questions.premium.answer'),
+    },
+    {
+      question: t('help.questions.security.question'),
+      answer: t('help.questions.security.answer'),
+    },
   ];
 
   const toggleItem = (index: number) => {
@@ -80,7 +104,8 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
   };
 
   const openEmail = () => {
-    Linking.openURL('mailto:cashcraft325@gmail.com?subject=Помощь с приложением Cashcraft');
+    const subject = t('help.emailSubject') || 'Cashcraft App Support';
+    Linking.openURL(`mailto:cashcraft325@gmail.com?subject=${encodeURIComponent(subject)}`);
   };
 
   return (
@@ -165,6 +190,20 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
               {t('help.tips.backup')}
             </Text>
           </View>
+          
+          <View style={styles.tipItem}>
+            <Ionicons name="wallet-outline" size={24} color={colors.primary} style={styles.tipIcon} />
+            <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+              {t('help.tips.savingsHelp')}
+            </Text>
+          </View>
+          
+          <View style={styles.tipItem}>
+            <Ionicons name="people-outline" size={24} color={colors.primary} style={styles.tipIcon} />
+            <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+              {t('help.tips.debtTracking')}
+            </Text>
+          </View>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
@@ -202,7 +241,7 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
           </Text>
           
           <Text style={[styles.versionText, { color: colors.textSecondary }]}>
-            {t('help.version')} 1.0.0
+            {t('help.version')} 1.1.0
           </Text>
         </View>
       </ScrollView>

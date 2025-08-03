@@ -568,12 +568,15 @@ export default {
       useCategories: 'Use categories to analyze where most of your money goes',
       setGoals: 'Set financial goals and track progress with savings accounts',
       backup: 'Sign in to your account for automatic data backup',
+      savingsHelp: 'Use savings to set aside money from any account for specific goals',
+      debtTracking: 'Track debts and loans to always know who owes you and whom you owe',
     },
     contactTitle: 'Support Contacts',
     emailSupport: 'Support Email',
+    emailSubject: 'Cashcraft App Support',
     responseTime: 'We usually respond within 24-48 hours',
     aboutTitle: 'About the App',
-    aboutText: 'Cashcraft is a simple and convenient app for personal finance tracking. We are constantly working on improving functionality and would love to hear your suggestions.',
+    aboutText: 'Cashcraft is a powerful and convenient app for personal finance tracking. We are constantly working on improving functionality and welcome your feedback and suggestions. The app supports various account types, savings goals, debts, credits, multi-currency and much more.',
     version: 'App version:',
     questions: {
       addAccount: {
@@ -598,7 +601,7 @@ export default {
       },
       exchangeRates: {
         question: 'How to configure exchange rates?',
-        answer: 'In settings select "Exchange Rates". Here you can add, edit or delete exchange rates between different currencies. Rates are saved and used for automatic conversion.',
+        answer: 'In settings select "Exchange Rates". The app supports automatic rate updates via internet or manual input. Each account can have its own exchange rate.',
       },
       dataSync: {
         question: 'How does data synchronization work?',
@@ -622,7 +625,31 @@ export default {
       },
       exportData: {
         question: 'How to export data?',
-        answer: 'Data export feature is under development and will be added in future app updates.',
+        answer: 'Go to "More" → "Export & Import Data". You can export data in JSON format for backup or transfer to another device. Import of previously exported data is also supported.',
+      },
+      savings: {
+        question: 'How do savings work?',
+        answer: 'Create a savings account and link it to any regular account. Money will be reserved from the main account but physically remain there. You can add to savings or withdraw money back at any time.',
+      },
+      debts: {
+        question: 'How to track debts?',
+        answer: 'On the main screen tap "+" and select debt operation. You can lend money, borrow money, collect debt or pay back debt. All debts are displayed on a separate tab divided into "Owed to me" and "I owe".',
+      },
+      credits: {
+        question: 'How to add a credit?',
+        answer: 'When creating a new account, select "Credit" type. Enter credit amount, interest rate, term and payment type (annuity or differentiated). The app will automatically calculate monthly payment.',
+      },
+      multiCurrency: {
+        question: 'How to work with different currencies?',
+        answer: 'When creating an account, select the desired currency. Each account can have its own exchange rate relative to the main currency. The main screen displays total balance with conversion of all currencies.',
+      },
+      premium: {
+        question: 'What does Premium subscription offer?',
+        answer: 'Premium removes the limit on number of accounts (free version - 2 accounts), provides access to advanced statistics, sync between devices and priority support.',
+      },
+      security: {
+        question: 'How secure is my data?',
+        answer: 'All financial data is stored locally on your device in an encrypted database. Secure connection is used for synchronization. We do not have access to the content of your transactions.',
       },
     },
   },

@@ -385,52 +385,96 @@ export default {
   },
   help: {
     title: 'Hilfe',
-    contactUs: 'Kontaktieren Sie uns',
-    faq: 'Häufig gestellte Fragen',
-    support: 'Support',
-    feedback: 'Feedback',
+    faqTitle: 'Häufig gestellte Fragen',
+    tipsTitle: 'Nützliche Tipps',
+    tips: {
+      recordTransactions: 'Erfassen Sie regelmäßig alle Transaktionen, um einen genauen Überblick über Ihre Finanzen zu haben',
+      useCategories: 'Verwenden Sie Kategorien zur Analyse, wofür Sie das meiste Geld ausgeben',
+      setGoals: 'Setzen Sie sich finanzielle Ziele und verfolgen Sie den Fortschritt mit Sparkonten',
+      backup: 'Melden Sie sich in Ihrem Konto an für automatische Datensicherung',
+      savingsHelp: 'Verwenden Sie Ersparnisse, um Geld von jedem Konto für bestimmte Ziele beiseite zu legen',
+      debtTracking: 'Verfolgen Sie Schulden und Darlehen, um immer zu wissen, wer Ihnen schuldet und wem Sie schulden',
+    },
+    contactTitle: 'Support-Kontakte',
+    emailSupport: 'Support-E-Mail',
+    emailSubject: 'Cashcraft App Support',
+    responseTime: 'Wir antworten normalerweise innerhalb von 24-48 Stunden',
+    aboutTitle: 'Über die App',
+    aboutText: 'Cashcraft ist eine leistungsstarke und benutzerfreundliche App zur Verwaltung persönlicher Finanzen. Wir arbeiten ständig an der Verbesserung der Funktionalität und freuen uns über Ihr Feedback und Ihre Vorschläge. Die App unterstützt verschiedene Kontotypen, Ersparnisse, Schulden, Kredite, Mehrwährungsfähigkeit und vieles mehr.',
+    version: 'App-Version:',
     questions: {
       addAccount: {
         question: 'Wie füge ich ein neues Konto hinzu?',
-        answer: 'Gehen Sie zu "Konten" und tippen Sie auf das "+" Symbol. Wählen Sie den Kontotyp und füllen Sie die erforderlichen Informationen aus.',
+        answer: 'Gehen Sie zur Registerkarte "Konten" und tippen Sie auf die "+" Schaltfläche in der oberen rechten Ecke. Wählen Sie den Kontotyp, geben Sie den Namen und den Anfangssaldo ein. Sie können die Kontowährung auswählen und andere Einstellungen konfigurieren.',
       },
       addTransaction: {
-        question: 'Wie füge ich eine neue Transaktion hinzu?',
-        answer: 'Gehen Sie zu "Transaktionen" und tippen Sie auf das "+" Symbol. Wählen Sie den Transaktionstyp (Einkommen, Ausgabe, Überweisung) und füllen Sie die Details aus.',
+        question: 'Wie füge ich eine Transaktion hinzu?',
+        answer: 'Tippen Sie auf dem Hauptbildschirm auf die "+" Schaltfläche unten. Wählen Sie den Transaktionstyp (Einkommen/Ausgabe/Überweisung), geben Sie Betrag, Kategorie und Konto ein. Fügen Sie bei Bedarf eine Beschreibung hinzu.',
       },
-      changeCurrency: {
+      categories: {
+        question: 'Was sind Kategorien und wie verwalte ich sie?',
+        answer: 'Kategorien helfen, Ihre Einnahmen und Ausgaben zu gruppieren. Gehen Sie zu "Mehr" → "Kategorien", um die Standardkategorien anzuzeigen. Die Funktion für benutzerdefinierte Kategorien wird in zukünftigen Updates hinzugefügt.',
+      },
+      transfers: {
+        question: 'Wie funktionieren Überweisungen zwischen Konten?',
+        answer: 'Wählen Sie beim Erstellen einer Transaktion den Typ "Überweisung". Wählen Sie Quell- und Zielkonto. Wenn Konten unterschiedliche Währungen haben, wendet die App automatisch den Wechselkurs an.',
+      },
+      defaultCurrency: {
         question: 'Wie ändere ich die Standardwährung?',
-        answer: 'Gehen Sie zu "Einstellungen" > "Währung" und wählen Sie Ihre bevorzugte Währung aus.',
+        answer: 'Gehen Sie zu "Mehr" → "Einstellungen" → "Währung". Wählen Sie die gewünschte Währung aus der Liste. Wenn Sie Konten in anderen Währungen haben, fragt die App nach Wechselkursen.',
       },
-      exportData: {
-        question: 'Wie exportiere ich meine Daten?',
-        answer: 'Diese Funktion ist nur in der Premium-Version verfügbar. Melden Sie sich an und abonnieren Sie Premium für den Datenexport.',
+      exchangeRates: {
+        question: 'Wie konfiguriere ich Wechselkurse?',
+        answer: 'Wählen Sie in den Einstellungen "Wechselkurse". Die App unterstützt automatische Kursaktualisierungen über das Internet oder manuelle Eingabe. Jedes Konto kann seinen eigenen Wechselkurs haben.',
       },
-      syncData: {
-        question: 'Wie synchronisiere ich Daten zwischen Geräten?',
-        answer: 'Die Synchronisation ist nur in der Premium-Version verfügbar. Melden Sie sich an und abonnieren Sie Premium für die Gerätesynchronisation.',
+      dataSync: {
+        question: 'Wie funktioniert die Datensynchronisierung?',
+        answer: 'Wenn Sie sich mit einem Google-Konto anmelden, werden Ihre Daten automatisch mit der Firebase-Cloud synchronisiert. Dies ermöglicht die Nutzung der App auf mehreren Geräten. Im Gastmodus werden Daten nur lokal gespeichert.',
       },
       accountLimit: {
-        question: 'Wie viele Konten kann ich in der kostenlosen Version erstellen?',
+        question: 'Wie viele Konten kann ich erstellen?',
         answer: 'Die kostenlose Version und der Gastmodus erlauben bis zu 2 Konten. Für unbegrenzte Konten müssen Sie sich anmelden und Premium abonnieren.',
       },
-    },
-    contactInfo: {
-      email: 'E-Mail: support@cashcraft.app',
-      responseTime: 'Wir antworten normalerweise innerhalb von 24-48 Stunden',
-      lastUpdated: 'Zuletzt aktualisiert: 12. Juni 2025',
-    },
-    section1: {
-      title: 'Erste Schritte',
-      description: 'Erfahren Sie, wie Sie mit CashCraft beginnen und Ihre Finanzen verwalten.',
-    },
-    section2: {
-      title: 'Konten und Transaktionen',
-      description: 'Erfahren Sie, wie Sie Konten erstellen und Transaktionen verfolgen.',
-    },
-    section3: {
-      title: 'Erweiterte Funktionen',
-      description: 'Entdecken Sie Premium-Funktionen und erweiterte Analysen.',
+      deleteTransaction: {
+        question: 'Wie lösche ich eine Transaktion?',
+        answer: 'Finden Sie die Transaktion in der Liste und wischen Sie nach links. Die Schaltfläche Löschen wird angezeigt. Bestätigen Sie das Löschen im Popup.',
+      },
+      changeLanguage: {
+        question: 'Wie ändere ich die App-Sprache?',
+        answer: 'Gehen Sie zu "Mehr" → "Einstellungen" → "Sprache". Wählen Sie die bevorzugte Sprache aus der Liste. Die App unterstützt 13 Sprachen.',
+      },
+      forgotPassword: {
+        question: 'Was mache ich, wenn ich mein Passwort vergessen habe?',
+        answer: 'Tippen Sie auf dem Anmeldebildschirm auf "Passwort vergessen?". Geben Sie die E-Mail-Adresse ein, die für die Registrierung verwendet wurde. Anweisungen zum Zurücksetzen des Passworts werden an Ihre E-Mail gesendet.',
+      },
+      exportData: {
+        question: 'Wie exportiere ich Daten?',
+        answer: 'Gehen Sie zu "Mehr" → "Daten exportieren & importieren". Sie können Daten im JSON-Format für Backup oder Übertragung auf ein anderes Gerät exportieren. Der Import zuvor exportierter Daten wird ebenfalls unterstützt.',
+      },
+      savings: {
+        question: 'Wie funktionieren Ersparnisse?',
+        answer: 'Erstellen Sie ein Sparkonto und verknüpfen Sie es mit einem regulären Konto. Geld wird vom Hauptkonto reserviert, bleibt aber physisch dort. Sie können jederzeit Ersparnisse hinzufügen oder Geld zurückziehen.',
+      },
+      debts: {
+        question: 'Wie verfolge ich Schulden?',
+        answer: 'Tippen Sie auf dem Hauptbildschirm auf "+" und wählen Sie Schuldoperation. Sie können Geld verleihen, Geld leihen, Schulden eintreiben oder Schulden zurückzahlen. Alle Schulden werden auf einer separaten Registerkarte angezeigt, unterteilt in "Mir geschuldet" und "Ich schulde".',
+      },
+      credits: {
+        question: 'Wie füge ich einen Kredit hinzu?',
+        answer: 'Wählen Sie beim Erstellen eines neuen Kontos den Typ "Kredit". Geben Sie Kreditbetrag, Zinssatz, Laufzeit und Zahlungsart (Annuität oder differenziert) ein. Die App berechnet automatisch die monatliche Zahlung.',
+      },
+      multiCurrency: {
+        question: 'Wie arbeite ich mit verschiedenen Währungen?',
+        answer: 'Wählen Sie beim Erstellen eines Kontos die gewünschte Währung. Jedes Konto kann seinen eigenen Wechselkurs relativ zur Hauptwährung haben. Der Hauptbildschirm zeigt den Gesamtsaldo mit Umrechnung aller Währungen an.',
+      },
+      premium: {
+        question: 'Was bietet das Premium-Abonnement?',
+        answer: 'Premium hebt das Limit für die Anzahl der Konten auf (kostenlose Version - 2 Konten), bietet Zugriff auf erweiterte Statistiken, Synchronisierung zwischen Geräten und bevorzugten Support.',
+      },
+      security: {
+        question: 'Wie sicher sind meine Daten?',
+        answer: 'Alle Finanzdaten werden lokal auf Ihrem Gerät in einer verschlüsselten Datenbank gespeichert. Für die Synchronisierung wird eine sichere Verbindung verwendet. Wir haben keinen Zugriff auf den Inhalt Ihrer Transaktionen.',
+      },
     },
   },
 }; 
