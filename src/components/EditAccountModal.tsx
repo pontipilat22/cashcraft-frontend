@@ -26,8 +26,6 @@ interface EditAccountModalProps {
     cardNumber?: string;
     isDefault?: boolean;
     isIncludedInTotal?: boolean;
-    isTargetedSavings?: boolean;
-    targetAmount?: number;
   }) => void;
 }
 
@@ -44,8 +42,6 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
   const [cardNumber, setCardNumber] = useState('');
   const [isDefault, setIsDefault] = useState(false);
   const [isIncludedInTotal, setIsIncludedInTotal] = useState(true);
-  const [isTargetedSavings, setIsTargetedSavings] = useState(true);
-  const [targetAmount, setTargetAmount] = useState('');
 
   useEffect(() => {
     if (account) {
@@ -54,30 +50,19 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
       setCardNumber(account.cardNumber || '');
       setIsDefault(account.isDefault || false);
       setIsIncludedInTotal(account.isIncludedInTotal !== false);
-      setIsTargetedSavings((account as any).isTargetedSavings !== false);
-      setTargetAmount(account.targetAmount?.toString() || '');
     }
   }, [account]);
 
   const handleSave = () => {
     if (!account || !name.trim()) return;
 
-    const saveData: any = {
+    onSave(account.id, {
       name: name.trim(),
       balance: parseFloat(balance) || 0,
       cardNumber: cardNumber.trim() || undefined,
       isDefault,
       isIncludedInTotal,
-    };
-
-    if (account.type === 'savings') {
-      saveData.isTargetedSavings = isTargetedSavings;
-      if (isTargetedSavings && targetAmount) {
-        saveData.targetAmount = parseFloat(targetAmount) || 0;
-      }
-    }
-
-    onSave(account.id, saveData);
+    });
 
     onClose();
   };
@@ -181,8 +166,7 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
 
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}> 
-                {Boolean(account.type === 'debt' || account.type === 'credit') ? t('accounts.debtAmount') : 
-                 account.type === 'savings' ? t('accounts.savedAmount') : t('accounts.balance')}
+                {Boolean(account.type === 'debt' || account.type === 'credit') ? t('accounts.debtAmount') : t('accounts.balance')}
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -201,6 +185,22 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
             <View style={styles.switchContainer}>
               <View style={styles.switchRow}>
                 <Text style={[styles.switchLabel, { color: colors.text }]}>
+                  {t('accounts.defaultAccount')}
+                </Text>
+                <Switch
+                  value={isDefault}
+                  onValueChange={setIsDefault}
+                  trackColor={{ false: '#767577', true: colors.primary }}
+                />
+              </View>
+              <Text style={[styles.switchDescription, { color: colors.textSecondary }]}>
+                {t('accounts.defaultAccountDescription')}
+              </Text>
+            </View>
+
+            <View style={styles.switchContainer}>
+              <View style={styles.switchRow}>
+                <Text style={[styles.switchLabel, { color: colors.text }]}>
                   {t('accounts.includeInBalance')}
                 </Text>
                 <Switch
@@ -213,61 +213,6 @@ export const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 {t('accounts.includeInBalanceDescription')}
               </Text>
             </View>
-
-            {account.type !== 'savings' && (
-              <View style={styles.switchContainer}>
-                <View style={styles.switchRow}>
-                  <Text style={[styles.switchLabel, { color: colors.text }]}>
-                    {t('accounts.defaultAccount')}
-                  </Text>
-                  <Switch
-                    value={isDefault}
-                    onValueChange={setIsDefault}
-                    trackColor={{ false: '#767577', true: colors.primary }}
-                  />
-                </View>
-                <Text style={[styles.switchDescription, { color: colors.textSecondary }]}>
-                  {t('accounts.defaultAccountDescription')}
-                </Text>
-              </View>
-            )}
-
-            {account.type === 'savings' && (
-              <>
-                <View style={styles.switchContainer}>
-                  <View style={styles.switchRow}>
-                    <Text style={[styles.switchLabel, { color: colors.text }]}>
-                      {t('accounts.targetedSavings') || 'Целевое накопление'}
-                    </Text>
-                    <Switch
-                      value={isTargetedSavings}
-                      onValueChange={setIsTargetedSavings}
-                      trackColor={{ false: '#767577', true: colors.primary }}
-                    />
-                  </View>
-                </View>
-
-                {isTargetedSavings && (
-                  <View style={styles.inputContainer}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>
-                      {t('accounts.targetAmount')}
-                    </Text>
-                    <TextInput
-                      style={[styles.input, { 
-                        backgroundColor: colors.background,
-                        color: colors.text,
-                        borderColor: colors.border,
-                      }]}
-                      value={targetAmount}
-                      onChangeText={setTargetAmount}
-                      placeholder="0"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                )}
-              </>
-            )}
           </ScrollView>
 
           <View style={styles.footer}>

@@ -230,19 +230,6 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           onLongPress={handleLongPress}
           delayLongPress={500}
         >
-          {/* Верхняя светлая тень для неоморфизма */}
-          <View style={[
-            styles.neumorphicLight,
-            {
-              backgroundColor: isDark ? '#505050' : '#ffffff',
-              opacity: isPressed ? 0 : (isDark ? 0.4 : 0.9),
-              shadowColor: isDark ? '#505050' : '#ffffff',
-              shadowOffset: { width: -6, height: -6 },
-              shadowOpacity: isDark ? 0.4 : 0.8,
-              shadowRadius: 12,
-              elevation: 2,
-            }
-          ]} />
           
           {account.type === 'savings' && ((account as any).isTargetedSavings !== false) && account.targetAmount ? (
             <>
@@ -257,39 +244,24 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                   },
                 ]}
               />
-              <View style={[styles.content, { paddingBottom: 12 }]}>
+                              <View style={[styles.content, { paddingBottom: 12 }]}>
                 <View style={styles.row}>
                   <View style={[
                     styles.iconCircle,
                     {
-                      backgroundColor: account.isDefault 
-                        ? (isDark ? '#FF9800' : '#3B82F6') // Оранжевый в темной теме, синий в светлой для счета по умолчанию
-                        : (isDark ? '#4a4a4a' : '#9e9e9e'), // Серый для остальных счетов
-                      // Неоморфные тени для иконки - усиленные
-                      shadowColor: account.isDefault 
-                        ? (isDark ? '#FF9800' : '#3B82F6')
-                        : (isDark ? '#4a4a4a' : '#9e9e9e'),
+                      backgroundColor: isDark ? '#2a2a2a' : '#ffffff', // Для накоплений: темный фон в темной теме, белый в светлой
+                      // Неоморфные тени для иконки
+                      shadowColor: isDark ? '#FF9800' : '#3B82F6',
                       shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.4,
+                      shadowOpacity: 0.6,
                       shadowRadius: 8,
                       elevation: 6,
                     },
                   ]}>
-                    {/* Внутренняя светлая тень */}
-                    <View style={{
-                      position: 'absolute',
-                      top: -2,
-                      left: -2,
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: isDark ? '#404040' : '#ffffff',
-                      opacity: isDark ? 0.3 : 0.6,
-                    }} />
                     <Ionicons
                       name={getIcon()}
                       size={24}
-                      color="#fff"
+                      color={isDark ? '#FF9800' : '#3B82F6'} // Для накоплений: оранжевая иконка в темной, синяя в светлой
                     />
                   </View>
                   <View style={styles.textBlock}>
@@ -374,25 +346,53 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             <View style={styles.content}>
               <View style={styles.row}>
                 <View style={[
-                  styles.iconCircle, 
-                  { 
-                    backgroundColor: account.isDefault 
-                      ? (isDark ? '#FF9800' : '#3B82F6') // Оранжевый в темной теме, синий в светлой для счета по умолчанию
-                      : (isDark ? '#4a4a4a' : '#9e9e9e'), // Серый для остальных счетов
-                    // Неоморфные тени для иконки - усиленные
-                    shadowColor: account.isDefault 
-                      ? (isDark ? '#FF9800' : '#3B82F6')
-                      : (isDark ? '#4a4a4a' : '#9e9e9e'),
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.4,
-                    shadowRadius: 8,
-                    elevation: 6,
-                  }
-                ]}> 
+                  styles.iconCircle,
+                                      {
+                      backgroundColor: account.type === 'savings' 
+                        ? (isDark ? '#2a2a2a' : '#ffffff') // Для накоплений: темный фон в темной теме, белый в светлой
+                        : account.type === 'credit'
+                          ? (isDark ? '#EF4444' : '#DC2626') // Для кредитов: красный
+                          : account.isDefault 
+                            ? (isDark ? '#FF9800' : '#3B82F6') // Счет по умолчанию: яркие цвета
+                            : (isDark ? '#3a3a3a' : '#e0e0e0'), // Обычные счета: серый фон
+                      // Неоморфные тени для иконки
+                      shadowColor: account.type === 'savings'
+                        ? (isDark ? '#FF9800' : '#3B82F6')
+                        : account.type === 'credit'
+                          ? (isDark ? '#EF4444' : '#DC2626')
+                          : account.isDefault 
+                            ? (isDark ? '#FF9800' : '#3B82F6')
+                            : (isDark ? '#666666' : '#999999'),
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: account.type === 'savings' ? 0.6 : account.isDefault ? 0.5 : 0.2,
+                      shadowRadius: 8,
+                      elevation: 6,
+                    },
+                ]}>
+                  {/* Внутренняя светлая тень - не для накоплений */}
+                  {account.type !== 'savings' && account.type !== 'credit' && !account.isDefault && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -2,
+                      left: -2,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: isDark ? '#404040' : '#ffffff',
+                      opacity: isDark ? 0.2 : 0.4,
+                    }} />
+                  )}
                   <Ionicons
                     name={getIcon()}
                     size={24}
-                    color="#fff"
+                    color={account.type === 'savings'
+                      ? (isDark ? '#FF9800' : '#3B82F6') // Для накоплений: оранжевая иконка в темной, синяя в светлой
+                      : account.type === 'credit'
+                        ? '#fff' // Для кредитов: белая иконка
+                        : account.isDefault
+                          ? '#fff' // Для счета по умолчанию: белая иконка на ярком фоне
+                          : (isDark ? '#999999' : '#666666') // Для обычных счетов: серая иконка
+                    }
                   />
                 </View>
                 <View style={styles.textBlock}>
@@ -449,10 +449,9 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
     marginBottom: 12,
-    maxWidth: 380,
-    alignSelf: 'center',
-    width: '95%',
-    marginHorizontal: 8,
+    alignSelf: 'stretch',
+    width: '100%',
+    marginHorizontal: 0,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -583,15 +582,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 2,
   },
-  neumorphicLight: {
-    position: 'absolute',
-    top: -2,
-    left: -2,
-    right: 2,
-    bottom: 2,
-    borderRadius: 16,
-    opacity: 0.5,
-  },
+
   savingsButton: {
     flexDirection: 'row',
     alignItems: 'center',

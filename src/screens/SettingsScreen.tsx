@@ -44,7 +44,7 @@ export const SettingsScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
   const { t, currentLanguage, setLanguage, languages } = useLocalization();
   const { defaultCurrency, setDefaultCurrency, currencies, formatAmount } = useCurrency();
-  const { user, logout, login, forceReauth } = useAuth();
+  const { user, logout } = useAuth();
   const { accounts, updateAccount } = useData();
   const navigation = useNavigation();
   
@@ -121,37 +121,7 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
-  const handleForceLogin = async () => {
-    Alert.alert(
-      t('settings.forceLogin.title'),
-      t('settings.forceLogin.message'),
-      [
-        {
-          text: t('common.cancel'),
-          style: 'cancel',
-        },
-        {
-          text: t('settings.forceLogin.confirm'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await forceReauth();
-              Alert.alert(
-                t('settings.forceLogin.success.title'),
-                t('settings.forceLogin.success.message')
-              );
-            } catch (error) {
-              console.error('Force login error:', error);
-              Alert.alert(
-                t('common.error'),
-                t('settings.forceLogin.error')
-              );
-            }
-          },
-        },
-      ]
-    );
-  };
+
 
   const handleCurrencySelect = async (currencyCode: string) => {
     setShowCurrencyModal(false);
@@ -386,26 +356,7 @@ export const SettingsScreen: React.FC = () => {
           )}
         </View>
 
-        {user && !user.isGuest && (
-          <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('common.account')}
-            </Text>
-            
-            <View style={[styles.userInfo, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.userEmail, { color: colors.text }]}>
-                {user.email}
-              </Text>
-            </View>
-            
-            {renderSettingItem(
-              'refresh-outline',
-              t('settings.forceLogin.title'),
-              t('settings.forceLogin.description'),
-              handleForceLogin
-            )}
-          </View>
-        )}
+
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -485,6 +436,20 @@ export const SettingsScreen: React.FC = () => {
             }
           )}
         </View>
+
+        {user && !user.isGuest && (
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {t('common.account')}
+            </Text>
+            
+            <View style={[styles.userInfo, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.userEmail, { color: colors.text }]}>
+                {user.email}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {user && (
           <TouchableOpacity

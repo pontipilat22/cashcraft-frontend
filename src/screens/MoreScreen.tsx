@@ -82,15 +82,6 @@ export const MoreScreen: React.FC = () => {
       icon: 'help-circle-outline',
       onPress: () => navigation.navigate('Help'),
     },
-    {
-      id: 'refresh-subscription',
-      title: 'Обновить статус подписки',
-      icon: 'refresh-outline',
-      onPress: async () => {
-        const hasPremium = await checkIfPremium();
-        Alert.alert('Готово', `Статус подписки обновлен. Premium: ${hasPremium ? 'Да' : 'Нет'}`);
-      },
-    },
   ];
 
   const renderMenuItem = (item: typeof menuItems[0]) => (
@@ -113,7 +104,7 @@ export const MoreScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 10 }}>
         {user && !user.isGuest && (
           <View style={[styles.userCard, { backgroundColor: colors.card }]}>
             <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
@@ -205,7 +196,7 @@ export const MoreScreen: React.FC = () => {
         {/* Опасная зона */}
         <View style={[styles.section, { backgroundColor: colors.card, marginTop: 20 }]}>
           <TouchableOpacity 
-            style={styles.menuItem} 
+            style={[styles.menuItem, { borderBottomWidth: 0 }]} 
             activeOpacity={0.7}
             onPress={handleResetData}
           >

@@ -48,7 +48,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       id: 'monthly',
       name: t('premium.monthlySubscription'),
       price: '$2',
-      period: '/месяц',
+      period: t('premium.perMonth'),
       description: [
         t('premium.features.unlimitedAccounts'),
         t('premium.features.dataExport'),
@@ -61,8 +61,8 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       id: 'yearly',
       name: t('premium.yearlySubscription'),
       price: '$15',
-      period: '/год',
-      pricePerMonth: '$1.25/мес',
+      period: t('premium.perYear'),
+      pricePerMonth: '$1.25' + t('premium.perMonth'),
       badge: t('premium.savingsBadge'),
       description: [
         t('premium.features.unlimitedAccounts'),
@@ -110,7 +110,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       
       Alert.alert(
         t('premium.subscribeSuccess'),
-        `Вы успешно оформили ${plan.name.toLowerCase()}`,
+        t('premium.subscriptionSuccessMessage', { planName: plan.name.toLowerCase() }),
         [
           {
             text: 'OK',
@@ -162,23 +162,23 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
 
   const handleDeleteSubscription = async () => {
     Alert.alert(
-      'Удалить подписку',
-      'Вы уверены, что хотите полностью удалить подписку? Это действие нельзя отменить.',
+      t('premium.deleteSubscriptionTitle'),
+      t('premium.deleteSubscriptionConfirm'),
       [
         {
-          text: 'Отмена',
+          text: t('premium.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Удалить',
+          text: t('premium.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await cancelSubscription();
               setCurrentSubscription(null);
-              Alert.alert('Подписка удалена', 'Ваша подписка была успешно удалена.');
+              Alert.alert(t('premium.deleteSubscriptionSuccess'), t('premium.deleteSubscriptionSuccessMessage'));
             } catch (error) {
-              Alert.alert(t('common.error'), 'Ошибка при удалении подписки');
+              Alert.alert(t('common.error'), t('premium.deleteSubscriptionError'));
             }
           },
         },
@@ -196,7 +196,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
           <TouchableOpacity onPress={handleGoBack}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Подписка</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('premium.subscription')}</Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -207,7 +207,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
               {currentSubscription.planName}
             </Text>
             <Text style={[styles.activeStatus, { color: colors.primary }]}>
-              Активна
+              {t('premium.active')}
             </Text>
             <Text style={[styles.activeUntil, { color: colors.textSecondary }]}>
               {t('premium.activeFor', { 
@@ -216,14 +216,14 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
               })}
             </Text>
             <Text style={[styles.activeDate, { color: colors.textSecondary }]}>
-              До {endDate.toLocaleDateString('ru-RU')}
+              {t('premium.until')} {endDate.toLocaleDateString('ru-RU')}
             </Text>
 
             {!currentSubscription.willRenew && (
               <View style={[styles.warningBox, { backgroundColor: colors.warning + '20' }]}>
                 <Ionicons name="information-circle" size={20} color={colors.warning} />
                 <Text style={[styles.warningText, { color: colors.warning }]}>
-                  Автопродление отключено
+                  {t('premium.autoRenewalDisabled')}
                 </Text>
               </View>
             )}
@@ -234,7 +234,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
                 onPress={handleCancelSubscription}
               >
                 <Text style={[styles.cancelButtonText, { color: colors.danger }]}>
-                  Отменить подписку
+                  {t('premium.cancelSubscriptionButton')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -244,7 +244,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
               onPress={handleDeleteSubscription}
             >
               <Text style={[styles.deleteButtonText, { color: colors.danger }]}>
-                Удалить подписку
+                {t('premium.deleteSubscription')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -259,7 +259,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
         <TouchableOpacity onPress={handleGoBack}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Подписка Premium</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('premium.subscriptionPremium')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -267,10 +267,10 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
         <View style={styles.heroSection}>
           <Ionicons name="diamond" size={60} color={colors.primary} />
           <Text style={[styles.heroTitle, { color: colors.text }]}>
-            Получите полный доступ
+            {t('premium.getFullAccess')}
           </Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Разблокируйте все возможности CashCraft
+            {t('premium.unlockAllFeatures')}
           </Text>
         </View>
 
@@ -349,15 +349,13 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.subscribeButtonText}>
-              Оформить подписку
+              {t('premium.subscribeButton')}
             </Text>
           )}
         </TouchableOpacity>
 
         <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
-          • Оплата будет снята с вашего счета после подтверждения покупки{'\n'}
-          • Подписка автоматически продлевается, если не отменена{'\n'}
-          • Вы можете отменить подписку в любое время
+          {t('premium.disclaimer')}
         </Text>
       </ScrollView>
     </SafeAreaView>

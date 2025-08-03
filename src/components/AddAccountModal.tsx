@@ -238,7 +238,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       currency: selectedCurrency,
       exchangeRate: selectedCurrency !== defaultCurrency ? parseFloat(exchangeRate) || 1 : undefined,
       cardNumber: cardNumber.trim() ? cardNumber.trim() : undefined,
-      isDefault: accountType !== 'savings' ? isDefault : false,
+      isDefault: (accountType !== 'savings' && accountType !== 'credit' && accountType !== 'debt') ? isDefault : false,
       isIncludedInTotal: accountType === 'savings' ? false : isIncludedInTotal,
     };
 
@@ -561,7 +561,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
               </View>
             )}
 
-            {accountType !== 'savings' && (
+            {accountType !== 'savings' && accountType !== 'credit' && accountType !== 'debt' && (
               <View style={styles.switchContainer}>
                 <Text style={[styles.switchLabel, { color: colors.text }]}>{t('accounts.defaultAccount')}</Text>
                 <Switch

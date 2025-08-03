@@ -221,7 +221,6 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         const currentDefault = accounts.find(acc => acc.isDefault);
         if (currentDefault) {
           await updateAccount(currentDefault.id, {
-            ...currentDefault,
             isDefault: false
           });
         }
@@ -250,7 +249,6 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         const currentDefault = accounts.find(acc => acc.isDefault && acc.id !== accountId);
         if (currentDefault) {
           await updateAccount(currentDefault.id, {
-            ...currentDefault,
             isDefault: false
           });
         }

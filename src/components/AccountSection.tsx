@@ -46,7 +46,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({
         </TouchableOpacity>
       </View>
       {isExpanded && (
-        <View>
+        <View style={{ paddingHorizontal: 16 }}>
           {React.Children.toArray(children).map((child, idx) =>
             (typeof child === 'string' || typeof child === 'number')
               ? <Text key={idx}>{child}</Text>
