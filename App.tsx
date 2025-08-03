@@ -24,6 +24,8 @@ import { CurrencyProvider, useCurrency } from './src/context/CurrencyContext';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { SplashScreen } from './src/components/SplashScreen';
 import { LocalDatabaseService } from './src/services/localDatabase';
+import { PinLockScreen } from './src/screens/PinLockScreen';
+import { pinService } from './src/services/pinService';
 
 // Предотвращаем автоматическое скрытие нативного splash screen
 SplashScreenExpo.preventAutoHideAsync();
@@ -34,11 +36,30 @@ function AppContent() {
   const { user, isLoading: authLoading, isPreparing } = useAuth();
   const { defaultCurrency } = useCurrency();
   const [dataProviderKey, setDataProviderKey] = useState(0);
+  const [isPinLocked, setIsPinLocked] = useState(false);
+  const [isPinChecking, setIsPinChecking] = useState(true);
 
   // Скрываем сплэш-скрин после инициализации
   useEffect(() => {
     SplashScreenExpo.hideAsync();
   }, []);
+
+  // Проверяем, нужна ли проверка PIN-кода
+  useEffect(() => {
+    const checkPinStatus = async () => {
+      if (user) {
+        try {
+          const isPinEnabled = await pinService.isPinEnabled();
+          setIsPinLocked(isPinEnabled);
+        } catch (error) {
+          console.error('Error checking PIN status:', error);
+        }
+      }
+      setIsPinChecking(false);
+    };
+
+    checkPinStatus();
+  }, [user]);
 
   // Пересоздаём DataProvider, если пользователь сменил валюту
   useEffect(() => {
@@ -54,27 +75,39 @@ function AppContent() {
     }
   }, [user, isPreparing, defaultCurrency]);
 
-  if (authLoading || isPreparing) {
+  if (authLoading || isPreparing || isPinChecking) {
     return <SplashScreen />;
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaProvider>
+        <AuthScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (isPinLocked) {
+    return (
+      <SafeAreaProvider>
+        <PinLockScreen onSuccess={() => setIsPinLocked(false)} />
+      </SafeAreaProvider>
+    );
   }
 
   return (
     <SafeAreaProvider>
-      {!user ? (
-        <AuthScreen />
-      ) : (
-        <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
-          <SubscriptionProvider userId={user.id} isGuest={user.isGuest}>
-            <DataProvider
-              key={dataProviderKey}
-              userId={user.id}
-              defaultCurrency={defaultCurrency}
-            >
-              <BottomTabNavigator />
-            </DataProvider>
-          </SubscriptionProvider>
-        </NavigationContainer>
-      )}
+      <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
+        <SubscriptionProvider userId={user.id} isGuest={user.isGuest}>
+          <DataProvider
+            key={dataProviderKey}
+            userId={user.id}
+            defaultCurrency={defaultCurrency}
+          >
+            <BottomTabNavigator />
+          </DataProvider>
+        </SubscriptionProvider>
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }
