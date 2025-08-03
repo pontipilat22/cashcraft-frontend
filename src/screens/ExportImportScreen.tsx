@@ -19,12 +19,14 @@ import { useLocalization } from '../context/LocalizationContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { DataExportImportService } from '../services/dataExportImport';
 import { useData } from '../context/DataContext';
+import { useNavigation } from '@react-navigation/native';
 
 export const ExportImportScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const { isPremium } = useSubscription();
   const { refreshData } = useData();
+  const navigation = useNavigation();
   
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -135,11 +137,21 @@ export const ExportImportScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.topHeader, { backgroundColor: colors.card }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {t('export.title') || 'Экспорт и импорт данных'}
+        </Text>
+        <View style={styles.placeholder} />
+      </View>
+      
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            {t('export.title') || 'Экспорт и импорт данных'}
-          </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             {t('export.subtitle') || 'Создайте резервную копию или перенесите данные'}
           </Text>
@@ -349,16 +361,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  placeholder: {
+    width: 40,
+  },
   content: {
     padding: 16,
   },
   header: {
     marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
