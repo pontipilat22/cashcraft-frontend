@@ -27,9 +27,10 @@
       "package": "com.pontipilat.cashcraft",
       "versionCode": 3,
       "edgeToEdgeEnabled": true,
+      "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#4287f5"
       },
       "intentFilters": [
         {

@@ -18,6 +18,7 @@ interface ThemeContextType {
     statsBg: string;
     warning: string;
     danger: string;
+    error: string;
     success: string;
     successLight: string;
     dangerLight: string;
@@ -47,6 +48,7 @@ const lightTheme = {
   statsBg: '#4287f5',
   warning: '#ff9800',
   danger: '#f44336',
+  error: '#f44336',
   success: '#4CAF50',
   successLight: '#E8F5E9',
   dangerLight: '#FFEBEE',
@@ -75,6 +77,7 @@ const darkTheme = {
   statsBg: 'rgba(255, 104, 0, 0.9)',
   warning: '#ff9800',
   danger: '#f44336',
+  error: '#f44336',
   success: '#4CAF50',
   successLight: '#1B5E20',
   dangerLight: '#B71C1C',
