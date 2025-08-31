@@ -7,7 +7,8 @@ interface AccountSectionProps {
   title: string;
   count: number;
   children?: React.ReactNode;
-  onAddPress: () => void;
+  onAddPress?: () => void;
+  showAddButton?: boolean;
 }
 
 export const AccountSection: React.FC<AccountSectionProps> = ({
@@ -15,6 +16,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({
   count,
   children,
   onAddPress,
+  showAddButton = false,
 }) => {
   // Определяем начальное состояние: если счетов больше 0, секция открыта
   const [isExpanded, setIsExpanded] = useState(count > 0);
@@ -41,9 +43,11 @@ export const AccountSection: React.FC<AccountSectionProps> = ({
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.count, { color: colors.textSecondary }]}>{count}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onAddPress} style={styles.addButton}>
-          <Ionicons name="add" size={24} color={colors.primary} />
-        </TouchableOpacity>
+        {showAddButton && onAddPress && (
+          <TouchableOpacity onPress={onAddPress} style={styles.addButton}>
+            <Ionicons name="add" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
       {isExpanded && (
         <View style={{ paddingHorizontal: 16 }}>

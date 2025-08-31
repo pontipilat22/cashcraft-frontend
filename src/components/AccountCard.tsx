@@ -1,12 +1,80 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Vibration, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Svg, { Defs, RadialGradient, Stop, Circle, Mask } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
 import { Account } from '../types';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useData } from '../context/DataContext';
+
+// Type workaround for React 19 compatibility
+const SvgComponent = Svg as any;
+const DefsComponent = Defs as any;
+const RadialGradientComponent = RadialGradient as any;
+const StopComponent = Stop as any;
+const CircleComponent = Circle as any;
+const MaskComponent = Mask as any;
+
+// Design constants
+const SIZES = {
+  cardRadius: 28,
+  cardPad: 18,
+  disc: 50,
+  innerDisc: 44,
+};
+
+const INSET = {
+  x: 2,
+  y: 4,
+  blur: 4,
+  fill: '#F5F5F5',
+  aSoft: 0.01,
+  aMid: 0.20,
+  aHard: 0.20,
+};
+
+// Embossed Icon Component - без теней
+function EmbossedIcon({ name, size = 22, color = '#6B7280' }: { name: keyof typeof Ionicons.glyphMap; size?: number; color?: string }) {
+  return (
+    <View style={styles.iconCenter}>
+      <Ionicons name={name} size={size} color={color} />
+    </View>
+  );
+}
+
+// Icon Disc Component  
+function IconDisc({ icon, iconColor = '#6B7280', isDark = false }: { icon: keyof typeof Ionicons.glyphMap; iconColor?: string; isDark?: boolean }) {
+  const R = SIZES.innerDisc / 2;
+  const cxP = ((R + INSET.x) / (2 * R)) * 100;
+  const cyP = ((R + INSET.y) / (2 * R)) * 100;
+
+  return (
+    <View style={styles.discContainer}>
+      <View style={[styles.disc, isDark && { backgroundColor: '#2C2C2C', shadowOpacity: 0 }]} />
+      <View style={[styles.innerDisc, isDark && { backgroundColor: '#2C2C2C' }]}>
+        <SvgComponent width={SIZES.innerDisc} height={SIZES.innerDisc} style={StyleSheet.absoluteFill} pointerEvents="none">
+          <DefsComponent>
+            <RadialGradientComponent id="innerEdgeXY" cx={`${cxP}%`} cy={`${cyP}%`} r="66%">
+              <StopComponent offset="0%" stopColor="#000" stopOpacity={0} />
+              <StopComponent offset="78%" stopColor="#000" stopOpacity={INSET.aSoft} />
+              <StopComponent offset="90%" stopColor="#000" stopOpacity={INSET.aMid} />
+              <StopComponent offset="100%" stopColor="#000" stopOpacity={INSET.aHard} />
+            </RadialGradientComponent>
+            <MaskComponent id="innerRing" x="0" y="0" width={SIZES.innerDisc} height={SIZES.innerDisc}>
+              <CircleComponent cx={R} cy={R} r={R} fill="#fff" />
+              <CircleComponent cx={R} cy={R} r={R - INSET.blur} fill="#000" />
+            </MaskComponent>
+          </DefsComponent>
+          <CircleComponent cx={R} cy={R} r={R} fill={isDark ? '#2C2C2C' : INSET.fill} />
+          <CircleComponent cx={R} cy={R} r={R} fill="url(#innerEdgeXY)" mask="url(#innerRing)" />
+        </SvgComponent>
+        <EmbossedIcon name={icon} color={iconColor} />
+      </View>
+    </View>
+  );
+}
 
 interface AccountCardProps {
   account: Account;
@@ -45,7 +113,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const handlePressIn = () => {
     setIsPressed(true);
     Animated.spring(scaleAnim, {
-      toValue: 0.95,
+      toValue: 0.98,
       useNativeDriver: true,
     }).start();
   };
@@ -59,28 +127,20 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   };
 
   const handleLongPress = () => {
-    // Добавляем вибрацию для обратной связи
     if (Platform.OS !== 'web') {
       Vibration.vibrate(50);
     }
-    
-    // Вызываем колбэк для долгого нажатия
     if (onLongPress) {
       onLongPress();
     }
   };
 
-  const getHighlightColor = () => {
-    if (!isPressed) {
-      // Используем тот же базовый цвет, что и в TransactionItem
-      return isDark ? '#232323' : '#f5f5f5';
+  const getIcon = () => {
+    // Если есть кастомная иконка, используем её
+    if (account.icon) {
+      return account.icon as keyof typeof Ionicons.glyphMap;
     }
     
-    // Более яркий неоновый эффект при нажатии
-    return isDark ? colors.primary + '20' : colors.primary + '15';
-  };
-
-  const getIcon = () => {
     if (account.type === 'savings' && account.icon) {
       return account.icon as keyof typeof Ionicons.glyphMap;
     }
@@ -205,25 +265,40 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     }
   };
 
+  // Определяем цвет иконки в зависимости от типа счета и темы
+  const getIconColor = () => {
+    if (account.isDefault) {
+      // Для счета по умолчанию - яркий цвет
+      return isDark ? '#FFA726' : '#2196F3';
+    }
+    if (account.type === 'savings') {
+      return isDark ? '#FF9800' : '#3B82F6';
+    }
+    if (account.type === 'credit') {
+      return isDark ? '#FF6B6B' : '#EF4444';
+    }
+    if (account.type === 'debt' as any) {
+      return isDark ? '#4CAF50' : '#10B981';
+    }
+    // Для обычных счетов - серый цвет
+    return isDark ? '#9CA3AF' : '#6B7280';
+  };
+
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <View style={isPressed ? [styles.glowContainer, { shadowColor: isDark ? colors.primary : '#3B82F6' }] : {}}>
         <TouchableOpacity
           style={[
-            styles.container,
-            {
-              backgroundColor: isDark ? '#232323' : '#f5f5f5',
-              borderWidth: isPressed ? 2 : 0,
-              borderColor: isPressed ? (isDark ? colors.primary : '#3B82F6') : 'transparent',
-              // Неоморфные тени - оставляем как есть
-              shadowColor: isDark ? '#000' : '#c0c0c0',
-              shadowOffset: { width: 8, height: 8 },
-              shadowOpacity: isDark ? 0.7 : 0.4,
-              shadowRadius: 15,
-              elevation: 12,
-            },
-          ]}
-          activeOpacity={1}
+          styles.card,
+          {
+            backgroundColor: isDark ? '#232323' : '#FFFFFF',
+            shadowColor: '#000',
+            shadowOpacity: isDark ? 0.3 : 0.10,
+            shadowRadius: 14,
+            shadowOffset: { width: 0, height: 8 },
+            elevation: 8,
+          }
+        ]}
+        activeOpacity={0.95}
           onPress={onPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
@@ -233,37 +308,26 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           
           {account.type === 'savings' && ((account as any).isTargetedSavings !== false) && account.targetAmount ? (
             <>
-              <LinearGradient
-                colors={isDark ? ['#FF9800', '#FFD600'] : ['#3B82F6', '#00E0FF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${getProgress()}%`,
-                  },
-                ]}
-              />
-                              <View style={[styles.content, { paddingBottom: 12 }]}>
-                <View style={styles.row}>
-                  <View style={[
-                    styles.iconCircle,
+              <View style={styles.progressContainer}>
+                <LinearGradient
+                  colors={isDark ? ['#FF9800', '#FFD600'] : ['#3B82F6', '#00E0FF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[
+                    styles.progressFill,
                     {
-                      backgroundColor: isDark ? '#2a2a2a' : '#ffffff', // Для накоплений: темный фон в темной теме, белый в светлой
-                      // Неоморфные тени для иконки
-                      shadowColor: isDark ? '#FF9800' : '#3B82F6',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.6,
-                      shadowRadius: 8,
-                      elevation: 6,
+                      width: `${Math.round(getProgress())}%`,
                     },
-                  ]}>
-                    <Ionicons
-                      name={getIcon()}
-                      size={24}
-                      color={isDark ? '#FF9800' : '#3B82F6'} // Для накоплений: оранжевая иконка в темной, синяя в светлой
-                    />
-                  </View>
+                  ]}
+                />
+              </View>
+              <View style={styles.content}>
+                <View style={styles.row}>
+                  <IconDisc 
+                    icon={getIcon()} 
+                    iconColor={getIconColor()}
+                    isDark={isDark}
+                  />
                   <View style={styles.textBlock}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text
@@ -345,56 +409,11 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           ) : (
             <View style={styles.content}>
               <View style={styles.row}>
-                <View style={[
-                  styles.iconCircle,
-                                      {
-                      backgroundColor: account.type === 'savings' 
-                        ? (isDark ? '#2a2a2a' : '#ffffff') // Для накоплений: темный фон в темной теме, белый в светлой
-                        : account.type === 'credit'
-                          ? (isDark ? '#EF4444' : '#DC2626') // Для кредитов: красный
-                          : account.isDefault 
-                            ? (isDark ? '#FF9800' : '#3B82F6') // Счет по умолчанию: яркие цвета
-                            : (isDark ? '#3a3a3a' : '#e0e0e0'), // Обычные счета: серый фон
-                      // Неоморфные тени для иконки
-                      shadowColor: account.type === 'savings'
-                        ? (isDark ? '#FF9800' : '#3B82F6')
-                        : account.type === 'credit'
-                          ? (isDark ? '#EF4444' : '#DC2626')
-                          : account.isDefault 
-                            ? (isDark ? '#FF9800' : '#3B82F6')
-                            : (isDark ? '#666666' : '#999999'),
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: account.type === 'savings' ? 0.6 : account.isDefault ? 0.5 : 0.2,
-                      shadowRadius: 8,
-                      elevation: 6,
-                    },
-                ]}>
-                  {/* Внутренняя светлая тень - не для накоплений */}
-                  {account.type !== 'savings' && account.type !== 'credit' && !account.isDefault && (
-                    <View style={{
-                      position: 'absolute',
-                      top: -2,
-                      left: -2,
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: isDark ? '#404040' : '#ffffff',
-                      opacity: isDark ? 0.2 : 0.4,
-                    }} />
-                  )}
-                  <Ionicons
-                    name={getIcon()}
-                    size={24}
-                    color={account.type === 'savings'
-                      ? (isDark ? '#FF9800' : '#3B82F6') // Для накоплений: оранжевая иконка в темной, синяя в светлой
-                      : account.type === 'credit'
-                        ? '#fff' // Для кредитов: белая иконка
-                        : account.isDefault
-                          ? '#fff' // Для счета по умолчанию: белая иконка на ярком фоне
-                          : (isDark ? '#999999' : '#666666') // Для обычных счетов: серая иконка
-                    }
-                  />
-                </View>
+                <IconDisc 
+                  icon={getIcon()} 
+                  iconColor={getIconColor()}
+                  isDark={isDark}
+                />
                 <View style={styles.textBlock}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[styles.title, { color: isDark ? '#fff' : '#232323' }]} numberOfLines={1}>
@@ -440,180 +459,127 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             </View>
           )}
         </TouchableOpacity>
-      </View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: 16,
-    marginBottom: 12,
-    alignSelf: 'stretch',
-    width: '100%',
-    marginHorizontal: 0,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  titleContainer: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    borderRadius: SIZES.cardRadius,
+    padding: SIZES.cardPad,
+    marginBottom: 16,
   },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  
+  discContainer: {
+    width: SIZES.disc,
+    height: SIZES.disc,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
   },
-  titleWrapper: {
+
+  disc: {
+    width: SIZES.disc,
+    height: SIZES.disc,
+    borderRadius: SIZES.disc / 2,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowRadius: 6.5,
+    shadowOffset: { width: 1, height: 4 },
+    elevation: 4,
+  },
+
+  innerDisc: {
+    position: 'absolute',
+    width: SIZES.innerDisc,
+    height: SIZES.innerDisc,
+    borderRadius: SIZES.innerDisc / 2,
+    backgroundColor: INSET.fill,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  iconCenter: {
+    position: 'absolute',
+    width: SIZES.innerDisc,
+    height: SIZES.innerDisc,
+    borderRadius: SIZES.innerDisc / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  iconOverlay: {
+    position: 'absolute',
+    left: 0, 
+    right: 0, 
+    top: 0, 
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  content: {
+    zIndex: 1,
     flex: 1,
   },
+  
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  
+  textBlock: {
+    flex: 1,
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  
   title: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 2,
   },
+  
   subtitle: {
     fontSize: 13,
   },
-  defaultIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  balanceContainer: {
-    marginBottom: 8,
-  },
+  
   balance: {
     fontSize: 20,
     fontWeight: '700',
     textAlign: 'right',
   },
-  targetAmount: {
-    fontSize: 13,
-    marginTop: 4,
-  },
+  
   progressContainer: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  progressFill: {
     position: 'absolute',
     top: 0,
     left: 0,
+    right: 0,
     bottom: 0,
-    borderRadius: 12,
+    borderRadius: SIZES.cardRadius,
+    overflow: 'hidden',
     zIndex: 0,
   },
-  content: {
-    padding: 16,
-    zIndex: 1,
+  
+  progressFill: {
+    height: '100%',
+    borderRadius: SIZES.cardRadius,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  textBlock: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  cardContent: {
-    padding: 16,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  accountName: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  cardNumber: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  creditInfo: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  defaultBadge: {
-    padding: 4,
-    borderRadius: 4,
-  },
-  defaultText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  creditTotal: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  progressText: {
-    fontSize: 12,
-    marginLeft: 8,
-  },
+  
   creditPayment: {
     fontSize: 14,
     fontWeight: '700',
     marginTop: 2,
   },
 
-  savingsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    flex: 1,
-    justifyContent: 'center',
-    gap: 4,
-  },
-  savingsButtonText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  savingsDivider: {
-    height: 1,
-    marginVertical: 10,
-    marginHorizontal: -12,
-  },
   compactButton: {
     width: 28,
     height: 28,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  glowContainer: {
-    borderRadius: 16,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
   },
 }); 

@@ -34,10 +34,20 @@ function AppContent() {
   const { user, isLoading: authLoading, isPreparing } = useAuth();
   const { defaultCurrency } = useCurrency();
   const [dataProviderKey, setDataProviderKey] = useState(0);
+  const [showSplash, setShowSplash] = useState(true);
 
-  // Скрываем сплэш-скрин после инициализации
+  // Скрываем нативный сплэш-скрин сразу
   useEffect(() => {
     SplashScreenExpo.hideAsync();
+  }, []);
+
+  // Показываем кастомный сплэш-скрин на 10 секунд
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 10000);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   // Пересоздаём DataProvider, если пользователь сменил валюту
@@ -54,7 +64,8 @@ function AppContent() {
     }
   }, [user, isPreparing, defaultCurrency]);
 
-  if (authLoading || isPreparing) {
+  // Показываем сплэш-скрин в течение 10 секунд или пока идет загрузка
+  if (showSplash || authLoading || isPreparing) {
     return <SplashScreen />;
   }
 

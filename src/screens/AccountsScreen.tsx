@@ -8,6 +8,7 @@ import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
+import { AccountTabs } from '../components/AccountTabs';
 import { FABMenu } from '../components/FABMenu';
 import { AddAccountModal } from '../components/AddAccountModal';
 import { EditAccountModal } from '../components/EditAccountModal';
@@ -39,7 +40,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const { checkIfPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
-  const { formatAmount } = useCurrency();
+  const { formatAmount, defaultCurrency } = useCurrency();
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -58,6 +59,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [savingsAction, setSavingsAction] = useState<'add' | 'withdraw'>('add');
   const [selectedSavings, setSelectedSavings] = useState<Account | null>(null);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('cards');
 
   // Загружаем долги при фокусе экрана
   useFocusEffect(
@@ -405,11 +407,10 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       <ScrollView showsVerticalScrollIndicator={false}>
         <StatisticsCard />
 
-        <AccountSection 
-          title={t('accounts.cardsAndAccounts')}
-          count={groupedAccounts.cards.length}
-          onAddPress={() => handleAddAccount('cards')}
-        >
+        <AccountTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {activeTab === 'cards' && (
+          <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
           {Array.isArray(groupedAccounts.cards) && groupedAccounts.cards.length > 0
             ? groupedAccounts.cards.map(account => (
                 <AccountCard
@@ -420,13 +421,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                 />
               ))
             : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noAccounts')}</Text>}
-        </AccountSection>
+          </View>
+        )}
 
-        <AccountSection 
-          title={t('accounts.savingsAccounts')}
-          count={groupedAccounts.savings.length}
-          onAddPress={() => handleAddAccount('savings')}
-        >
+        {activeTab === 'goals' && (
+          <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
           {Array.isArray(groupedAccounts.savings) && groupedAccounts.savings.length > 0
             ? groupedAccounts.savings.map(account => (
                 <AccountCard
@@ -439,84 +438,48 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                 />
               ))
             : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noSavings')}</Text>}
-        </AccountSection>
+          </View>
+        )}
 
-        <AccountSection 
-          title={t('accounts.debts')}
-          count={debts.length > 0 ? 2 : 0}
-          onAddPress={() => handleAddAccount('debts')}
-        >
+        {activeTab === 'debts' && (
+          <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
           {debts.length === 0 ? (
             <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noDebts')}</Text>
           ) : (
-            <View style={{ paddingHorizontal: 16 }}>
-              <TouchableOpacity 
-                style={[styles.debtCard, { 
-                  backgroundColor: isDark ? colors.card : '#f5f5f5',
-                  shadowColor: isDark ? '#000' : '#b0b0b0',
-                  shadowOffset: { width: 8, height: 8 },
-                  shadowOpacity: isDark ? 0.7 : 0.4,
-                  shadowRadius: 15,
-                  elevation: 12,
-                }]}
+            <>
+              <AccountCard
+                account={{
+                  id: 'debt-owed-to-me',
+                  name: t('accounts.owedToMe'),
+                  type: 'debt' as any,
+                  balance: debtTotals.owed,
+                  currency: defaultCurrency,
+                  icon: 'trending-up-outline' as any,
+                  isDefault: false,
+                }}
                 onPress={() => navigation.navigate('DebtList', { type: 'owed_to_me' })}
-              >
-                <View style={[styles.debtIconContainer, {
-                  backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
-                  shadowColor: isDark ? '#000' : '#a0a0a0',
-                  shadowOffset: { width: 4, height: 4 },
-                  shadowOpacity: isDark ? 0.6 : 0.3,
-                  shadowRadius: 6,
-                  elevation: 5,
-                }]}>
-                  <Ionicons name="trending-up-outline" size={24} color={colors.primary} />
-                </View>
-                <View style={styles.debtCardContent}>
-                  <Text style={[styles.debtCardTitle, { color: colors.text }]}>{t('accounts.owedToMe')}</Text>
-                  <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
-                    {formatAmount(debtTotals.owed)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.debtCard, { 
-                  backgroundColor: isDark ? colors.card : '#f5f5f5',
-                  shadowColor: isDark ? '#000' : '#b0b0b0',
-                  shadowOffset: { width: 8, height: 8 },
-                  shadowOpacity: isDark ? 0.7 : 0.4,
-                  shadowRadius: 15,
-                  elevation: 12,
-                }]}
+                onLongPress={() => {}}
+              />
+              <AccountCard
+                account={{
+                  id: 'debt-owed-by-me',
+                  name: t('accounts.owedByMe'),
+                  type: 'debt' as any,
+                  balance: debtTotals.owe,
+                  currency: defaultCurrency,
+                  icon: 'trending-down-outline' as any,
+                  isDefault: false,
+                }}
                 onPress={() => navigation.navigate('DebtList', { type: 'owed_by_me' })}
-              >
-                <View style={[styles.debtIconContainer, {
-                  backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8',
-                  shadowColor: isDark ? '#000' : '#a0a0a0',
-                  shadowOffset: { width: 4, height: 4 },
-                  shadowOpacity: isDark ? 0.6 : 0.3,
-                  shadowRadius: 6,
-                  elevation: 5,
-                }]}>
-                  <Ionicons name="trending-down-outline" size={24} color={colors.primary} />
-                </View>
-                <View style={styles.debtCardContent}>
-                  <Text style={[styles.debtCardTitle, { color: colors.text }]}>{t('accounts.owedByMe')}</Text>
-                  <Text style={[styles.debtCardAmount, { color: colors.primary }]}>
-                    {formatAmount(debtTotals.owe)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+                onLongPress={() => {}}
+              />
+            </>
           )}
-        </AccountSection>
+          </View>
+        )}
 
-        <AccountSection 
-          title={t('accounts.credits')}
-          count={groupedAccounts.credits.length}
-          onAddPress={() => handleAddAccount('credits')}
-        >
+        {activeTab === 'credits' && (
+          <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
           {Array.isArray(groupedAccounts.credits) && groupedAccounts.credits.length > 0
             ? groupedAccounts.credits.map(account => (
                 <AccountCard
@@ -527,7 +490,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                 />
               ))
             : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noCredits')}</Text>}
-        </AccountSection>
+          </View>
+        )}
 
         <View style={{ height: 100 }}></View>
       </ScrollView>
@@ -537,6 +501,9 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         onExpensePress={handleQuickExpense}
         onDebtPress={handleQuickDebt}
         onTransferPress={handleQuickTransfer}
+        onAddAccountPress={() => handleAddAccount('cards')}
+        onAddSavingsPress={() => handleAddAccount('savings')}
+        onAddCreditPress={() => handleAddAccount('credits')}
       />
 
       <AccountTypeSelector
@@ -632,30 +599,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  debtCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  debtCardContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  debtCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  debtCardAmount: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  debtIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
 }); 

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Appearance } from 'react-native';
 
 interface ThemeContextType {
   isDark: boolean;
@@ -91,7 +92,20 @@ const darkTheme = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isDark, setIsDark] = useState(false);
+  // Инициализируем тему на основе системной
+  const [isDark, setIsDark] = useState(() => {
+    const colorScheme = Appearance.getColorScheme();
+    return colorScheme === 'dark';
+  });
+
+  // Слушаем изменения системной темы
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setIsDark(colorScheme === 'dark');
+    });
+
+    return () => subscription?.remove();
+  }, []);
 
   const toggleTheme = () => {
     setIsDark(!isDark);

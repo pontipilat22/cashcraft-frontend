@@ -6,16 +6,21 @@
     "description": "Управляйте финансами легко",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "packagerOpts": {
       "port": 8081
     },
     "scheme": "cashcraft",
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#4287f5"
+      "image": "./assets/140140.png",
+      "resizeMode": "center",
+      "backgroundColor": "#EAF4FF",
+      "dark": {
+        "image": "./assets/140140.png",
+        "resizeMode": "center",
+        "backgroundColor": "#0B1220"
+      }
     },
     "ios": {
       "supportsTablet": true,

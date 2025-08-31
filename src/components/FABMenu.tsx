@@ -18,6 +18,9 @@ interface FABMenuProps {
   onExpensePress: () => void;
   onDebtPress: () => void;
   onTransferPress?: () => void;
+  onAddAccountPress?: () => void;
+  onAddSavingsPress?: () => void;
+  onAddCreditPress?: () => void;
 }
 
 export const FABMenu: React.FC<FABMenuProps> = ({
@@ -25,8 +28,11 @@ export const FABMenu: React.FC<FABMenuProps> = ({
   onExpensePress,
   onDebtPress,
   onTransferPress,
+  onAddAccountPress,
+  onAddSavingsPress,
+  onAddCreditPress,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const [isOpen, setIsOpen] = useState(false);
   const animationValue = useRef(new Animated.Value(0)).current;
@@ -123,6 +129,34 @@ export const FABMenu: React.FC<FABMenuProps> = ({
     });
   }
 
+  // Добавляем опции для создания счетов
+  if (onAddAccountPress) {
+    menuItems.push({
+      label: t('accounts.addAccount'),
+      icon: 'wallet-outline',
+      color: '#2196F3',
+      onPress: onAddAccountPress,
+    });
+  }
+
+  if (onAddSavingsPress) {
+    menuItems.push({
+      label: t('accounts.addGoal'),
+      icon: 'flag-outline',
+      color: '#9C27B0',
+      onPress: onAddSavingsPress,
+    });
+  }
+
+  if (onAddCreditPress) {
+    menuItems.push({
+      label: t('accounts.addCredit'),
+      icon: 'card-outline',
+      color: '#607D8B',
+      onPress: onAddCreditPress,
+    });
+  }
+
   const styles = StyleSheet.create({
     container: {
       position: 'absolute',
@@ -134,7 +168,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
       width: 56,
       height: 56,
       borderRadius: 28,
-      backgroundColor: colors.primary,
+      backgroundColor: isDark ? '#FF9800' : '#2196F3',
       justifyContent: 'center',
       alignItems: 'center',
       elevation: 8,

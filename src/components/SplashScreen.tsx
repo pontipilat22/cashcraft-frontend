@@ -1,233 +1,289 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
-  StyleSheet,
-  Animated,
-  Image,
-  Dimensions,
   Text,
+  Image,
+  ActivityIndicator,
+  StyleSheet,
+  Platform,
+  Animated,
+  Easing,
+  Appearance,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Localization from 'expo-localization';
 
-const { width, height } = Dimensions.get('window');
+/* ===== ПАЛИТРЫ (HEX) ===== */
+const LIGHT_BG: [string, string] = ["#EAF4FF", "#BFD6FF"]; // светлый фон экрана
+const DARK_BG: [string, string]  = ["#0B1220", "#111A2E"]; // тёмный фон экрана
+
+const BLUE_TILE: [string, string]   = ["#D1ECFF", "#4CA7FF"]; // плитка — голубой
+const ORANGE_TILE: [string, string] = ["#FFE5A6", "#FF9D2E"]; // плитка — оранжевый
+
+// прогресс-бар / спиннер: цвета под синий/оранжевый
+const PROGRESS_TRACK_BLUE   = "#CFE6FF";
+const PROGRESS_FILL_BLUE    = "#2E6AD6";
+const PROGRESS_TRACK_ORANGE = "#FFE0C2";
+const PROGRESS_FILL_ORANGE  = "#FF9D2E";
+
+// подписи под светлый/тёмный фон
+const CAPTION_LIGHT  = "#314969";
+const CAPTION_DARK   = "#C9D4F1";
+
+// неоморфные «свет/тень» у плитки
+const TILE_SHADOW = "rgba(0,23,58,0.35)";
+const HILITE      = "rgba(255,255,255,0.85)";
+const INNER_DARK  = "rgba(0,0,0,0.18)";
 
 export const SplashScreen: React.FC = () => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const DURATION_MS = 10000; // 10 секунд
+  const [leftSec, setLeftSec] = useState(DURATION_MS / 1000);
+  
+  // Определяем системную тему
+  const [systemIsDark, setSystemIsDark] = useState(() => {
+    const colorScheme = Appearance.getColorScheme();
+    return colorScheme === 'dark';
+  });
 
   // Определяем язык устройства для отображения правильного текста
   const deviceLanguage = Localization.locale?.split('-')[0] || 'en';
   
   // Словарь тагланов для всех поддерживаемых языков
-  const taglines: Record<string, string> = {
-    en: 'MANAGE YOUR FINANCES EASILY',
-    ru: 'УПРАВЛЯЙТЕ ФИНАНСАМИ ЛЕГКО',
-    kk: 'ҚАРЖЫНЫ ОҢАЙ БАСҚАРЫҢЫЗ',
-    uk: 'КЕРУЙТЕ ФІНАНСАМИ ЛЕГКО',
-    zh: '轻松管理您的财务',
-    ar: 'إدارة أموالك بسهولة',
-    de: 'VERWALTEN SIE IHRE FINANZEN EINFACH',
-    fr: 'GÉREZ VOS FINANCES FACILEMENT',
-    hi: 'अपने वित्त को आसानी से प्रबंधित करें',
-    tr: 'FİNANSLARINIZI KOLAYCA YÖNETİN',
-    el: 'ΔΙΑΧΕΙΡΙΣΤΕΙΤΕ ΤΑ ΟΙΚΟΝΟΜΙΚΑ ΣΑΣ ΕΥΚΟΛΑ',
-    it: 'GESTISCI LE TUE FINANZE FACILMENTE',
-    pl: 'ZARZĄDZAJ SWOIMI FINANSAMI ŁATWO',
+  const loadingTexts: Record<string, string> = {
+    en: 'Loading data…',
+    ru: 'Загружаем данные…',
+    kk: 'Деректер жүктелуде…',
+    uk: 'Завантажуємо дані…',
+    zh: '正在加载数据…',
+    ar: 'تحميل البيانات…',
+    de: 'Lade Daten…',
+    fr: 'Chargement des données…',
+    hi: 'डेटा लोड हो रहा है…',
+    tr: 'Veriler yükleniyor…',
+    el: 'Φόρτωση δεδομένων…',
+    it: 'Caricamento dati…',
+    pl: 'Ładowanie danych…',
   };
   
-  // Используем тагланд для языка устройства или английский по умолчанию
-  const tagline = taglines[deviceLanguage] || taglines.en;
+  // Используем текст для языка устройства или английский по умолчанию
+  const loadingText = loadingTexts[deviceLanguage] || loadingTexts.en;
 
   useEffect(() => {
-    // Анимация появления
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 4,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      // Анимация прогресс бара без useNativeDriver
-      Animated.timing(progressAnim, {
-        toValue: 1,
-        duration: 1500,
-        useNativeDriver: false, // width не поддерживается нативным драйвером
-      }),
-    ]).start();
+    let interval: NodeJS.Timeout;
+    const t0 = Date.now();
+    
+    interval = setInterval(() => {
+      const left = Math.max(0, Math.ceil((DURATION_MS - (Date.now() - t0)) / 1000));
+      setLeftSec(left);
+    }, 200);
 
-    // Анимация вращения
+    return () => clearInterval(interval);
+  }, []);
+
+  const progress = 1 - leftSec / (DURATION_MS / 1000); // 0..1
+  const mm = String(Math.floor(leftSec / 60)).padStart(2, "0");
+  const ss = String(leftSec % 60).padStart(2, "0");
+
+  /* --- фон: свет↔тёмный (кроссфейд), завершение на системной теме --- */
+  const themeT = useRef(new Animated.Value(0)).current; // 0 — LIGHT, 1 — DARK
+  useEffect(() => {
+    const FADE_MS = 2600;
+    const FINAL_DELAY = 1000; // Задержка перед финальной анимацией
+    
+    // Сначала циклическая анимация
+    const loopAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(themeT, { toValue: 1, duration: FADE_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(themeT, { toValue: 0, duration: FADE_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+      ])
+    );
+    
+    loopAnimation.start();
+    
+    // За 1 секунду до конца останавливаем цикл и переходим к нужной теме
+    const finalTimer = setTimeout(() => {
+      loopAnimation.stop();
+      Animated.timing(themeT, {
+        toValue: systemIsDark ? 1 : 0,
+        duration: 800,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }, DURATION_MS - FINAL_DELAY);
+    
+    return () => {
+      clearTimeout(finalTimer);
+      loopAnimation.stop();
+    };
+  }, [systemIsDark]);
+  
+  const lightOpacity = themeT.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const darkOpacity  = themeT.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+
+  /* --- плитка: дыхание и синий↔оранжевый --- */
+  const breath = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 3000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: 0,
-          duration: 3000,
-          useNativeDriver: true,
-        }),
+        Animated.timing(breath, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(breath, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ])
     ).start();
   }, []);
 
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  const colorT = useRef(new Animated.Value(0)).current; // 0..1
+  useEffect(() => {
+    const D = 2600;
+    const FINAL_DELAY = 1000;
+    
+    // Циклическая анимация цветов
+    const colorLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(colorT, { toValue: 1, duration: D, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(colorT, { toValue: 0, duration: D, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+      ])
+    );
+    
+    colorLoop.start();
+    
+    // За 1 секунду до конца фиксируем цвет (синий для светлой темы, оранжевый для темной)
+    const colorTimer = setTimeout(() => {
+      colorLoop.stop();
+      Animated.timing(colorT, {
+        toValue: systemIsDark ? 1 : 0, // 0 = синий, 1 = оранжевый
+        duration: 800,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }, DURATION_MS - FINAL_DELAY);
+    
+    return () => {
+      clearTimeout(colorTimer);
+      colorLoop.stop();
+    };
+  }, [systemIsDark]);
+  
+  const blueOpacity   = colorT.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const orangeOpacity = colorT.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#4287f5', '#2563eb']}
-        style={styles.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+    <View style={styles.loader}>
+      {/* Фон — два слоя градиентов */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: lightOpacity }]} pointerEvents="none">
+        <LinearGradient colors={LIGHT_BG} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: darkOpacity }]} pointerEvents="none">
+        <LinearGradient colors={DARK_BG} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+
+      {/* Центр: плитка + логотип */}
+      <View style={styles.hero}>
+        {/* Плитка под логотипом */}
         <Animated.View
           style={[
-            styles.logoContainer,
+            styles.tile,
             {
-              opacity: fadeAnim,
-              transform: [{ scale: scaleAnim }],
+              transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.06] }) }],
+              ...Platform.select({ android: { elevation: 8 } }), // ниже логотипа
             },
           ]}
         >
-          <View style={styles.iconWrapper}>
-            <Image
-              source={require('../../assets/splash-icon.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Animated.View
-              style={[
-                styles.circle,
-                {
-                  transform: [{ rotate: spin }],
-                },
-              ]}
-            />
-          </View>
-          
-          <Animated.View style={{ opacity: fadeAnim }}>
-            <Text style={styles.appName}>CASHCRAFT</Text>
+          {/* голубой градиент */}
+          <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: blueOpacity }]} pointerEvents="none">
+            <LinearGradient colors={BLUE_TILE} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           </Animated.View>
-          
-          <Animated.View style={{ opacity: fadeAnim }}>
-            <Text style={styles.tagline}>{tagline}</Text>
+          {/* оранжевый градиент */}
+          <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: orangeOpacity }]} pointerEvents="none">
+            <LinearGradient colors={ORANGE_TILE} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           </Animated.View>
+
+          {/* неоморфные «блики» */}
+          <LinearGradient colors={[HILITE, "rgba(255,255,255,0)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.topHilite} pointerEvents="none" />
+          <LinearGradient colors={[INNER_DARK, "rgba(0,0,0,0)"]} start={{ x: 1, y: 1 }} end={{ x: 0, y: 0 }} style={styles.bottomInnerShadow} pointerEvents="none" />
         </Animated.View>
 
-        <Animated.View
-          style={[
-            styles.loadingContainer,
-            {
-              opacity: fadeAnim,
-            },
-          ]}
-        >
-          <View style={styles.loadingBar}>
-            <Animated.View
-              style={[
-                styles.loadingProgress,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-              ]}
-            />
-          </View>
+        {/* ЛОГОТИП — сверху */}
+        <Image
+          source={require("../../assets/140140.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* СПИННЕР: меняет цвет синхронно с плиткой */}
+      <View style={styles.centerRow}>
+        <Animated.View style={[styles.centerOverlay, { opacity: blueOpacity }]}>
+          <ActivityIndicator size="large" color={PROGRESS_FILL_BLUE} />
         </Animated.View>
-      </LinearGradient>
+        <Animated.View style={[styles.centerOverlay, { opacity: orangeOpacity }]}>
+          <ActivityIndicator size="large" color={PROGRESS_FILL_ORANGE} />
+        </Animated.View>
+      </View>
+
+      {/* Прогресс-бар: меняет цвет синхронно с плиткой */}
+      <View style={styles.progressTrackWrap}>
+        <Animated.View style={[styles.progressTrack, { backgroundColor: PROGRESS_TRACK_BLUE, opacity: blueOpacity }]} />
+        <Animated.View style={[styles.progressTrack, { backgroundColor: PROGRESS_TRACK_ORANGE, opacity: orangeOpacity, position: "absolute" }]} />
+
+        <View style={styles.progressFillLayer}>
+          <Animated.View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: PROGRESS_FILL_BLUE, opacity: blueOpacity }]} />
+          <Animated.View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: PROGRESS_FILL_ORANGE, opacity: orangeOpacity, position: "absolute" }]} />
+        </View>
+      </View>
+
+      {/* Подпись: светлая/тёмная */}
+      <View style={styles.centerRow}>
+        <Animated.Text style={[styles.caption, { color: CAPTION_LIGHT, opacity: lightOpacity }]}>
+          {loadingText} {mm}:{ss}
+        </Animated.Text>
+        <Animated.Text style={[styles.caption, { color: CAPTION_DARK, opacity: darkOpacity, position: "absolute" }]}>
+          {loadingText} {mm}:{ss}
+        </Animated.Text>
+      </View>
     </View>
   );
 };
 
+/* ===== СТИЛИ ===== */
+const TILE_SIZE = 200;
+const RADIUS = 100;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  loader: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  hero: {
+    width: TILE_SIZE,
+    height: TILE_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
   },
-  gradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+
+  tile: {
+    position: "absolute",
+    left: 0, right: 0, top: 0, bottom: 0,
+    borderRadius: RADIUS,
+    shadowColor: TILE_SHADOW,
+    shadowOpacity: 0.5,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 18 },
+    overflow: "hidden",
+    zIndex: 0,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  iconWrapper: {
-    width: 150,
-    height: 150,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  logo: {
-    width: 100,
-    height: 100,
-    zIndex: 2,
-  },
-  logoPlaceholder: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#fff',
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  logoText: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#4287f5',
-  },
-  circle: {
-    position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    borderStyle: 'dashed',
-  },
-  appName: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: '#fff',
-    marginTop: 24,
-    letterSpacing: 1,
-  },
-  tagline: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 8,
-  },
-  loadingContainer: {
-    position: 'absolute',
-    bottom: 80,
-    width: width * 0.6,
-  },
-  loadingBar: {
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  loadingProgress: {
-    height: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 2,
-  },
+
+  topHilite: { ...StyleSheet.absoluteFillObject, borderRadius: RADIUS, opacity: 0.6 },
+  bottomInnerShadow: { ...StyleSheet.absoluteFillObject, borderRadius: RADIUS, opacity: 0.6 },
+
+  logo: { width: TILE_SIZE * 0.7, height: TILE_SIZE * 0.7, zIndex: 2 },
+
+  centerRow: { height: 36, alignItems: "center", justifyContent: "center", marginTop: 8 },
+  centerOverlay: { position: "absolute", left: 0, right: 0, alignItems: "center", justifyContent: "center" },
+
+  // Прогресс-бар с двумя слоями
+  progressTrackWrap: { width: TILE_SIZE, height: 10, marginTop: 14, position: "relative" },
+  progressTrack: { width: "100%", height: "100%", borderRadius: 999 },
+  progressFillLayer: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, overflow: "hidden", borderRadius: 999 },
+  progressFill: { height: "100%", borderRadius: 999 },
+
+  caption: { fontSize: 14, fontWeight: "600" },
 }); 
