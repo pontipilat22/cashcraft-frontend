@@ -7,6 +7,7 @@ import { CategoriesScreen } from '../screens/CategoriesScreen';
 import { PrivacyPolicyScreen } from '../screens/PrivacyPolicyScreen';
 import { HelpScreen } from '../screens/HelpScreen';
 import { ExportImportScreen } from '../screens/ExportImportScreen';
+import { SetPinScreen } from '../screens/SetPinScreen';
 
 export type MoreStackParamList = {
   MoreMain: undefined;
@@ -16,6 +17,7 @@ export type MoreStackParamList = {
   PrivacyPolicy: undefined;
   Help: undefined;
   ExportImport: undefined;
+  SetPin: { isChangingPin?: boolean } | undefined;
 };
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -61,6 +63,11 @@ export const MoreNavigator: React.FC = () => {
       <Stack.Screen
         name="ExportImport"
         component={ExportImportScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SetPin"
+        component={SetPinScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

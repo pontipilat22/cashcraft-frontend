@@ -184,7 +184,7 @@ export const AuthScreen: React.FC = () => {
             {!keyboardVisible && (
               <View style={styles.header}>
                 <Image
-                  source={require('../../assets/icon.png')}
+                  source={require('../../assets/splash-icon.png')}
                   style={[styles.logo, { tintColor: colors.primary }]}
                   resizeMode="contain"
                 />

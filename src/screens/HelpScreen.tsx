@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, Text, StyleSheet, SafeAreaView, TouchableOpacity, View, Linking } from 'react-native';
+import { ScrollView, Text, StyleSheet, TouchableOpacity, View, Linking } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalization } from '../context/LocalizationContext';
@@ -18,6 +19,7 @@ interface FAQItem {
 export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const insets = useSafeAreaInsets();
   const [expandedItems, setExpandedItems] = useState<number[]>([]);
 
   const faqData: FAQItem[] = [
@@ -109,7 +111,10 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { 
+      backgroundColor: colors.background,
+      paddingTop: insets.top
+    }]}>
       <View style={[styles.header, { backgroundColor: colors.card }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -245,7 +250,7 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ navigation }) => {
           </Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, Text, StyleSheet, SafeAreaView, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ interface PrivacyPolicyScreenProps {
 export const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const insets = useSafeAreaInsets();
 
 
 
@@ -48,7 +50,10 @@ export const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ naviga
   ];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { 
+      backgroundColor: colors.background,
+      paddingTop: insets.top
+    }]}>
       <View style={[styles.header, { backgroundColor: colors.card }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -101,7 +106,7 @@ export const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ naviga
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -132,54 +137,57 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   contentWrapper: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
   card: {
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
+    marginTop: 8,
   },
   appName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 2,
     flexWrap: 'wrap',
   },
   version: {
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: 12,
+    marginBottom: 2,
   },
   date: {
-    fontSize: 14,
-    marginBottom: 20,
+    fontSize: 12,
+    marginBottom: 12,
   },
   intro: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 24,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 16,
     textAlign: 'justify',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 6,
     flexWrap: 'wrap',
   },
   sectionContent: {
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'justify',
   },
   contactSection: {
-    marginTop: 24,
-    paddingTop: 20,
+    marginTop: 16,
+    paddingTop: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
   },
   contactText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
   },
 }); 

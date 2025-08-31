@@ -30,6 +30,7 @@ import { TestConnection } from '../components/TestConnection';
 import { CurrencyDiagnostics } from '../components/CurrencyDiagnostics';
 import { ApiService } from '../services/api';
 import { AuthService } from '../services/auth';
+import { pinService } from '../services/pinService';
 
 
 type ExchangeRates = { [accountId: string]: { 
@@ -57,6 +58,7 @@ export const SettingsScreen: React.FC = () => {
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({});
   const [newCurrency, setNewCurrency] = useState(defaultCurrency);
   const [isAutoMode, setIsAutoMode] = useState(false);
+  const [isPinEnabled, setIsPinEnabled] = useState(false);
 
   // Загружаем режим курсов при монтировании
   useEffect(() => {
@@ -78,9 +80,33 @@ export const SettingsScreen: React.FC = () => {
       }
     };
     
+    const checkPinStatus = async () => {
+      try {
+        const enabled = await pinService.isPinEnabled();
+        setIsPinEnabled(enabled);
+      } catch (error) {
+        console.error('Error checking PIN status:', error);
+      }
+    };
+    
     loadExchangeRatesMode();
     preloadExchangeRates();
+    checkPinStatus();
   }, []);
+
+  // Обновляем состояние PIN при возвращении с экрана установки
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      try {
+        const enabled = await pinService.isPinEnabled();
+        setIsPinEnabled(enabled);
+      } catch (error) {
+        console.error('Error checking PIN status on focus:', error);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const testCurrencyConversion = async () => {
     try {
@@ -204,6 +230,38 @@ export const SettingsScreen: React.FC = () => {
     } catch (error) {
       Alert.alert(t('common.error'), t('settings.errorChangingCurrency'));
     }
+  };
+
+  const handlePinToggle = async (value: boolean) => {
+    if (value) {
+      // Включаем PIN - переходим на экран установки
+      (navigation as any).navigate('SetPin');
+    } else {
+      // Отключаем PIN - просим подтвердить текущий PIN
+      Alert.alert(
+        t('pin.disableTitle'),
+        t('pin.disableMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.confirm'),
+            onPress: async () => {
+              try {
+                await pinService.disablePin();
+                setIsPinEnabled(false);
+                Alert.alert(t('common.success'), t('pin.disabled'));
+              } catch (error) {
+                Alert.alert(t('common.error'), t('pin.error'));
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const handleChangePin = () => {
+    (navigation as any).navigate('SetPin', { isChangingPin: true });
   };
 
   const renderLanguageModal = () => (
@@ -356,7 +414,28 @@ export const SettingsScreen: React.FC = () => {
           )}
         </View>
 
-
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('settings.security')}
+          </Text>
+          
+          {renderSettingItem(
+            'lock-closed-outline',
+            t('pin.title'),
+            isPinEnabled ? t('common.active') : t('common.inactive'),
+            undefined,
+            true,
+            isPinEnabled,
+            handlePinToggle
+          )}
+          
+          {isPinEnabled && renderSettingItem(
+            'key-outline',
+            t('pin.changeTitle'),
+            undefined,
+            handleChangePin
+          )}
+        </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
