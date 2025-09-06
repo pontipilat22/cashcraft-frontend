@@ -28,6 +28,7 @@
     "expo-constants": "^17.1.6",
     "expo-crypto": "~14.1.5",
     "expo-dev-client": "~5.2.0",
+    "expo-iap": "^2.8.8",
     "expo-linear-gradient": "~14.1.5",
     "expo-localization": "^16.1.5",
     "expo-secure-store": "^14.2.3",

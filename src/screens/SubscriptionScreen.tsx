@@ -16,9 +16,10 @@ import { useSubscription } from '../context/SubscriptionContext';
 import { useNavigation } from '@react-navigation/native';
 import { useLocalization } from '../context/LocalizationContext';
 import { useAuth } from '../context/AuthContext';
+import { SUBSCRIPTION_SKUS, SubscriptionSKU } from '../services/iapService';
 
 interface SubscriptionPlan {
-  id: string;
+  id: SubscriptionSKU;
   name: string;
   price: string;
   period: string;
@@ -36,43 +37,74 @@ interface SubscriptionScreenProps {
 export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose }) => {
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
-  const { subscription, checkIfPremium, activateSubscription, cancelSubscription } = useSubscription();
+  const { 
+    subscription, 
+    isLoading: contextLoading,
+    availableProducts,
+    checkIfPremium, 
+    activateSubscription, 
+    purchaseSubscription,
+    restorePurchases,
+    cancelSubscription,
+    initializeIAP
+  } = useSubscription();
   const navigation = useNavigation();
   const { t } = useLocalization();
-  const [selectedPlan, setSelectedPlan] = useState<string>('monthly');
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionSKU>(SUBSCRIPTION_SKUS.MONTHLY);
   const [isLoading, setIsLoading] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
 
-  const plans: SubscriptionPlan[] = [
-    {
-      id: 'monthly',
-      name: t('premium.monthlySubscription'),
-      price: '$2',
-      period: t('premium.perMonth'),
-      description: [
-        t('premium.features.unlimitedAccounts'),
-        t('premium.features.dataExport'),
-        t('premium.features.advancedAnalytics'),
-        t('premium.features.deviceSync'),
-        t('premium.features.prioritySupport'),
-      ],
-    },
-    {
-      id: 'yearly',
-      name: t('premium.yearlySubscription'),
-      price: '$15',
-      period: t('premium.perYear'),
-      pricePerMonth: '$1.25' + t('premium.perMonth'),
-      badge: t('premium.savingsBadge'),
-      description: [
-        t('premium.features.unlimitedAccounts'),
-        t('premium.features.yearlySavings'),
-        t('premium.features.exclusiveThemes'),
-        t('premium.features.earlyAccess'),
-        t('premium.features.personalConsultations'),
-      ],
-    },
-  ];
+  // Генерируем планы на основе доступных продуктов или используем дефолтные
+  const plans: SubscriptionPlan[] = React.useMemo(() => {
+    const defaultPlans: SubscriptionPlan[] = [
+      {
+        id: SUBSCRIPTION_SKUS.MONTHLY,
+        name: t('premium.monthlySubscription'),
+        price: '$2',
+        period: t('premium.perMonth'),
+        description: [
+          t('premium.features.unlimitedAccounts'),
+          t('premium.features.dataExport'),
+          t('premium.features.advancedAnalytics'),
+          t('premium.features.deviceSync'),
+          t('premium.features.prioritySupport'),
+        ],
+      },
+      {
+        id: SUBSCRIPTION_SKUS.YEARLY,
+        name: t('premium.yearlySubscription'),
+        price: '$15',
+        period: t('premium.perYear'),
+        pricePerMonth: '$1.25' + t('premium.perMonth'),
+        badge: t('premium.savingsBadge'),
+        description: [
+          t('premium.features.unlimitedAccounts'),
+          t('premium.features.yearlySavings'),
+          t('premium.features.exclusiveThemes'),
+          t('premium.features.earlyAccess'),
+          t('premium.features.personalConsultations'),
+        ],
+      },
+    ];
+
+    // Если у нас есть продукты из Google Play, используем их цены
+    if (availableProducts.length > 0) {
+      return defaultPlans.map(plan => {
+        const product = availableProducts.find(p => p.productId === plan.id);
+        if (product) {
+          return {
+            ...plan,
+            name: product.title || plan.name,
+            price: product.price || plan.price,
+            description: [product.description || '', ...plan.description.slice(1)],
+          };
+        }
+        return plan;
+      });
+    }
+
+    return defaultPlans;
+  }, [availableProducts, t]);
 
   useEffect(() => {
     console.log('🔍 [SubscriptionScreen] useEffect triggered');
@@ -101,25 +133,57 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       const plan = plans.find(p => p.id === selectedPlan);
       if (!plan) return;
 
-      // Симуляция процесса оплаты
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Активируем подписку
-      const days = selectedPlan === 'monthly' ? 30 : 365;
-      await activateSubscription(plan.id, plan.name, plan.price, days);
+      // Покупаем подписку через Google Play/App Store
+      const success = await purchaseSubscription(selectedPlan);
       
-      Alert.alert(
-        t('premium.subscribeSuccess'),
-        t('premium.subscriptionSuccessMessage', { planName: plan.name.toLowerCase() }),
-        [
-          {
-            text: 'OK',
-            onPress: handleGoBack,
-          },
-        ]
-      );
+      if (success) {
+        Alert.alert(
+          t('premium.subscribeSuccess'),
+          t('premium.subscriptionSuccessMessage', { planName: plan.name.toLowerCase() }),
+          [
+            {
+              text: 'OK',
+              onPress: handleGoBack,
+            },
+          ]
+        );
+      } else {
+        Alert.alert(t('common.error'), t('premium.subscribeError'));
+      }
     } catch (error) {
+      console.error('Purchase error:', error);
       Alert.alert(t('common.error'), error instanceof Error ? error.message : t('premium.subscribeError'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    try {
+      setIsLoading(true);
+      
+      const success = await restorePurchases();
+      
+      if (success) {
+        Alert.alert(
+          t('premium.restoreSuccess'),
+          t('premium.restoreSuccessMessage'),
+          [
+            {
+              text: 'OK',
+              onPress: handleGoBack,
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          t('premium.restoreNoSubscriptions'),
+          t('premium.restoreNoSubscriptionsMessage')
+        );
+      }
+    } catch (error) {
+      console.error('Restore error:', error);
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('premium.restoreError'));
     } finally {
       setIsLoading(false);
     }
@@ -339,17 +403,35 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
           style={[
             styles.subscribeButton,
             { backgroundColor: colors.primary },
-            isLoading && styles.disabledButton,
+            (isLoading || contextLoading) && styles.disabledButton,
           ]}
           onPress={handleSubscribe}
-          disabled={isLoading}
+          disabled={isLoading || contextLoading}
           activeOpacity={0.8}
         >
-          {isLoading ? (
+          {(isLoading || contextLoading) ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.subscribeButtonText}>
               {t('premium.subscribeButton')}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.restoreButton,
+            { borderColor: colors.primary }
+          ]}
+          onPress={handleRestorePurchases}
+          disabled={isLoading || contextLoading}
+          activeOpacity={0.8}
+        >
+          {(isLoading || contextLoading) ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <Text style={[styles.restoreButtonText, { color: colors.primary }]}>
+              {t('premium.restoreButton')}
             </Text>
           )}
         </TouchableOpacity>
@@ -477,6 +559,17 @@ const styles = StyleSheet.create({
   },
   subscribeButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  restoreButton: {
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  restoreButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },

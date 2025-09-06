@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Localization from 'expo-localization';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 
 /* ===== ПАЛИТРЫ (HEX) ===== */
 const LIGHT_BG: [string, string] = ["#EAF4FF", "#BFD6FF"]; // светлый фон экрана
@@ -38,12 +39,16 @@ const INNER_DARK  = "rgba(0,0,0,0.18)";
 export const SplashScreen: React.FC = () => {
   const DURATION_MS = 10000; // 10 секунд
   const [leftSec, setLeftSec] = useState(DURATION_MS / 1000);
+  const [isReady, setIsReady] = useState(false);
   
   // Определяем системную тему
   const [systemIsDark, setSystemIsDark] = useState(() => {
     const colorScheme = Appearance.getColorScheme();
     return colorScheme === 'dark';
   });
+
+  // Анимация появления для предотвращения моргания
+  const fadeInAnim = useRef(new Animated.Value(0)).current;
 
   // Определяем язык устройства для отображения правильного текста
   const deviceLanguage = Localization.locale?.split('-')[0] || 'en';
@@ -68,7 +73,27 @@ export const SplashScreen: React.FC = () => {
   // Используем текст для языка устройства или английский по умолчанию
   const loadingText = loadingTexts[deviceLanguage] || loadingTexts.en;
 
+  // Инициализация с плавным появлением
   useEffect(() => {
+    // Небольшая задержка для инициализации
+    const initTimer = setTimeout(() => {
+      setIsReady(true);
+      
+      // Плавное появление
+      Animated.timing(fadeInAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }, 150);
+
+    return () => clearTimeout(initTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+    
     let interval: NodeJS.Timeout;
     const t0 = Date.now();
     
@@ -78,7 +103,7 @@ export const SplashScreen: React.FC = () => {
     }, 200);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isReady]);
 
   const progress = 1 - leftSec / (DURATION_MS / 1000); // 0..1
   const mm = String(Math.floor(leftSec / 60)).padStart(2, "0");
@@ -87,6 +112,8 @@ export const SplashScreen: React.FC = () => {
   /* --- фон: свет↔тёмный (кроссфейд), завершение на системной теме --- */
   const themeT = useRef(new Animated.Value(0)).current; // 0 — LIGHT, 1 — DARK
   useEffect(() => {
+    if (!isReady) return;
+    
     const FADE_MS = 2600;
     const FINAL_DELAY = 1000; // Задержка перед финальной анимацией
     
@@ -115,7 +142,7 @@ export const SplashScreen: React.FC = () => {
       clearTimeout(finalTimer);
       loopAnimation.stop();
     };
-  }, [systemIsDark]);
+  }, [systemIsDark, isReady]);
   
   const lightOpacity = themeT.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const darkOpacity  = themeT.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
@@ -123,16 +150,20 @@ export const SplashScreen: React.FC = () => {
   /* --- плитка: дыхание и синий↔оранжевый --- */
   const breath = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (!isReady) return;
+    
     Animated.loop(
       Animated.sequence([
         Animated.timing(breath, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
         Animated.timing(breath, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [isReady]);
 
   const colorT = useRef(new Animated.Value(0)).current; // 0..1
   useEffect(() => {
+    if (!isReady) return;
+    
     const D = 2600;
     const FINAL_DELAY = 1000;
     
@@ -161,13 +192,20 @@ export const SplashScreen: React.FC = () => {
       clearTimeout(colorTimer);
       colorLoop.stop();
     };
-  }, [systemIsDark]);
+  }, [systemIsDark, isReady]);
   
   const blueOpacity   = colorT.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const orangeOpacity = colorT.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
+  // Если компонент не готов, показываем прозрачный фон с тем же цветом, что и нативный splash
+  if (!isReady) {
+    return (
+      <View style={[styles.loader, { backgroundColor: systemIsDark ? '#0B1220' : '#EAF4FF' }]} />
+    );
+  }
+
   return (
-    <View style={styles.loader}>
+    <Animated.View style={[styles.loader, { opacity: fadeInAnim }]}>
       {/* Фон — два слоя градиентов */}
       <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: lightOpacity }]} pointerEvents="none">
         <LinearGradient colors={LIGHT_BG} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
@@ -240,7 +278,7 @@ export const SplashScreen: React.FC = () => {
           {loadingText} {mm}:{ss}
         </Animated.Text>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

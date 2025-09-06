@@ -363,7 +363,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           mode="date"
           display="default"
           onChange={handleDateChange}
-          maximumDate={new Date()}
         />
       )}
       {showDatePicker && Platform.OS === 'ios' && (
@@ -391,7 +390,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 mode="date"
                 display="spinner"
                 onChange={handleDateChange}
-                maximumDate={new Date()}
                 themeVariant={isDark ? 'dark' : 'light'}
               />
             </View>

@@ -321,7 +321,6 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                 setDueDate(selectedDate);
               }
             }}
-            minimumDate={new Date()}
           />
         )}
 

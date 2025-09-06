@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { iapService, SubscriptionProduct, PurchaseResult, SubscriptionSKU, SubscriptionUtils, SUBSCRIPTION_SKUS } from '../services/iapService';
 
 interface Subscription {
   planId: string;
@@ -14,10 +15,15 @@ interface Subscription {
 interface SubscriptionContextType {
   subscription: Subscription | null;
   isPremium: boolean;
+  isLoading: boolean;
+  availableProducts: SubscriptionProduct[];
   checkIfPremium: () => Promise<boolean>;
   activateSubscription: (planId: string, planName: string, price: string, days: number) => Promise<void>;
+  purchaseSubscription: (productId: SubscriptionSKU) => Promise<boolean>;
+  restorePurchases: () => Promise<boolean>;
   cancelSubscription: () => Promise<void>;
   hasFeature: (feature: string) => boolean;
+  initializeIAP: () => Promise<boolean>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -54,6 +60,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
 }) => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isPremium, setIsPremium] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [availableProducts, setAvailableProducts] = useState<SubscriptionProduct[]>([]);
 
   // Простая функция проверки подписки
   const checkIfPremium = async (): Promise<boolean> => {
@@ -131,6 +139,142 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
     console.log('✅ [SubscriptionContext] Subscription activated:', subscription);
   };
 
+  // Инициализация IAP
+  const initializeIAP = async (): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      console.log('🔄 [SubscriptionContext] Initializing IAP...');
+      
+      const isAvailable = await iapService.isAvailable();
+      if (!isAvailable) {
+        console.log('❌ [SubscriptionContext] IAP not available on this device');
+        return false;
+      }
+      
+      const initialized = await iapService.initialize();
+      if (initialized) {
+        const products = await iapService.getProducts();
+        setAvailableProducts(products);
+        console.log('✅ [SubscriptionContext] IAP initialized, products loaded:', products.length);
+        
+        // Проверяем активные подписки
+        await checkActiveSubscriptions();
+      }
+      
+      return initialized;
+    } catch (error) {
+      console.error('❌ [SubscriptionContext] IAP initialization failed:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Проверка активных подписок через IAP
+  const checkActiveSubscriptions = async (): Promise<void> => {
+    try {
+      if (!iapService.connected) return;
+      
+      const activeSubscriptions = await iapService.getActiveSubscriptions();
+      console.log('📋 [SubscriptionContext] Active IAP subscriptions:', activeSubscriptions);
+      
+      if (activeSubscriptions.length > 0) {
+        const latestSubscription = activeSubscriptions[activeSubscriptions.length - 1];
+        const productName = SubscriptionUtils.getSubscriptionName(latestSubscription.productId as SubscriptionSKU);
+        const days = SubscriptionUtils.getSubscriptionDays(latestSubscription.productId as SubscriptionSKU);
+        
+        // Активируем подписку
+        await activateSubscription(
+          latestSubscription.productId,
+          productName,
+          'N/A', // Цена будет получена из продукта
+          days
+        );
+      }
+    } catch (error) {
+      console.error('❌ [SubscriptionContext] Failed to check active subscriptions:', error);
+    }
+  };
+
+  // Покупка подписки через IAP
+  const purchaseSubscription = async (productId: SubscriptionSKU): Promise<boolean> => {
+    try {
+      if (!userId || isGuest) {
+        throw new Error('Подписка доступна только авторизованным пользователям');
+      }
+
+      setIsLoading(true);
+      console.log('💳 [SubscriptionContext] Purchasing subscription:', productId);
+      
+      const purchaseResult = await iapService.purchaseSubscription(productId);
+      
+      if (purchaseResult) {
+        // Получаем информацию о продукте
+        const product = availableProducts.find(p => p.productId === productId);
+        const productName = product?.title || SubscriptionUtils.getSubscriptionName(productId);
+        const price = product?.price || 'N/A';
+        const days = SubscriptionUtils.getSubscriptionDays(productId);
+        
+        // Активируем подписку локально
+        await activateSubscription(productId, productName, price, days);
+        
+        console.log('✅ [SubscriptionContext] Subscription purchased successfully');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('❌ [SubscriptionContext] Purchase failed:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Восстановление покупок
+  const restorePurchases = async (): Promise<boolean> => {
+    try {
+      if (!userId || isGuest) {
+        throw new Error('Восстановление покупок доступно только авторизованным пользователям');
+      }
+
+      setIsLoading(true);
+      console.log('🔄 [SubscriptionContext] Restoring purchases...');
+      
+      const purchases = await iapService.restorePurchases();
+      console.log('📜 [SubscriptionContext] Restored purchases:', purchases);
+      
+      if (purchases.length > 0) {
+        // Находим последнюю активную подписку
+        const subscriptionPurchases = purchases.filter(p => 
+          Object.values(SUBSCRIPTION_SKUS).includes(p.productId as any)
+        );
+        
+        if (subscriptionPurchases.length > 0) {
+          const latestPurchase = subscriptionPurchases
+            .sort((a, b) => b.transactionDate - a.transactionDate)[0];
+          
+          const product = availableProducts.find(p => p.productId === latestPurchase.productId);
+          const productName = product?.title || SubscriptionUtils.getSubscriptionName(latestPurchase.productId as SubscriptionSKU);
+          const price = product?.price || 'N/A';
+          const days = SubscriptionUtils.getSubscriptionDays(latestPurchase.productId as SubscriptionSKU);
+          
+          await activateSubscription(latestPurchase.productId, productName, price, days);
+          console.log('✅ [SubscriptionContext] Purchases restored successfully');
+          return true;
+        }
+      }
+      
+      console.log('ℹ️ [SubscriptionContext] No subscription purchases found to restore');
+      return false;
+    } catch (error) {
+      console.error('❌ [SubscriptionContext] Failed to restore purchases:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Отмена подписки
   const cancelSubscription = async () => {
     if (!userId) return;
@@ -156,6 +300,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
   useEffect(() => {
     if (userId && !isGuest) {
       checkIfPremium();
+      // Инициализируем IAP
+      initializeIAP();
       // Проверяем каждую минуту
       const interval = setInterval(checkIfPremium, 60 * 1000);
       return () => clearInterval(interval);
@@ -165,14 +311,28 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
     }
   }, [userId, isGuest]);
 
+  // Cleanup при размонтировании
+  useEffect(() => {
+    return () => {
+      if (iapService.connected) {
+        iapService.disconnect();
+      }
+    };
+  }, []);
+
   return (
     <SubscriptionContext.Provider value={{
       subscription,
       isPremium,
+      isLoading,
+      availableProducts,
       checkIfPremium,
       activateSubscription,
+      purchaseSubscription,
+      restorePurchases,
       cancelSubscription,
       hasFeature,
+      initializeIAP,
     }}>
       {children}
     </SubscriptionContext.Provider>

@@ -430,7 +430,6 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                     setShowDatePicker(false);
                   }
                 }}
-                maximumDate={new Date()}
                 textColor={colors.text}
                 themeVariant={isDark ? 'dark' : 'light'}
                 style={{ height: 200 }}

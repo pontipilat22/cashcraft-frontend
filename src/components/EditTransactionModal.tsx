@@ -495,7 +495,6 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           mode="date"
           display="default"
           onChange={handleDateChange}
-          maximumDate={new Date()}
           locale="ru"
         />
       )}
@@ -524,7 +523,6 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                 mode="date"
                 display="spinner"
                 onChange={handleDateChange}
-                maximumDate={new Date()}
                 locale="ru"
                 themeVariant={isDark ? 'dark' : 'light'}
               />

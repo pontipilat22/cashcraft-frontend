@@ -404,7 +404,6 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           mode="date"
           display="default"
           onChange={handleDateChange}
-          maximumDate={new Date()}
           locale="ru"
         />
       )}
@@ -433,7 +432,6 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 mode="date"
                 display="spinner"
                 onChange={handleDateChange}
-                maximumDate={new Date()}
                 locale="ru"
                 themeVariant={isDark ? 'dark' : 'light'}
               />

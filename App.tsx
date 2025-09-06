@@ -36,9 +36,14 @@ function AppContent() {
   const [dataProviderKey, setDataProviderKey] = useState(0);
   const [showSplash, setShowSplash] = useState(true);
 
-  // Скрываем нативный сплэш-скрин сразу
+  // Скрываем нативный сплэш-скрин с задержкой для плавного перехода
   useEffect(() => {
-    SplashScreenExpo.hideAsync();
+    // Даем время на инициализацию кастомного SplashScreen
+    const timer = setTimeout(() => {
+      SplashScreenExpo.hideAsync();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   // Показываем кастомный сплэш-скрин на 10 секунд

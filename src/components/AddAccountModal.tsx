@@ -837,7 +837,6 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                     setShowCreditDatePicker(false);
                   }
                 }}
-                maximumDate={new Date()}
                 themeVariant={isDark ? 'dark' : 'light'}
                 style={{ height: 200 }}
               />
