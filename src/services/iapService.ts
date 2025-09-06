@@ -2,7 +2,8 @@ import {
   initConnection, 
   endConnection, 
   getSubscriptions, 
-  requestPurchase, 
+  requestPurchase,
+  requestSubscription,
   getAvailablePurchases,
   finishTransaction,
   type SubscriptionProduct,
@@ -101,18 +102,16 @@ class IAPService {
 
       console.log('💳 [IAPService] Purchasing subscription:', productId);
       
-      const result = await requestPurchase({
-        request: {
-          ios: { sku: productId },
-          android: {
-            skus: [productId],
-            subscriptionOffers: [{
-              sku: productId,
-              offerToken: ''
-            }]
-          }
-        },
-        type: 'subs'
+      // Используем deprecated метод requestSubscription с базовым offerToken
+      const result = await requestSubscription({
+        ios: { sku: productId },
+        android: { 
+          skus: [productId],
+          subscriptionOffers: [{
+            sku: productId,
+            offerToken: 'default' // Пробуем с дефолтным значением
+          }]
+        }
       });
       
       console.log('✅ [IAPService] Purchase result:', result);
