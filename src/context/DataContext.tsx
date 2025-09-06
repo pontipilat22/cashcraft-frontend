@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Account, Transaction, Category, Debt } from '../types';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { ApiService } from '../services/api';
@@ -118,7 +118,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     try {
       console.log('📊 [DataContext] RefreshData called...');
       
@@ -204,7 +204,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [defaultCurrency]);
 
   const createAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
@@ -406,7 +406,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
-  const getStatistics = (startDate?: Date, endDate?: Date) => {
+  const getStatistics = useCallback((startDate?: Date, endDate?: Date) => {
     const filteredTransactions = transactions.filter(transaction => {
       if (startDate && new Date(transaction.date) < startDate) return false;
       if (endDate && new Date(transaction.date) > endDate) return false;
@@ -422,7 +422,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       .reduce((sum, t) => sum + t.amount, 0);
 
     return { income, expense };
-  };
+  }, [transactions]);
 
   const resetAllData = async () => {
     try {

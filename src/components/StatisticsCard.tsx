@@ -60,8 +60,12 @@ export const StatisticsCard: React.FC<StatisticsCardProps> = ({ onPeriodPress })
         return;
     }
     
+    // Устанавливаем конец дня для endDate, чтобы включить все транзакции дня
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    
     setStartDate(start);
-    setEndDate(now);
+    setEndDate(end);
   };
 
   const getPeriodText = () => {

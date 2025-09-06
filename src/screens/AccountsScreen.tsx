@@ -36,7 +36,7 @@ interface AccountsScreenProps {
 
 export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
-  const { accounts, isLoading, createAccount, updateAccount, deleteAccount, addToSavings, withdrawFromSavings } = useData();
+  const { accounts, isLoading, createAccount, updateAccount, deleteAccount, addToSavings, withdrawFromSavings, refreshData } = useData();
   const { checkIfPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
@@ -95,6 +95,13 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       }, 500);
       return () => clearTimeout(timer);
     }, [checkIfPremium])
+  );
+
+  // Обновляем данные при фокусе экрана (для синхронизации между вкладками)
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshData();
+    }, [refreshData])
   );
 
   const loadDebts = async () => {

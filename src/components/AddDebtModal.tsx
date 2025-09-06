@@ -316,7 +316,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             mode="date"
             display="default"
             onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
+              if (Platform.OS === 'android') {
+                setShowDatePicker(false);
+              }
               if (selectedDate) {
                 setDueDate(selectedDate);
               }

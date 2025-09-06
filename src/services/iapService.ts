@@ -1,22 +1,24 @@
-import * as InAppPurchases from 'expo-iap';
+import { 
+  initConnection, 
+  endConnection, 
+  getSubscriptions, 
+  requestPurchase, 
+  getAvailablePurchases,
+  finishTransaction,
+  type SubscriptionProduct,
+  type Purchase 
+} from 'expo-iap';
 import { Platform } from 'react-native';
 
-// Типы для товаров и покупок
-export interface SubscriptionProduct {
-  productId: string;
-  price: string;
-  title: string;
-  description: string;
-  priceAmountMicros?: string;
-  priceCurrencyCode?: string;
-  subscriptionPeriod?: string;
-  freeTrialPeriod?: string;
-  introductoryPrice?: string;
-  introductoryPriceAmountMicros?: string;
-  introductoryPricePeriod?: string;
-  introductoryPriceCycles?: string;
-}
+// Константы для подписок
+export const SUBSCRIPTION_SKUS = {
+  MONTHLY: 'cashcraft_monthly',
+  YEARLY: 'cashcraft_yearly',
+} as const;
 
+export type SubscriptionSKU = typeof SUBSCRIPTION_SKUS[keyof typeof SUBSCRIPTION_SKUS];
+
+// Наш интерфейс для результата покупки
 export interface PurchaseResult {
   purchaseId: string;
   productId: string;
@@ -27,14 +29,9 @@ export interface PurchaseResult {
   isAcknowledged?: boolean;
 }
 
-// ID товаров в Google Play Console и App Store Connect
-export const SUBSCRIPTION_SKUS = {
-  MONTHLY: 'cashcraft_premium_monthly',
-  YEARLY: 'cashcraft_premium_yearly',
-} as const;
-
-export type SubscriptionSKU = typeof SUBSCRIPTION_SKUS[keyof typeof SUBSCRIPTION_SKUS];
-
+/**
+ * Сервис для работы с покупками в приложении через expo-iap
+ */
 class IAPService {
   private isInitialized = false;
   private isConnected = false;
@@ -47,17 +44,22 @@ class IAPService {
       console.log('🔄 [IAPService] Initializing...');
       
       // Инициализируем подключение к store
-      await InAppPurchases.connectAsync();
-      this.isConnected = true;
+      const result = await initConnection();
+      this.isConnected = result;
       
-      console.log('✅ [IAPService] Connected to store');
-      
-      // Получаем список доступных товаров
-      const products = await this.getProducts();
-      console.log('📦 [IAPService] Available products:', products.length);
-      
-      this.isInitialized = true;
-      return true;
+      if (this.isConnected) {
+        console.log('✅ [IAPService] Connected to store');
+        
+        // Получаем список доступных товаров
+        const products = await this.getProducts();
+        console.log('📦 [IAPService] Available products:', products.length);
+        
+        this.isInitialized = true;
+        return true;
+      } else {
+        console.log('❌ [IAPService] Failed to connect to store');
+        return false;
+      }
     } catch (error) {
       console.error('❌ [IAPService] Initialization failed:', error);
       this.isInitialized = false;
@@ -78,23 +80,10 @@ class IAPService {
       const skus = Object.values(SUBSCRIPTION_SKUS);
       console.log('🔍 [IAPService] Getting products for SKUs:', skus);
       
-      const products = await InAppPurchases.getProductsAsync(skus);
+      const products = await getSubscriptions(skus);
       console.log('📦 [IAPService] Retrieved products:', products);
 
-      return products.map(product => ({
-        productId: product.productId,
-        price: product.price || '',
-        title: product.title || '',
-        description: product.description || '',
-        priceAmountMicros: product.priceAmountMicros,
-        priceCurrencyCode: product.priceCurrencyCode,
-        subscriptionPeriod: product.subscriptionPeriod,
-        freeTrialPeriod: product.freeTrialPeriod,
-        introductoryPrice: product.introductoryPrice,
-        introductoryPriceAmountMicros: product.introductoryPriceAmountMicros,
-        introductoryPricePeriod: product.introductoryPricePeriod,
-        introductoryPriceCycles: product.introductoryPriceCycles,
-      }));
+      return products;
     } catch (error) {
       console.error('❌ [IAPService] Failed to get products:', error);
       throw error;
@@ -104,31 +93,46 @@ class IAPService {
   /**
    * Покупка подписки
    */
-  async purchaseSubscription(productId: SubscriptionSKU): Promise<PurchaseResult | null> {
+  async purchaseProduct(productId: SubscriptionSKU): Promise<PurchaseResult | null> {
     try {
-      if (!this.isConnected) {
+      if (!this.isInitialized) {
         throw new Error('IAPService не инициализирован');
       }
 
       console.log('💳 [IAPService] Purchasing subscription:', productId);
       
-      const result = await InAppPurchases.purchaseItemAsync(productId);
+      const result = await requestPurchase({
+        request: {
+          ios: { sku: productId },
+          android: {
+            skus: [productId],
+            subscriptionOffers: [{
+              sku: productId,
+              offerToken: ''
+            }]
+          }
+        },
+        type: 'subs'
+      });
+      
       console.log('✅ [IAPService] Purchase result:', result);
 
-      if (result && result.transactionId) {
+      // result может быть Purchase, Purchase[] или void
+      const purchase = Array.isArray(result) ? result[0] : result;
+      
+      if (purchase && purchase.transactionId) {
         const purchaseResult: PurchaseResult = {
-          purchaseId: result.transactionId,
+          purchaseId: purchase.transactionId,
           productId: productId,
-          transactionId: result.transactionId,
+          transactionId: purchase.transactionId,
           transactionDate: Date.now(),
-          transactionReceipt: result.transactionReceipt || '',
-          orderId: result.orderId,
-          isAcknowledged: result.isAcknowledged,
+          transactionReceipt: purchase.transactionReceipt || '',
+          // orderId и isAcknowledged могут отсутствовать в новом API
         };
 
-        // Для Android нужно подтвердить покупку
-        if (Platform.OS === 'android' && !result.isAcknowledged) {
-          await this.acknowledgePurchase(result.transactionId);
+        // Для Android подтверждаем покупку
+        if (Platform.OS === 'android') {
+          await this.acknowledgePurchase(purchase);
         }
 
         return purchaseResult;
@@ -146,14 +150,14 @@ class IAPService {
    */
   async restorePurchases(): Promise<PurchaseResult[]> {
     try {
-      if (!this.isConnected) {
+      if (!this.isInitialized) {
         throw new Error('IAPService не инициализирован');
       }
 
       console.log('🔄 [IAPService] Restoring purchases...');
       
-      const purchases = await InAppPurchases.getPurchaseHistoryAsync();
-      console.log('📜 [IAPService] Purchase history:', purchases);
+      const purchases = await getAvailablePurchases();
+      console.log('📜 [IAPService] Available purchases:', purchases);
 
       return purchases.map(purchase => ({
         purchaseId: purchase.transactionId || '',
@@ -161,8 +165,6 @@ class IAPService {
         transactionId: purchase.transactionId || '',
         transactionDate: purchase.transactionDate || Date.now(),
         transactionReceipt: purchase.transactionReceipt || '',
-        orderId: purchase.orderId,
-        isAcknowledged: purchase.isAcknowledged,
       }));
     } catch (error) {
       console.error('❌ [IAPService] Failed to restore purchases:', error);
@@ -171,27 +173,30 @@ class IAPService {
   }
 
   /**
-   * Получение текущих активных подписок
+   * Получение активных подписок
    */
   async getActiveSubscriptions(): Promise<PurchaseResult[]> {
     try {
-      if (!this.isConnected) {
+      if (!this.isInitialized) {
         throw new Error('IAPService не инициализирован');
       }
 
       console.log('🔍 [IAPService] Getting active subscriptions...');
       
-      const subscriptions = await InAppPurchases.getUnconsumedPurchasesAsync();
-      console.log('📋 [IAPService] Active subscriptions:', subscriptions);
+      const subscriptions = await getAvailablePurchases();
+      console.log('📋 [IAPService] Available subscriptions:', subscriptions);
 
-      return subscriptions.map(subscription => ({
+      // Фильтруем только наши подписки
+      const ourSubscriptions = subscriptions.filter(sub => 
+        Object.values(SUBSCRIPTION_SKUS).includes(sub.productId as SubscriptionSKU)
+      );
+
+      return ourSubscriptions.map(subscription => ({
         purchaseId: subscription.transactionId || '',
         productId: subscription.productId,
         transactionId: subscription.transactionId || '',
         transactionDate: subscription.transactionDate || Date.now(),
         transactionReceipt: subscription.transactionReceipt || '',
-        orderId: subscription.orderId,
-        isAcknowledged: subscription.isAcknowledged,
       }));
     } catch (error) {
       console.error('❌ [IAPService] Failed to get active subscriptions:', error);
@@ -200,13 +205,18 @@ class IAPService {
   }
 
   /**
-   * Подтверждение покупки для Android
+   * Подтверждение покупки (для Android)
    */
-  private async acknowledgePurchase(transactionId: string): Promise<void> {
+  private async acknowledgePurchase(purchase: Purchase): Promise<void> {
     try {
       if (Platform.OS === 'android') {
-        console.log('✅ [IAPService] Acknowledging purchase:', transactionId);
-        await InAppPurchases.acknowledgeItemAsync(transactionId);
+        console.log('✅ [IAPService] Acknowledging purchase:', purchase.transactionId);
+        
+        await finishTransaction({ 
+          purchase: purchase, 
+          isConsumable: false 
+        });
+        
         console.log('✅ [IAPService] Purchase acknowledged');
       }
     } catch (error) {
@@ -220,7 +230,9 @@ class IAPService {
    */
   async isAvailable(): Promise<boolean> {
     try {
-      return await InAppPurchases.isAvailableAsync();
+      // В новой версии expo-iap нет метода isAvailable
+      // Возвращаем статус подключения
+      return this.isConnected;
     } catch (error) {
       console.error('❌ [IAPService] Failed to check availability:', error);
       return false;
@@ -233,52 +245,39 @@ class IAPService {
   async disconnect(): Promise<void> {
     try {
       if (this.isConnected) {
-        await InAppPurchases.disconnectAsync();
+        await endConnection();
         this.isConnected = false;
         this.isInitialized = false;
         console.log('✅ [IAPService] Disconnected from store');
       }
     } catch (error) {
       console.error('❌ [IAPService] Failed to disconnect:', error);
+      throw error;
     }
   }
 
   /**
-   * Получение статуса инициализации
+   * Проверка состояния инициализации
    */
   get initialized(): boolean {
     return this.isInitialized;
   }
 
   /**
-   * Получение статуса подключения
+   * Проверка состояния подключения
    */
   get connected(): boolean {
     return this.isConnected;
   }
 }
 
-// Экспортируем singleton
+// Создаем singleton instance
 export const iapService = new IAPService();
 
-// Утилиты для работы с подписками
-export const SubscriptionUtils = {
+// Вспомогательные функции
+export const IAPHelpers = {
   /**
-   * Получение периода подписки в днях
-   */
-  getSubscriptionDays(productId: SubscriptionSKU): number {
-    switch (productId) {
-      case SUBSCRIPTION_SKUS.MONTHLY:
-        return 30;
-      case SUBSCRIPTION_SKUS.YEARLY:
-        return 365;
-      default:
-        return 30;
-    }
-  },
-
-  /**
-   * Получение отображаемого имени подписки
+   * Получение названия подписки по ID
    */
   getSubscriptionName(productId: SubscriptionSKU): string {
     switch (productId) {
@@ -292,22 +291,34 @@ export const SubscriptionUtils = {
   },
 
   /**
-   * Проверка валидности receipt для отправки на сервер
+   * Получение длительности подписки в днях
    */
-  validateReceipt(receipt: string): boolean {
-    return receipt && receipt.length > 0;
+  getSubscriptionDuration(productId: SubscriptionSKU): number {
+    switch (productId) {
+      case SUBSCRIPTION_SKUS.MONTHLY:
+        return 30;
+      case SUBSCRIPTION_SKUS.YEARLY:
+        return 365;
+      default:
+        return 30;
+    }
   },
 
   /**
-   * Форматирование цены
+   * Проверка валидности receipt для отправки на сервер
    */
-  formatPrice(price: string, currencyCode?: string): string {
-    if (!price) return '';
-    
-    if (currencyCode) {
-      return `${price} ${currencyCode}`;
-    }
-    
-    return price;
+  validateReceipt(receipt: string): boolean {
+    return !!(receipt && receipt.length > 0);
   },
+
+  /**
+   * Проверка активности подписки по времени
+   */
+  isSubscriptionActive(transactionDate: number, duration: number): boolean {
+    const now = Date.now();
+    const expireDate = transactionDate + (duration * 24 * 60 * 60 * 1000);
+    return now < expireDate;
+  }
 };
+
+export default iapService;

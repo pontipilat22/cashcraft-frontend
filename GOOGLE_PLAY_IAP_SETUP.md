@@ -21,7 +21,7 @@
 
 Создайте подписку со следующими параметрами:
 
-- **ID продукта**: `cashcraft_premium_monthly`
+- **ID продукта**: `cashcraft_monthly`
 - **Название**: `CashCraft Premium - Месячная подписка`
 - **Описание**: `Получите неограниченные счета, экспорт данных и премиум функции`
 - **Цена**: установите желаемую цену (например, $1.99)
@@ -32,7 +32,7 @@
 
 Создайте вторую подписку:
 
-- **ID продукта**: `cashcraft_premium_yearly`
+- **ID продукта**: `cashcraft_yearly`
 - **Название**: `CashCraft Premium - Годовая подписка`
 - **Описание**: `Годовая подписка с экономией до 38%. Все премиум функции.`
 - **Цена**: установите цену с учетом скидки (например, $14.99)
@@ -53,8 +53,8 @@
 
 ```typescript
 export const SUBSCRIPTION_SKUS = {
-  MONTHLY: 'cashcraft_premium_monthly',
-  YEARLY: 'cashcraft_premium_yearly',
+  MONTHLY: 'cashcraft_monthly',
+  YEARLY: 'cashcraft_yearly',
 } as const;
 ```
 
@@ -119,7 +119,7 @@ eas build --platform android --profile development
 🔄 [IAPService] Initializing...
 ✅ [IAPService] Connected to store
 📦 [IAPService] Available products: 2
-💳 [IAPService] Purchasing subscription: cashcraft_premium_monthly
+💳 [IAPService] Purchasing subscription: cashcraft_monthly
 ✅ [IAPService] Purchase result: {...}
 ```
 

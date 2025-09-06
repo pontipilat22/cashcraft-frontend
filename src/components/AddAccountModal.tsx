@@ -830,11 +830,11 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={(event, date) => {
-                  if (date) {
-                    setCreditStartDate(date);
-                  }
                   if (Platform.OS === 'android') {
                     setShowCreditDatePicker(false);
+                  }
+                  if (date) {
+                    setCreditStartDate(date);
                   }
                 }}
                 themeVariant={isDark ? 'dark' : 'light'}

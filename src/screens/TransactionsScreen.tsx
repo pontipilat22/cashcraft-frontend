@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -127,7 +128,7 @@ const ListHeader = React.memo(({
 
 export const TransactionsScreen = () => {
   const { colors } = useTheme();
-  const { transactions, accounts, categories, totalBalance, isLoading, deleteTransaction } = useData();
+  const { transactions, accounts, categories, totalBalance, isLoading, deleteTransaction, refreshData } = useData();
   const { t } = useLocalization();
   const { defaultCurrency } = useCurrency();
   const currentLanguage = getCurrentLanguage();
@@ -162,6 +163,13 @@ export const TransactionsScreen = () => {
 
   // Состояние для отложенной загрузки
   const [isFilteringTransactions, setIsFilteringTransactions] = useState(false);
+
+  // Обновляем данные при фокусе экрана (для синхронизации между вкладками)
+  useFocusEffect(
+    useCallback(() => {
+      refreshData();
+    }, [refreshData])
+  );
 
   // Фильтрация и объединение парных транзакций переводов
   const filteredTransactions = useMemo(() => {

@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import DateTimePickerModal from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -423,11 +422,11 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={(event, date) => {
-                  if (date) {
-                    setTransactionDate(date);
-                  }
                   if (Platform.OS === 'android') {
                     setShowDatePicker(false);
+                  }
+                  if (date) {
+                    setTransactionDate(date);
                   }
                 }}
                 textColor={colors.text}

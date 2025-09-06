@@ -90,12 +90,12 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
     // Если у нас есть продукты из Google Play, используем их цены
     if (availableProducts.length > 0) {
       return defaultPlans.map(plan => {
-        const product = availableProducts.find(p => p.productId === plan.id);
+        const product = availableProducts.find(p => p.id === plan.id);
         if (product) {
           return {
             ...plan,
             name: product.title || plan.name,
-            price: product.price || plan.price,
+            price: product.displayPrice || String(product.price) || plan.price,
             description: [product.description || '', ...plan.description.slice(1)],
           };
         }
@@ -109,6 +109,8 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
   useEffect(() => {
     console.log('🔍 [SubscriptionScreen] useEffect triggered');
     loadSubscriptionStatus();
+    // Принудительно инициализируем IAP если еще не инициализирован
+    initializeIAP();
   }, []);
 
   const handleGoBack = () => {
@@ -133,6 +135,19 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       const plan = plans.find(p => p.id === selectedPlan);
       if (!plan) return;
 
+      // Проверяем, что IAP инициализирован, если нет - пытаемся инициализировать
+      if (availableProducts.length === 0) {
+        console.log('🔄 [SubscriptionScreen] IAP не инициализирован, пытаемся инициализировать...');
+        const initialized = await initializeIAP();
+        if (!initialized) {
+          Alert.alert(
+            t('common.error'), 
+            'Сервис покупок временно недоступен. Попробуйте позже.'
+          );
+          return;
+        }
+      }
+
       // Покупаем подписку через Google Play/App Store
       const success = await purchaseSubscription(selectedPlan);
       
@@ -152,7 +167,20 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       }
     } catch (error) {
       console.error('Purchase error:', error);
-      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('premium.subscribeError'));
+      
+      // Более дружелюбная обработка ошибок
+      let errorMessage = t('premium.subscribeError');
+      if (error instanceof Error) {
+        if (error.message.includes('IAPService не инициализирован')) {
+          errorMessage = 'Сервис покупок еще загружается. Попробуйте через несколько секунд.';
+        } else if (error.message.includes('User cancelled')) {
+          errorMessage = 'Покупка отменена пользователем.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert(t('common.error'), errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -161,6 +189,19 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
   const handleRestorePurchases = async () => {
     try {
       setIsLoading(true);
+      
+      // Проверяем, что IAP инициализирован
+      if (availableProducts.length === 0) {
+        console.log('🔄 [SubscriptionScreen] IAP не инициализирован для восстановления, пытаемся инициализировать...');
+        const initialized = await initializeIAP();
+        if (!initialized) {
+          Alert.alert(
+            t('common.error'), 
+            'Сервис покупок временно недоступен. Попробуйте позже.'
+          );
+          return;
+        }
+      }
       
       const success = await restorePurchases();
       
@@ -183,7 +224,18 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       }
     } catch (error) {
       console.error('Restore error:', error);
-      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('premium.restoreError'));
+      
+      // Более дружелюбная обработка ошибок
+      let errorMessage = t('premium.restoreError');
+      if (error instanceof Error) {
+        if (error.message.includes('IAPService не инициализирован')) {
+          errorMessage = 'Сервис покупок еще загружается. Попробуйте через несколько секунд.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert(t('common.error'), errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -336,6 +388,13 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
             {t('premium.unlockAllFeatures')}
           </Text>
+          
+          {/* Показываем индикатор загрузки цен */}
+          {availableProducts.length === 0 && isLoading && (
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+              Загружаем актуальные цены...
+            </Text>
+          )}
         </View>
 
         <View style={styles.plansSection}>
@@ -634,5 +693,11 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingText: {
+    fontSize: 14,
+    marginTop: 12,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 }); 

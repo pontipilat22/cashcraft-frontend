@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { iapService, SubscriptionProduct, PurchaseResult, SubscriptionSKU, SubscriptionUtils, SUBSCRIPTION_SKUS } from '../services/iapService';
+import { iapService, PurchaseResult, SubscriptionSKU, SUBSCRIPTION_SKUS, IAPHelpers } from '../services/iapService';
+import { type SubscriptionProduct } from 'expo-iap';
 
 interface Subscription {
   planId: string;
@@ -145,14 +146,14 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
       setIsLoading(true);
       console.log('🔄 [SubscriptionContext] Initializing IAP...');
       
-      const isAvailable = await iapService.isAvailable();
-      if (!isAvailable) {
-        console.log('❌ [SubscriptionContext] IAP not available on this device');
+      const initialized = await iapService.initialize();
+      if (!initialized) {
+        console.log('❌ [SubscriptionContext] Failed to initialize IAP');
         return false;
       }
       
-      const initialized = await iapService.initialize();
-      if (initialized) {
+      const isAvailable = await iapService.isAvailable();
+      if (isAvailable) {
         const products = await iapService.getProducts();
         setAvailableProducts(products);
         console.log('✅ [SubscriptionContext] IAP initialized, products loaded:', products.length);
@@ -180,8 +181,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
       
       if (activeSubscriptions.length > 0) {
         const latestSubscription = activeSubscriptions[activeSubscriptions.length - 1];
-        const productName = SubscriptionUtils.getSubscriptionName(latestSubscription.productId as SubscriptionSKU);
-        const days = SubscriptionUtils.getSubscriptionDays(latestSubscription.productId as SubscriptionSKU);
+        const productName = IAPHelpers.getSubscriptionName(latestSubscription.productId as SubscriptionSKU);
+        const days = IAPHelpers.getSubscriptionDuration(latestSubscription.productId as SubscriptionSKU);
         
         // Активируем подписку
         await activateSubscription(
@@ -206,14 +207,14 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
       setIsLoading(true);
       console.log('💳 [SubscriptionContext] Purchasing subscription:', productId);
       
-      const purchaseResult = await iapService.purchaseSubscription(productId);
+      const purchaseResult = await iapService.purchaseProduct(productId);
       
       if (purchaseResult) {
         // Получаем информацию о продукте
-        const product = availableProducts.find(p => p.productId === productId);
-        const productName = product?.title || SubscriptionUtils.getSubscriptionName(productId);
-        const price = product?.price || 'N/A';
-        const days = SubscriptionUtils.getSubscriptionDays(productId);
+        const product = availableProducts.find(p => p.id === productId);
+        const productName = product?.title || IAPHelpers.getSubscriptionName(productId);
+        const price = String(product?.price || 'N/A');
+        const days = IAPHelpers.getSubscriptionDuration(productId);
         
         // Активируем подписку локально
         await activateSubscription(productId, productName, price, days);
@@ -254,10 +255,10 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
           const latestPurchase = subscriptionPurchases
             .sort((a, b) => b.transactionDate - a.transactionDate)[0];
           
-          const product = availableProducts.find(p => p.productId === latestPurchase.productId);
-          const productName = product?.title || SubscriptionUtils.getSubscriptionName(latestPurchase.productId as SubscriptionSKU);
-          const price = product?.price || 'N/A';
-          const days = SubscriptionUtils.getSubscriptionDays(latestPurchase.productId as SubscriptionSKU);
+          const product = availableProducts.find(p => p.id === latestPurchase.productId);
+          const productName = product?.title || IAPHelpers.getSubscriptionName(latestPurchase.productId as SubscriptionSKU);
+          const price = String(product?.price || 'N/A');
+          const days = IAPHelpers.getSubscriptionDuration(latestPurchase.productId as SubscriptionSKU);
           
           await activateSubscription(latestPurchase.productId, productName, price, days);
           console.log('✅ [SubscriptionContext] Purchases restored successfully');
