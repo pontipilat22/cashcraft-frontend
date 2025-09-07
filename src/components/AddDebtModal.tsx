@@ -17,6 +17,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useDatePickerProtection } from '../hooks/useDatePickerProtection';
 import { Debt } from '../types';
 
 interface AddDebtModalProps {
@@ -35,6 +36,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const { defaultCurrency, currencies, formatAmount } = useCurrency();
+  const { protectedOpen, protectedClose, resetProtection } = useDatePickerProtection();
   
   const [type, setType] = useState<'owed_to_me' | 'owed_by_me'>('owed_to_me');
   const [name, setName] = useState('');
@@ -45,13 +47,12 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const [isIncludedInTotal, setIsIncludedInTotal] = useState(true);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
 
   // Функция для правильного закрытия модального окна
   const handleClose = () => {
     console.log('📅 [AddDebtModal] Closing modal and resetting states...');
-    setShowDatePicker(false);
-    setIsDatePickerOpening(false);
+    protectedClose(() => setShowDatePicker(false));
+    resetProtection();
     onClose();
   };
 
@@ -279,16 +280,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               <TouchableOpacity
                 style={[styles.dateButton, { backgroundColor: colors.card }]}
                 onPress={() => {
-                  if (!showDatePicker && !isDatePickerOpening) {
-                    console.log('📅 [AddDebtModal] Opening DatePicker...');
-                    setIsDatePickerOpening(true);
-                    setTimeout(() => {
-                      setShowDatePicker(true);
-                      setIsDatePickerOpening(false);
-                    }, 100);
-                  } else {
-                    console.log('📅 [AddDebtModal] DatePicker already opening/open, ignoring...');
-                  }
+                  protectedOpen(() => {
+                    setShowDatePicker(true);
+                  });
                 }}
               >
                 <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
@@ -345,8 +339,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               
               // Всегда закрываем пикер для Android
               console.log('📅 [AddDebtModal] Closing DatePicker (Android)...');
-              setShowDatePicker(false);
-              setIsDatePickerOpening(false);
+              protectedClose(() => setShowDatePicker(false));
               
               // Устанавливаем дату только если пользователь действительно выбрал
               if (selectedDate) {
@@ -385,23 +378,20 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               activeOpacity={1}
               onPress={() => {
                 console.log('📅 [AddDebtModal] Closing DatePicker (iOS overlay)...');
-                setShowDatePicker(false);
-                setIsDatePickerOpening(false);
+                protectedClose(() => setShowDatePicker(false));
               }}
             >
               <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
                 <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
                   <TouchableOpacity onPress={() => {
                     console.log('📅 [AddDebtModal] Closing DatePicker (iOS cancel)...');
-                    setShowDatePicker(false);
-                    setIsDatePickerOpening(false);
+                    protectedClose(() => setShowDatePicker(false));
                   }}>
                     <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => {
                     console.log('📅 [AddDebtModal] Closing DatePicker (iOS done)...');
-                    setShowDatePicker(false);
-                    setIsDatePickerOpening(false);
+                    protectedClose(() => setShowDatePicker(false));
                   }}>
                     <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                   </TouchableOpacity>

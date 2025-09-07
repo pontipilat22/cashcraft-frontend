@@ -9,7 +9,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
 import { AccountTabs } from '../components/AccountTabs';
-import { FABMenu } from '../components/FABMenu';
+import { NewFABMenu } from '../components/NewFABMenu';
 import { AddAccountModal } from '../components/AddAccountModal';
 import { EditAccountModal } from '../components/EditAccountModal';
 import { AccountTypeSelector } from '../components/AccountTypeSelector';
@@ -503,11 +503,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         <View style={{ height: 100 }}></View>
       </ScrollView>
 
-      <FABMenu
+      <NewFABMenu
         onIncomePress={handleQuickIncome}
         onExpensePress={handleQuickExpense}
-        onDebtPress={handleQuickDebt}
         onTransferPress={handleQuickTransfer}
+        onDebtPress={handleQuickDebt}
         onAddAccountPress={() => handleAddAccount('cards')}
         onAddSavingsPress={() => handleAddAccount('savings')}
         onAddCreditPress={() => handleAddAccount('credits')}

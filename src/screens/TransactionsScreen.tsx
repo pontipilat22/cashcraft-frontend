@@ -20,7 +20,7 @@ import { TransactionItem } from '../components/TransactionItem';
 import { TransactionActionsModal } from '../components/TransactionActionsModal';
 import { EditTransactionModal } from '../components/EditTransactionModal';
 import { AddTransactionModal } from '../components/AddTransactionModal';
-import { FABMenu } from '../components/FABMenu';
+import { NewFABMenu } from '../components/NewFABMenu';
 import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { TransferModal } from '../components/TransferModal';
@@ -590,11 +590,15 @@ export const TransactionsScreen = () => {
       />
 
       {!isSelectionMode && (
-        <FABMenu
+        <NewFABMenu
           onIncomePress={handleQuickIncome}
           onExpensePress={handleQuickExpense}
-          onDebtPress={handleQuickDebt}
           onTransferPress={handleQuickTransfer}
+          onDebtPress={handleQuickDebt}
+          onAddAccountPress={() => {
+            // TODO: Add account creation functionality
+            console.log('Add account pressed');
+          }}
         />
       )}
 
