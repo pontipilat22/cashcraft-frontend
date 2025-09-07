@@ -447,11 +447,16 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                   ) : (
                     <>
                       {getBalanceDisplay(account.balance, true)}
-                      {getReservedAmount() > 0 && (
-                        <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                          {formatBalance(getReservedAmount())} {t('accounts.inSavings')}
-                        </Text>
-                      )}
+                      {getReservedAmount() > 0 ? (
+                        <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
+                          <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                            {t('accounts.available')}: {formatBalance(account.balance - getReservedAmount())}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>
+                            {t('accounts.inGoals')}: {formatBalance(getReservedAmount())}
+                          </Text>
+                        </View>
+                      ) : null}
                     </>
                   )}
                 </View>

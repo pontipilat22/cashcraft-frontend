@@ -161,6 +161,8 @@ export default {
     perMonth: '/мес',
     remainingPayment: 'Осталось выплатить:',
     inSavings: 'в накоплениях',
+    available: 'доступно',
+    inGoals: 'в целях',
     // Модальное окно накоплений
     addToSavings: 'Пополнение накопления',
     withdrawFromSavings: 'Снятие с накопления',

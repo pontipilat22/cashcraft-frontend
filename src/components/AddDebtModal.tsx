@@ -17,7 +17,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { useDatePickerProtection } from '../hooks/useDatePickerProtection';
+import { useDatePicker } from '../hooks/useDatePicker';
 import { Debt } from '../types';
 
 interface AddDebtModalProps {
@@ -36,7 +36,12 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const { defaultCurrency, currencies, formatAmount } = useCurrency();
-  const { protectedOpen, protectedClose, resetProtection } = useDatePickerProtection();
+  
+  // Используем новый хук для DatePicker
+  const datePicker = useDatePicker({
+    initialDate: undefined,
+    onDateChange: (date) => setDueDate(date)
+  });
   
   const [type, setType] = useState<'owed_to_me' | 'owed_by_me'>('owed_to_me');
   const [name, setName] = useState('');
@@ -46,13 +51,12 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [isIncludedInTotal, setIsIncludedInTotal] = useState(true);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Функция для правильного закрытия модального окна
   const handleClose = () => {
     console.log('📅 [AddDebtModal] Closing modal and resetting states...');
-    protectedClose(() => setShowDatePicker(false));
-    resetProtection();
+    datePicker.closeDatePicker();
+    datePicker.resetProtection();
     onClose();
   };
 
@@ -92,7 +96,11 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       setSelectedCurrency(editingDebt.currency || defaultCurrency);
       setExchangeRate(editingDebt.exchangeRate?.toString() || '1');
       setIsIncludedInTotal(editingDebt.isIncludedInTotal !== false);
-      setDueDate(editingDebt.dueDate ? new Date(editingDebt.dueDate) : undefined);
+      const date = editingDebt.dueDate ? new Date(editingDebt.dueDate) : undefined;
+      setDueDate(date);
+      if (date) {
+        datePicker.setSelectedDate(date);
+      }
     } else {
       // Сброс формы для нового долга
       setType('owed_to_me');
@@ -102,6 +110,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       setExchangeRate('1');
       setIsIncludedInTotal(true);
       setDueDate(undefined);
+      datePicker.setSelectedDate(new Date());
     }
   }, [editingDebt, visible, defaultCurrency]);
 
@@ -279,11 +288,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               </Text>
               <TouchableOpacity
                 style={[styles.dateButton, { backgroundColor: colors.card }]}
-                onPress={() => {
-                  protectedOpen(() => {
-                    setShowDatePicker(true);
-                  });
-                }}
+                onPress={datePicker.openDatePicker}
               >
                 <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
                 <Text
@@ -324,94 +329,40 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
           </ScrollView>
         </View>
 
-        {showDatePicker && Platform.OS === 'android' && (
+        {datePicker.showDatePicker && Platform.OS === 'android' && (
           <DateTimePicker
-            value={dueDate || new Date()}
+            value={dueDate || datePicker.selectedDate}
             mode="date"
             display="default"
-            onChange={(event, selectedDate) => {
-              console.log('📅 [AddDebtModal] DatePicker onChange (Android):', {
-                event: event?.type,
-                selectedDate: selectedDate?.toISOString(),
-                platform: Platform.OS,
-                nativeEvent: event?.nativeEvent
-              });
-              
-              // Всегда закрываем пикер для Android
-              console.log('📅 [AddDebtModal] Closing DatePicker (Android)...');
-              protectedClose(() => setShowDatePicker(false));
-              
-              // Устанавливаем дату только если пользователь действительно выбрал
-              if (selectedDate) {
-                if (event?.type === 'set') {
-                  // Пользователь нажал OK/выбрал дату
-                  setTimeout(() => {
-                    setDueDate(selectedDate);
-                    console.log('✅ [AddDebtModal] Date set (Android):', selectedDate.toISOString());
-                  }, 50);
-                } else if (event?.type === 'dismissed') {
-                  // Пользователь отменил выбор
-                  console.log('❌ [AddDebtModal] Date dismissed (Android)');
-                } else {
-                  // Неопределенный тип события - попробуем установить дату
-                  console.log('⚠️ [AddDebtModal] Unknown event type, trying to set date:', event?.type);
-                  setTimeout(() => {
-                    setDueDate(selectedDate);
-                    console.log('✅ [AddDebtModal] Date set (fallback):', selectedDate.toISOString());
-                  }, 50);
-                }
-              } else {
-                console.log('❌ [AddDebtModal] No selectedDate provided');
-              }
-            }}
+            onChange={datePicker.handleDateChange}
           />
         )}
         
-        {showDatePicker && Platform.OS === 'ios' && (
+        {datePicker.showDatePicker && Platform.OS === 'ios' && (
           <Modal
-            visible={showDatePicker}
+            visible={datePicker.showDatePicker}
             transparent={true}
             animationType="slide"
           >
             <TouchableOpacity
               style={styles.datePickerOverlay}
               activeOpacity={1}
-              onPress={() => {
-                console.log('📅 [AddDebtModal] Closing DatePicker (iOS overlay)...');
-                protectedClose(() => setShowDatePicker(false));
-              }}
+              onPress={datePicker.closeDatePicker}
             >
               <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
                 <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                  <TouchableOpacity onPress={() => {
-                    console.log('📅 [AddDebtModal] Closing DatePicker (iOS cancel)...');
-                    protectedClose(() => setShowDatePicker(false));
-                  }}>
+                  <TouchableOpacity onPress={datePicker.closeDatePicker}>
                     <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => {
-                    console.log('📅 [AddDebtModal] Closing DatePicker (iOS done)...');
-                    protectedClose(() => setShowDatePicker(false));
-                  }}>
+                  <TouchableOpacity onPress={datePicker.closeDatePicker}>
                     <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
-                  value={dueDate || new Date()}
+                  value={dueDate || datePicker.selectedDate}
                   mode="date"
                   display="spinner"
-                  onChange={(event, selectedDate) => {
-                    console.log('📅 [AddDebtModal] DatePicker onChange (iOS):', {
-                      event: event?.type,
-                      selectedDate: selectedDate?.toISOString(),
-                      platform: Platform.OS
-                    });
-                    
-                    if (selectedDate) {
-                      setDueDate(selectedDate);
-                      console.log('✅ [AddDebtModal] Date set (iOS):', selectedDate.toISOString());
-                    }
-                  }}
+                  onChange={datePicker.handleDateChange}
                   themeVariant={isDark ? 'dark' : 'light'}
                   style={{ height: 200 }}
                 />

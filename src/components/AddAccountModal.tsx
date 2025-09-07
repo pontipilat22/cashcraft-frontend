@@ -20,6 +20,7 @@ import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useData } from '../context/DataContext';
 import { LocalDatabaseService } from '../services/localDatabase';
+import { useDatePicker } from '../hooks/useDatePicker';
 
 interface AddAccountModalProps {
   visible: boolean;
@@ -101,9 +102,9 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const [interestDay, setInterestDay] = useState('');
 
   // Поля для кредитов
-  const [creditStartDate, setCreditStartDate] = useState(new Date());
-  const [showCreditDatePicker, setShowCreditDatePicker] = useState(false);
-  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
+  const creditDatePicker = useDatePicker({
+    initialDate: new Date()
+  });
   const [creditTerm, setCreditTerm] = useState('');
   const [creditRate, setCreditRate] = useState('');
   const [creditPaymentType, setCreditPaymentType] = useState<'annuity' | 'differentiated'>('annuity');
@@ -264,7 +265,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     }
 
     if (accountType === 'credit') {
-      accountData.creditStartDate = creditStartDate.toISOString();
+      accountData.creditStartDate = creditDatePicker.selectedDate.toISOString();
       accountData.creditTerm = parseInt(creditTerm) || 0;
       accountData.creditRate = parseFloat(creditRate) || 0;
       accountData.creditPaymentType = creditPaymentType;
@@ -288,7 +289,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     setInterestRate('');
     setOpenDate('');
     setInterestDay('');
-    setCreditStartDate(new Date());
+    creditDatePicker.setSelectedDate(new Date());
     setCreditTerm('');
     setCreditRate('');
     setCreditPaymentType('annuity');
@@ -627,22 +628,11 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                   <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditDate')}</Text>
                   <TouchableOpacity
                     style={[styles.dateButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                    onPress={() => {
-                      if (!showCreditDatePicker && !isDatePickerOpening) {
-                        console.log('📅 [AddAccountModal] Opening DatePicker...');
-                        setIsDatePickerOpening(true);
-                        setTimeout(() => {
-                          setShowCreditDatePicker(true);
-                          setIsDatePickerOpening(false);
-                        }, 100);
-                      } else {
-                        console.log('📅 [AddAccountModal] DatePicker already opening/open, ignoring...');
-                      }
-                    }}
+                    onPress={creditDatePicker.openDatePicker}
                   >
                     <Ionicons name="calendar-outline" size={20} color={colors.primary} />
                     <Text style={[styles.dateText, { color: colors.text }]}>
-                      {creditStartDate.toLocaleDateString('ru-RU')}
+                      {creditDatePicker.selectedDate.toLocaleDateString('ru-RU')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -819,50 +809,38 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       </Modal>
 
       {/* Date Picker для кредитов */}
-      {showCreditDatePicker && (
+      {creditDatePicker.showDatePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={creditDatePicker.selectedDate}
+          mode="date"
+          display="default"
+          onChange={creditDatePicker.handleDateChange}
+        />
+      )}
+      
+      {creditDatePicker.showDatePicker && Platform.OS === 'ios' && (
         <Modal
-          visible={showCreditDatePicker}
+          visible={creditDatePicker.showDatePicker}
           animationType="slide"
           transparent={true}
-          onRequestClose={() => setShowCreditDatePicker(false)}
+          onRequestClose={creditDatePicker.closeDatePicker}
         >
           <View style={styles.datePickerModal}>
             <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
               <View style={styles.datePickerHeader}>
-                <TouchableOpacity onPress={() => setShowCreditDatePicker(false)}>
+                <TouchableOpacity onPress={creditDatePicker.closeDatePicker}>
                   <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <Text style={[styles.datePickerTitle, { color: colors.text }]}>{t('accounts.creditDate')}</Text>
-                <TouchableOpacity onPress={() => setShowCreditDatePicker(false)}>
+                <TouchableOpacity onPress={creditDatePicker.closeDatePicker}>
                   <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
-                value={creditStartDate}
+                value={creditDatePicker.selectedDate}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, date) => {
-                  console.log('📅 [AddAccountModal] DatePicker onChange:', {
-                    event: event?.type,
-                    selectedDate: date?.toISOString(),
-                    platform: Platform.OS
-                  });
-                  
-              // Для Android всегда закрываем пикер при любом событии
-              if (Platform.OS === 'android') {
-                console.log('📅 [AddAccountModal] Closing DatePicker (Android)...');
-                setShowCreditDatePicker(false);
-                setIsDatePickerOpening(false);
-              }
-                  
-                  // Устанавливаем дату только если она действительно выбрана
-                  if (date && event?.type !== 'dismissed') {
-                    setCreditStartDate(date);
-                    console.log('✅ [AddAccountModal] Date set:', date.toISOString());
-                  } else {
-                    console.log('❌ [AddAccountModal] Date not set:', { date: !!date, eventType: event?.type });
-                  }
-                }}
+                onChange={creditDatePicker.handleDateChange}
                 themeVariant={isDark ? 'dark' : 'light'}
                 style={{ height: 200 }}
               />

@@ -11,6 +11,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useDatePicker } from '../hooks/useDatePicker';
 
 interface DateRangePickerProps {
   visible: boolean;
@@ -30,15 +31,26 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   
-  const [startDate, setStartDate] = useState(initialStartDate);
-  const [endDate, setEndDate] = useState(initialEndDate);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  // Используем новый хук для начальной даты
+  const startDatePicker = useDatePicker({
+    initialDate: initialStartDate,
+    onDateChange: (date) => {
+      // Если выбранная начальная дата позже конечной, обновляем конечную
+      if (date > endDatePicker.selectedDate) {
+        endDatePicker.setSelectedDate(date);
+      }
+    }
+  });
+  
+  // Используем новый хук для конечной даты
+  const endDatePicker = useDatePicker({
+    initialDate: initialEndDate
+  });
   
   const handleConfirm = () => {
     // Убедимся что конечная дата не раньше начальной
-    if (endDate >= startDate) {
-      onConfirm(startDate, endDate);
+    if (endDatePicker.selectedDate >= startDatePicker.selectedDate) {
+      onConfirm(startDatePicker.selectedDate, endDatePicker.selectedDate);
       onClose();
     }
   };
@@ -75,11 +87,11 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             </Text>
             <TouchableOpacity
               style={[styles.dateButton, { backgroundColor: colors.background }]}
-              onPress={() => setShowStartPicker(true)}
+              onPress={startDatePicker.openDatePicker}
             >
               <Ionicons name="calendar-outline" size={20} color={colors.text} />
               <Text style={[styles.dateText, { color: colors.text }]}>
-                {formatDate(startDate)}
+                {formatDate(startDatePicker.selectedDate)}
               </Text>
             </TouchableOpacity>
           </View>
@@ -90,11 +102,11 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             </Text>
             <TouchableOpacity
               style={[styles.dateButton, { backgroundColor: colors.background }]}
-              onPress={() => setShowEndPicker(true)}
+              onPress={endDatePicker.openDatePicker}
             >
               <Ionicons name="calendar-outline" size={20} color={colors.text} />
               <Text style={[styles.dateText, { color: colors.text }]}>
-                {formatDate(endDate)}
+                {formatDate(endDatePicker.selectedDate)}
               </Text>
             </TouchableOpacity>
           </View>
@@ -118,40 +130,26 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             </TouchableOpacity>
           </View>
           
-          {showStartPicker && (
+          {startDatePicker.showDatePicker && (
             <DateTimePicker
-              value={startDate}
+              value={startDatePicker.selectedDate}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               textColor={colors.text}
               accentColor={colors.primary}
-              onChange={(event, selectedDate) => {
-                setShowStartPicker(false);
-                if (selectedDate) {
-                  setStartDate(selectedDate);
-                  // Если выбранная начальная дата позже конечной, обновляем конечную
-                  if (selectedDate > endDate) {
-                    setEndDate(selectedDate);
-                  }
-                }
-              }}
+              onChange={startDatePicker.handleDateChange}
             />
           )}
           
-          {showEndPicker && (
+          {endDatePicker.showDatePicker && (
             <DateTimePicker
-              value={endDate}
+              value={endDatePicker.selectedDate}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               textColor={colors.text}
               accentColor={colors.primary}
-              minimumDate={startDate}
-              onChange={(event, selectedDate) => {
-                setShowEndPicker(false);
-                if (selectedDate) {
-                  setEndDate(selectedDate);
-                }
-              }}
+              minimumDate={startDatePicker.selectedDate}
+              onChange={endDatePicker.handleDateChange}
             />
           )}
         </View>

@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
-import { useDatePickerProtection } from '../hooks/useDatePickerProtection';
+import { useDatePicker } from '../hooks/useDatePicker';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 import { CURRENCIES } from '../config/currencies';
 import { AddCategoryModal } from './AddCategoryModal';
@@ -37,17 +37,19 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const { colors, isDark } = useTheme();
   const { accounts, categories, createTransaction } = useData();
   const { t } = useLocalization();
-  const { protectedOpen, protectedClose, resetProtection } = useDatePickerProtection();
+  
+  // Используем новый хук для DatePicker
+  const datePicker = useDatePicker({
+    initialDate: new Date()
+  });
   
   const [isIncome, setIsIncome] = useState(false);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   
   // Состояние для валидации
@@ -128,14 +130,14 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         accountId: selectedAccountId,
         categoryId: selectedCategoryId,
         description: description.trim() || undefined,
-        date: selectedDate.toISOString(),
+        date: datePicker.selectedDate.toISOString(),
       });
       
       // Очищаем форму и ошибки
       setAmount('');
       setDescription('');
       setIsIncome(false);
-      setSelectedDate(new Date());
+      datePicker.setSelectedDate(new Date());
       setSelectedCategoryId('');
       setErrors({});
       setShowErrors(false);
@@ -149,7 +151,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     setAmount('');
     setDescription('');
     setIsIncome(false);
-    setSelectedDate(new Date());
+    datePicker.setSelectedDate(new Date());
     setSelectedCategoryId('');
     onClose();
   };
@@ -172,27 +174,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   };
   
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    console.log('📅 [AddTransactionModal] DatePicker onChange:', {
-      event: event?.type,
-      selectedDate: selectedDate?.toISOString(),
-      platform: Platform.OS
-    });
-    
-    // Для Android всегда закрываем пикер при любом событии
-    if (Platform.OS === 'android') {
-      console.log('📅 [AddTransactionModal] Closing DatePicker (Android)...');
-      protectedClose(() => setShowDatePicker(false));
-    }
-    
-    // Устанавливаем дату только если она действительно выбрана
-    if (selectedDate && event?.type !== 'dismissed') {
-      setSelectedDate(selectedDate);
-      console.log('✅ [AddTransactionModal] Date set:', selectedDate.toISOString());
-    } else {
-      console.log('❌ [AddTransactionModal] Date not set:', { selectedDate: !!selectedDate, eventType: event?.type });
-    }
-  };
+  // Удалена старая функция handleDateChange - теперь используем из хука
   
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
   const selectedCategory = categories.find(c => c.id === selectedCategoryId);
@@ -301,14 +283,12 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => {
-                  protectedOpen(() => setShowDatePicker(true));
-                }}
+                onPress={datePicker.openDatePicker}
               >
                 <View style={styles.selectorContent}>
                   <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
                   <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {formatDate(selectedDate)}
+                    {formatDate(datePicker.selectedDate)}
                   </Text>
                 </View>
                 <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
@@ -415,49 +395,40 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         </View>
       </KeyboardAvoidingView>
 
-      {showDatePicker && Platform.OS === 'android' && (
+      {datePicker.showDatePicker && Platform.OS === 'android' && (
         <DateTimePicker
-          value={selectedDate}
+          value={datePicker.selectedDate}
           mode="date"
           display="default"
-          onChange={handleDateChange}
+          onChange={datePicker.handleDateChange}
           locale="ru"
         />
       )}
-      {showDatePicker && Platform.OS === 'ios' && (
+      {datePicker.showDatePicker && Platform.OS === 'ios' && (
         <Modal
-          visible={showDatePicker}
+          visible={datePicker.showDatePicker}
           transparent={true}
           animationType="slide"
         >
           <TouchableOpacity
             style={styles.datePickerOverlay}
             activeOpacity={1}
-            onPress={() => {
-              console.log('📅 [AddTransactionModal] Closing DatePicker (iOS overlay)...');
-              protectedClose(() => setShowDatePicker(false));
-            }}
+            onPress={datePicker.closeDatePicker}
           >
             <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
               <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => {
-                  console.log('📅 [AddTransactionModal] Closing DatePicker (iOS cancel)...');
-                  protectedClose(() => setShowDatePicker(false));
-                }}>
+                <TouchableOpacity onPress={datePicker.closeDatePicker}>
                   <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => {
-                  console.log('📅 [AddTransactionModal] Closing DatePicker (iOS done)...');
-                  protectedClose(() => setShowDatePicker(false));
-                }}>
+                <TouchableOpacity onPress={datePicker.closeDatePicker}>
                   <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
-                value={selectedDate}
+                value={datePicker.selectedDate}
                 mode="date"
                 display="spinner"
-                onChange={handleDateChange}
+                onChange={datePicker.handleDateChange}
                 locale="ru"
                 themeVariant={isDark ? 'dark' : 'light'}
               />
