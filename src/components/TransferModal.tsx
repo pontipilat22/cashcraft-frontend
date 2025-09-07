@@ -41,6 +41,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const [showFromAccountPicker, setShowFromAccountPicker] = useState(false);
   const [showToAccountPicker, setShowToAccountPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
   
   // Состояние для валидации
   const [errors, setErrors] = useState<{
@@ -159,11 +160,23 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
   
   const handleDateChange = (event: any, selectedDate?: Date) => {
+    console.log('📅 [TransferModal] DatePicker onChange:', {
+      event: event?.type,
+      selectedDate: selectedDate?.toISOString(),
+      platform: Platform.OS
+    });
+    
+    // Для Android всегда закрываем пикер при любом событии
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
-    if (selectedDate) {
+    
+    // Устанавливаем дату только если она действительно выбрана
+    if (selectedDate && event?.type !== 'dismissed') {
       setSelectedDate(selectedDate);
+      console.log('✅ [TransferModal] Date set:', selectedDate.toISOString());
+    } else {
+      console.log('❌ [TransferModal] Date not set:', { selectedDate: !!selectedDate, eventType: event?.type });
     }
   };
   
@@ -299,7 +312,18 @@ export const TransferModal: React.FC<TransferModalProps> = ({
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => {
+                  if (!showDatePicker && !isDatePickerOpening) {
+                    console.log('📅 [TransferModal] Opening DatePicker...');
+                    setIsDatePickerOpening(true);
+                    setTimeout(() => {
+                      setShowDatePicker(true);
+                      setIsDatePickerOpening(false);
+                    }, 100);
+                  } else {
+                    console.log('📅 [TransferModal] DatePicker already opening/open, ignoring...');
+                  }
+                }}
               >
                 <View style={styles.selectorContent}>
                   <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />

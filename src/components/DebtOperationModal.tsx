@@ -48,6 +48,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
   const [showPersonPicker, setShowPersonPicker] = useState(false);
   const [existingDebts, setExistingDebts] = useState<Debt[]>([]);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
@@ -351,7 +352,18 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => {
+                  if (!showDatePicker && !isDatePickerOpening) {
+                    console.log('📅 [DebtOperationModal] Opening DatePicker...');
+                    setIsDatePickerOpening(true);
+                    setTimeout(() => {
+                      setShowDatePicker(true);
+                      setIsDatePickerOpening(false);
+                    }, 100);
+                  } else {
+                    console.log('📅 [DebtOperationModal] DatePicker already opening/open, ignoring...');
+                  }
+                }}
               >
                 <View style={styles.selectorContent}>
                   <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
@@ -422,11 +434,25 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={(event, date) => {
-                  if (Platform.OS === 'android') {
-                    setShowDatePicker(false);
-                  }
-                  if (date) {
+                  console.log('📅 [DebtOperationModal] DatePicker onChange:', {
+                    event: event?.type,
+                    selectedDate: date?.toISOString(),
+                    platform: Platform.OS
+                  });
+                  
+              // Для Android всегда закрываем пикер при любом событии
+              if (Platform.OS === 'android') {
+                console.log('📅 [DebtOperationModal] Closing DatePicker (Android)...');
+                setShowDatePicker(false);
+                setIsDatePickerOpening(false);
+              }
+                  
+                  // Устанавливаем дату только если она действительно выбрана
+                  if (date && event?.type !== 'dismissed') {
                     setTransactionDate(date);
+                    console.log('✅ [DebtOperationModal] Date set:', date.toISOString());
+                  } else {
+                    console.log('❌ [DebtOperationModal] Date not set:', { date: !!date, eventType: event?.type });
                   }
                 }}
                 textColor={colors.text}

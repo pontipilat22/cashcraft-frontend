@@ -47,6 +47,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   
   // Проверяем, является ли транзакция переводом
@@ -257,11 +258,25 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   };
   
   const handleDateChange = (event: any, selectedDate?: Date) => {
+    console.log('📅 [EditTransactionModal] DatePicker onChange:', {
+      event: event?.type,
+      selectedDate: selectedDate?.toISOString(),
+      platform: Platform.OS
+    });
+    
+    // Для Android всегда закрываем пикер при любом событии
     if (Platform.OS === 'android') {
+      console.log('📅 [EditTransactionModal] Closing DatePicker (Android)...');
       setShowDatePicker(false);
+      setIsDatePickerOpening(false);
     }
-    if (selectedDate) {
+    
+    // Устанавливаем дату только если она действительно выбрана
+    if (selectedDate && event?.type !== 'dismissed') {
       setSelectedDate(selectedDate);
+      console.log('✅ [EditTransactionModal] Date set:', selectedDate.toISOString());
+    } else {
+      console.log('❌ [EditTransactionModal] Date not set:', { selectedDate: !!selectedDate, eventType: event?.type });
     }
   };
   
@@ -377,7 +392,18 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               </Text>
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => {
+                  if (!showDatePicker && !isDatePickerOpening) {
+                    console.log('📅 [EditTransactionModal] Opening DatePicker...');
+                    setIsDatePickerOpening(true);
+                    setTimeout(() => {
+                      setShowDatePicker(true);
+                      setIsDatePickerOpening(false);
+                    }, 100);
+                  } else {
+                    console.log('📅 [EditTransactionModal] DatePicker already opening/open, ignoring...');
+                  }
+                }}
               >
                 <View style={styles.selectorContent}>
                   <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
@@ -507,14 +533,26 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           <TouchableOpacity
             style={styles.datePickerOverlay}
             activeOpacity={1}
-            onPress={() => setShowDatePicker(false)}
+            onPress={() => {
+              console.log('📅 [EditTransactionModal] Closing DatePicker (iOS overlay)...');
+              setShowDatePicker(false);
+              setIsDatePickerOpening(false);
+            }}
           >
             <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
               <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <TouchableOpacity onPress={() => {
+                  console.log('📅 [EditTransactionModal] Closing DatePicker (iOS cancel)...');
+                  setShowDatePicker(false);
+                  setIsDatePickerOpening(false);
+                }}>
                   <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <TouchableOpacity onPress={() => {
+                  console.log('📅 [EditTransactionModal] Closing DatePicker (iOS done)...');
+                  setShowDatePicker(false);
+                  setIsDatePickerOpening(false);
+                }}>
                   <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>

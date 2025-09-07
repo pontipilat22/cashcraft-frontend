@@ -32,7 +32,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   onSave,
   editingDebt,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const { defaultCurrency, currencies, formatAmount } = useCurrency();
   
@@ -45,6 +45,15 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const [isIncludedInTotal, setIsIncludedInTotal] = useState(true);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
+
+  // Функция для правильного закрытия модального окна
+  const handleClose = () => {
+    console.log('📅 [AddDebtModal] Closing modal and resetting states...');
+    setShowDatePicker(false);
+    setIsDatePickerOpening(false);
+    onClose();
+  };
 
   // Загружаем предложенный курс при изменении валюты
   useEffect(() => {
@@ -127,7 +136,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -135,7 +144,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       >
         <View style={[styles.container, { backgroundColor: colors.background }]}>
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.title, { color: colors.text }]}>
@@ -269,7 +278,18 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               </Text>
               <TouchableOpacity
                 style={[styles.dateButton, { backgroundColor: colors.card }]}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => {
+                  if (!showDatePicker && !isDatePickerOpening) {
+                    console.log('📅 [AddDebtModal] Opening DatePicker...');
+                    setIsDatePickerOpening(true);
+                    setTimeout(() => {
+                      setShowDatePicker(true);
+                      setIsDatePickerOpening(false);
+                    }, 100);
+                  } else {
+                    console.log('📅 [AddDebtModal] DatePicker already opening/open, ignoring...');
+                  }
+                }}
               >
                 <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
                 <Text
@@ -310,20 +330,104 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
           </ScrollView>
         </View>
 
-        {showDatePicker && (
+        {showDatePicker && Platform.OS === 'android' && (
           <DateTimePicker
             value={dueDate || new Date()}
             mode="date"
             display="default"
             onChange={(event, selectedDate) => {
-              if (Platform.OS === 'android') {
-                setShowDatePicker(false);
-              }
+              console.log('📅 [AddDebtModal] DatePicker onChange (Android):', {
+                event: event?.type,
+                selectedDate: selectedDate?.toISOString(),
+                platform: Platform.OS,
+                nativeEvent: event?.nativeEvent
+              });
+              
+              // Всегда закрываем пикер для Android
+              console.log('📅 [AddDebtModal] Closing DatePicker (Android)...');
+              setShowDatePicker(false);
+              setIsDatePickerOpening(false);
+              
+              // Устанавливаем дату только если пользователь действительно выбрал
               if (selectedDate) {
-                setDueDate(selectedDate);
+                if (event?.type === 'set') {
+                  // Пользователь нажал OK/выбрал дату
+                  setTimeout(() => {
+                    setDueDate(selectedDate);
+                    console.log('✅ [AddDebtModal] Date set (Android):', selectedDate.toISOString());
+                  }, 50);
+                } else if (event?.type === 'dismissed') {
+                  // Пользователь отменил выбор
+                  console.log('❌ [AddDebtModal] Date dismissed (Android)');
+                } else {
+                  // Неопределенный тип события - попробуем установить дату
+                  console.log('⚠️ [AddDebtModal] Unknown event type, trying to set date:', event?.type);
+                  setTimeout(() => {
+                    setDueDate(selectedDate);
+                    console.log('✅ [AddDebtModal] Date set (fallback):', selectedDate.toISOString());
+                  }, 50);
+                }
+              } else {
+                console.log('❌ [AddDebtModal] No selectedDate provided');
               }
             }}
           />
+        )}
+        
+        {showDatePicker && Platform.OS === 'ios' && (
+          <Modal
+            visible={showDatePicker}
+            transparent={true}
+            animationType="slide"
+          >
+            <TouchableOpacity
+              style={styles.datePickerOverlay}
+              activeOpacity={1}
+              onPress={() => {
+                console.log('📅 [AddDebtModal] Closing DatePicker (iOS overlay)...');
+                setShowDatePicker(false);
+                setIsDatePickerOpening(false);
+              }}
+            >
+              <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
+                <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
+                  <TouchableOpacity onPress={() => {
+                    console.log('📅 [AddDebtModal] Closing DatePicker (iOS cancel)...');
+                    setShowDatePicker(false);
+                    setIsDatePickerOpening(false);
+                  }}>
+                    <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => {
+                    console.log('📅 [AddDebtModal] Closing DatePicker (iOS done)...');
+                    setShowDatePicker(false);
+                    setIsDatePickerOpening(false);
+                  }}>
+                    <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={dueDate || new Date()}
+                  mode="date"
+                  display="spinner"
+                  onChange={(event, selectedDate) => {
+                    console.log('📅 [AddDebtModal] DatePicker onChange (iOS):', {
+                      event: event?.type,
+                      selectedDate: selectedDate?.toISOString(),
+                      platform: Platform.OS
+                    });
+                    
+                    if (selectedDate) {
+                      setDueDate(selectedDate);
+                      console.log('✅ [AddDebtModal] Date set (iOS):', selectedDate.toISOString());
+                    }
+                  }}
+                  themeVariant={isDark ? 'dark' : 'light'}
+                  style={{ height: 200 }}
+                />
+              </View>
+            </TouchableOpacity>
+          </Modal>
         )}
 
         {/* Модальное окно выбора валюты */}
@@ -516,5 +620,27 @@ const styles = StyleSheet.create({
   },
   currencyItemText: {
     fontSize: 16,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  datePickerButton: {
+    fontSize: 17,
+    fontWeight: '600',
   },
 }); 

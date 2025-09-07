@@ -103,6 +103,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   // Поля для кредитов
   const [creditStartDate, setCreditStartDate] = useState(new Date());
   const [showCreditDatePicker, setShowCreditDatePicker] = useState(false);
+  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
   const [creditTerm, setCreditTerm] = useState('');
   const [creditRate, setCreditRate] = useState('');
   const [creditPaymentType, setCreditPaymentType] = useState<'annuity' | 'differentiated'>('annuity');
@@ -626,7 +627,18 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                   <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditDate')}</Text>
                   <TouchableOpacity
                     style={[styles.dateButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                    onPress={() => setShowCreditDatePicker(true)}
+                    onPress={() => {
+                      if (!showCreditDatePicker && !isDatePickerOpening) {
+                        console.log('📅 [AddAccountModal] Opening DatePicker...');
+                        setIsDatePickerOpening(true);
+                        setTimeout(() => {
+                          setShowCreditDatePicker(true);
+                          setIsDatePickerOpening(false);
+                        }, 100);
+                      } else {
+                        console.log('📅 [AddAccountModal] DatePicker already opening/open, ignoring...');
+                      }
+                    }}
                   >
                     <Ionicons name="calendar-outline" size={20} color={colors.primary} />
                     <Text style={[styles.dateText, { color: colors.text }]}>
@@ -830,11 +842,25 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={(event, date) => {
-                  if (Platform.OS === 'android') {
-                    setShowCreditDatePicker(false);
-                  }
-                  if (date) {
+                  console.log('📅 [AddAccountModal] DatePicker onChange:', {
+                    event: event?.type,
+                    selectedDate: date?.toISOString(),
+                    platform: Platform.OS
+                  });
+                  
+              // Для Android всегда закрываем пикер при любом событии
+              if (Platform.OS === 'android') {
+                console.log('📅 [AddAccountModal] Closing DatePicker (Android)...');
+                setShowCreditDatePicker(false);
+                setIsDatePickerOpening(false);
+              }
+                  
+                  // Устанавливаем дату только если она действительно выбрана
+                  if (date && event?.type !== 'dismissed') {
                     setCreditStartDate(date);
+                    console.log('✅ [AddAccountModal] Date set:', date.toISOString());
+                  } else {
+                    console.log('❌ [AddAccountModal] Date not set:', { date: !!date, eventType: event?.type });
                   }
                 }}
                 themeVariant={isDark ? 'dark' : 'light'}

@@ -175,6 +175,10 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
           errorMessage = 'Сервис покупок еще загружается. Попробуйте через несколько секунд.';
         } else if (error.message.includes('User cancelled')) {
           errorMessage = 'Покупка отменена пользователем.';
+        } else if (error.message.includes('еще не активирована в Google Play Console')) {
+          errorMessage = 'Подписка настраивается. Попробуйте через 15-60 минут или обратитесь в поддержку.';
+        } else if (error.message.includes('offerToken')) {
+          errorMessage = 'Подписки временно недоступны. Попробуйте позже.';
         } else {
           errorMessage = error.message;
         }

@@ -102,14 +102,44 @@ class IAPService {
 
       console.log('💳 [IAPService] Purchasing subscription:', productId);
       
-      // Используем deprecated метод requestSubscription с базовым offerToken
+      // Получаем реальный offerToken из продукта
+      let offerToken = '';
+      
+      if (Platform.OS === 'android') {
+        try {
+          const products = await this.getProducts();
+          const product = products.find(p => p.id === productId);
+          
+          console.log('🔍 [IAPService] Found product:', product);
+          
+          if (product && 'subscriptionOfferDetails' in product) {
+            const subscriptionOfferDetails = (product as any).subscriptionOfferDetails;
+            console.log('📋 [IAPService] SubscriptionOfferDetails:', subscriptionOfferDetails);
+            
+            if (subscriptionOfferDetails && subscriptionOfferDetails.length > 0) {
+              offerToken = subscriptionOfferDetails[0].offerToken;
+              console.log('🔑 [IAPService] Found offerToken:', offerToken);
+            }
+          }
+          
+          if (!offerToken) {
+            console.warn('⚠️ [IAPService] No offerToken found for product:', productId);
+            throw new Error('Подписка еще не активирована в Google Play Console. Попробуйте позже.');
+          }
+        } catch (error) {
+          console.error('❌ [IAPService] Error getting offerToken:', error);
+          throw error;
+        }
+      }
+
+      // Используем deprecated метод requestSubscription с реальным offerToken
       const result = await requestSubscription({
         ios: { sku: productId },
         android: { 
           skus: [productId],
           subscriptionOffers: [{
             sku: productId,
-            offerToken: 'default' // Пробуем с дефолтным значением
+            offerToken: offerToken || 'default' // Используем реальный токен или fallback
           }]
         }
       });
