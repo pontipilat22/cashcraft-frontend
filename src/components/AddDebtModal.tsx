@@ -18,6 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useDatePicker } from '../hooks/useDatePicker';
+import { useDatePickerProtection } from '../hooks/useDatePickerProtection';
 import { Debt } from '../types';
 
 interface AddDebtModalProps {
@@ -56,7 +57,6 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const handleClose = () => {
     console.log('📅 [AddDebtModal] Closing modal and resetting states...');
     datePicker.closeDatePicker();
-    datePicker.resetProtection();
     onClose();
   };
 

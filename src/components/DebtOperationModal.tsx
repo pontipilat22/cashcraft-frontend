@@ -18,8 +18,9 @@ import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { LocalDatabaseService } from '../services/localDatabase';
-import { Debt, Account } from '../types';
+import { Debt } from '../types';
 import { CURRENCIES } from '../config/currencies';
+import { useDatePicker } from '../hooks/useDatePicker'; // ⬅️ добавили хук
 
 type OperationType = 'give' | 'return' | 'borrow' | 'payback';
 
@@ -45,14 +46,17 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const [person, setPerson] = useState('');
   const [description, setDescription] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAccountPicker, setShowAccountPicker] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
   const [showPersonPicker, setShowPersonPicker] = useState(false);
   const [existingDebts, setExistingDebts] = useState<Debt[]>([]);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [transactionDate, setTransactionDate] = useState(new Date());
+
+  // ⬇️ единый хук выбора даты: он будет управлять модалкой и датой
+  const datePicker = useDatePicker({
+    initialDate: transactionDate,
+    onDateChange: (d) => setTransactionDate(d),
+  });
 
   // Загружаем существующие долги при открытии
   useEffect(() => {
@@ -73,10 +77,9 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const loadExistingDebts = async () => {
     try {
       const allDebts = await LocalDatabaseService.getDebts();
-      // Фильтруем долги в зависимости от типа операции
       const filtered = operationType === 'return' 
-              ? allDebts.filter(d => d.type === 'owed_to_me') // мне должны
-      : allDebts.filter(d => d.type === 'owed_by_me');  // я должен
+        ? allDebts.filter(d => d.type === 'owed_to_me')   // мне должны
+        : allDebts.filter(d => d.type === 'owed_by_me');  // я должен
       setExistingDebts(filtered);
     } catch (error) {
       console.error('Error loading debts:', error);
@@ -161,9 +164,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         if (newAmount <= 0) {
           await LocalDatabaseService.deleteDebt(selectedDebt.id);
         } else {
-          await LocalDatabaseService.updateDebt(selectedDebt.id, {
-            amount: newAmount,
-          });
+          await LocalDatabaseService.updateDebt(selectedDebt.id, { amount: newAmount });
         }
 
         // Создаем транзакцию
@@ -177,10 +178,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         });
       }
 
-      // Обновляем данные
       await refreshData();
-      
-      // Очищаем форму
       resetForm();
       Alert.alert(t('common.success'), t('debts.operationSuccess'));
       onOperationComplete?.();
@@ -195,7 +193,6 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
     setAmount('');
     setPerson('');
     setDescription('');
-    setSelectedDate(new Date());
     setSelectedDebt(null);
     setTransactionDate(new Date());
   };
@@ -208,8 +205,6 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const handleSelectDebt = (debt: Debt) => {
     setSelectedDebt(debt);
     setPerson(debt.name);
-    // Не заполняем сумму автоматически, чтобы можно было ввести частичную сумму
-    // setAmount(debt.amount.toString());
     setShowPersonPicker(false);
   };
 
@@ -236,7 +231,6 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const isReturnOperation = operationType === 'return' || operationType === 'payback';
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
   
-  // Получаем символ валюты выбранного счета
   const accountCurrency = selectedAccount?.currency || defaultCurrency;
   const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
 
@@ -283,8 +277,6 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                   placeholder="0"
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
-                  // Убираем ограничение на редактирование
-                  // editable={!selectedDebt}
                 />
               </View>
               {selectedDebt && amount && parseFloat(amount) > selectedDebt.amount && (
@@ -353,16 +345,9 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
               <TouchableOpacity
                 style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => {
-                  if (!showDatePicker && !isDatePickerOpening) {
-                    console.log('📅 [DebtOperationModal] Opening DatePicker...');
-                    setIsDatePickerOpening(true);
-                    setTimeout(() => {
-                      setShowDatePicker(true);
-                      setIsDatePickerOpening(false);
-                    }, 100);
-                  } else {
-                    console.log('📅 [DebtOperationModal] DatePicker already opening/open, ignoring...');
-                  }
+                  // открываем пикер на текущей дате операции
+                  datePicker.setSelectedDate(transactionDate);
+                  datePicker.openDatePicker();
                 }}
               >
                 <View style={styles.selectorContent}>
@@ -410,59 +395,53 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         </View>
       </KeyboardAvoidingView>
 
-      {/* Date Picker Modal */}
-      {showDatePicker && (
-        <Modal
-          visible={showDatePicker}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setShowDatePicker(false)}
-        >
-          <View style={styles.datePickerModal}>
-            <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
-              <View style={styles.datePickerHeader}>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
-                </TouchableOpacity>
-                <Text style={[styles.datePickerTitle, { color: colors.text }]}>{t('debts.selectDate')}</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={transactionDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, date) => {
-                  console.log('📅 [DebtOperationModal] DatePicker onChange:', {
-                    event: event?.type,
-                    selectedDate: date?.toISOString(),
-                    platform: Platform.OS
-                  });
-                  
-              // Для Android всегда закрываем пикер при любом событии
-              if (Platform.OS === 'android') {
-                console.log('📅 [DebtOperationModal] Closing DatePicker (Android)...');
-                setShowDatePicker(false);
-                setIsDatePickerOpening(false);
-              }
-                  
-                  // Устанавливаем дату только если она действительно выбрана
-                  if (date && event?.type !== 'dismissed') {
-                    setTransactionDate(date);
-                    console.log('✅ [DebtOperationModal] Date set:', date.toISOString());
-                  } else {
-                    console.log('❌ [DebtOperationModal] Date not set:', { date: !!date, eventType: event?.type });
-                  }
-                }}
-                textColor={colors.text}
-                themeVariant={isDark ? 'dark' : 'light'}
-                style={{ height: 200 }}
-              />
-            </View>
-          </View>
-        </Modal>
-      )}
+ {/* ANDROID: показываем только системный диалог */}
+{Platform.OS === 'android' && datePicker.showDatePicker && (
+  <DateTimePicker
+    value={datePicker.selectedDate}
+    mode="date"
+    display="default"
+    locale="ru"
+    onChange={datePicker.handleDateChange}
+  />
+)}
+
+{/* iOS: своя модалка со спиннером */}
+{Platform.OS === 'ios' && datePicker.showDatePicker && (
+  <Modal
+    visible={datePicker.showDatePicker}
+    animationType="slide"
+    transparent={true}
+    onRequestClose={datePicker.closeDatePicker}
+  >
+    <View style={styles.datePickerModal}>
+      <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
+        <View style={styles.datePickerHeader}>
+          <TouchableOpacity onPress={datePicker.closeDatePicker}>
+            <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
+          </TouchableOpacity>
+          <Text style={[styles.datePickerTitle, { color: colors.text }]}>
+            {t('debts.selectDate')}
+          </Text>
+          <TouchableOpacity onPress={datePicker.closeDatePicker}>
+            <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
+          </TouchableOpacity>
+        </View>
+        <DateTimePicker
+          value={datePicker.selectedDate}
+          mode="date"
+          display="spinner"
+          locale="ru"
+          onChange={datePicker.handleDateChange}
+          textColor={colors.text}
+          themeVariant={isDark ? 'dark' : 'light'}
+          style={{ height: 200 }}
+        />
+      </View>
+    </View>
+  </Modal>
+)}
+
 
       {/* Person Picker for return operations */}
       <Modal
@@ -515,29 +494,35 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         </TouchableOpacity>
       </Modal>
 
-      {/* Account Picker */}
-      <Modal
-        visible={showAccountPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowAccountPicker(false)}
+          {/* Account Picker */}
+    <Modal
+      visible={showAccountPicker}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowAccountPicker(false)}
+    >
+      <TouchableOpacity
+        style={styles.pickerOverlay}
+        activeOpacity={1}
+        onPress={() => setShowAccountPicker(false)}
       >
-        <TouchableOpacity
-          style={styles.pickerOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAccountPicker(false)}
-        >
-          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <View style={styles.pickerHeader}>
-              <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                {t('transactions.selectAccount')}
-              </Text>
-              <TouchableOpacity onPress={() => setShowAccountPicker(false)} style={styles.pickerCloseButton}>
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
-              {accounts.filter(acc => acc.type !== 'savings').map(account => (
+        <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
+          <View style={styles.pickerHeader}>
+            <Text style={[styles.pickerTitle, { color: colors.text }]}>
+              {t('transactions.selectAccount')}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowAccountPicker(false)}
+              style={styles.pickerCloseButton}
+            >
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+                
+          <ScrollView>
+            {accounts
+              .filter((acc) => acc.type !== 'savings')
+              .map((account) => (
                 <TouchableOpacity
                   key={account.id}
                   style={[styles.pickerItem, { backgroundColor: colors.background }]}
@@ -550,18 +535,20 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                     {account.name}
                   </Text>
                   <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
-                    {CURRENCIES[account.currency || defaultCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol}{account.balance.toLocaleString('ru-RU')}
+                    {(CURRENCIES[account.currency || defaultCurrency]?.symbol ||
+                      CURRENCIES[defaultCurrency]?.symbol)}
+                    {account.balance.toLocaleString('ru-RU')}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
     </Modal>
+  </Modal>
   );
 };
-
+    
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
@@ -734,4 +721,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-}); 
+});

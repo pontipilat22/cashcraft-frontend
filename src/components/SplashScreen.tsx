@@ -242,7 +242,7 @@ export const SplashScreen: React.FC = () => {
 
         {/* ЛОГОТИП — сверху */}
         <Image
-          source={require("../../assets/140140.png")}
+          source={require("../../assets/splash-icon.png")}
           style={styles.logo}
           resizeMode="contain"
         />

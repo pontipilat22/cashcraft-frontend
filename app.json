@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CashCraft",
+    "name": "Cashcraft",
     "slug": "cashcraft3",
     "version": "1.0.0",
     "description": "Управляйте финансами легко",
@@ -13,12 +13,12 @@
     },
     "scheme": "cashcraft",
     "splash": {
-      "image": "./assets/140140.png",
-      "resizeMode": "center",
+      "image": "./assets/splash-icon1.png",
+      "resizeMode": "contain",
       "backgroundColor": "#EAF4FF",
       "dark": {
-        "image": "./assets/140140.png",
-        "resizeMode": "center",
+        "image": "./assets/splash-icon1.png",
+        "resizeMode": "contain",
         "backgroundColor": "#0B1220"
       }
     },
@@ -38,11 +38,11 @@
         "backgroundColor": "#4287f5"
       },
       "splash": {
-        "image": "./assets/140140.png",
+        "image": "./assets/splash-icon1.png",
         "resizeMode": "center",
         "backgroundColor": "#EAF4FF",
         "dark": {
-          "image": "./assets/140140.png",
+          "image": "./assets/splash-icon1.png",
           "resizeMode": "center",
           "backgroundColor": "#0B1220"
         }
