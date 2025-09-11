@@ -492,8 +492,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 6.5,
-    shadowOffset: { width: 10, height: 12},
-    elevation: 10,
+    shadowOffset: { width: 4, height: 8},
+    elevation: 4,
   },
 
   innerDisc: {

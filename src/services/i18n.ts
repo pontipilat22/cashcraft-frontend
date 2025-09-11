@@ -14,11 +14,14 @@ import el from '../locales/el';
 import it from '../locales/it';
 import pl from '../locales/pl';
 
-// Тип для поддерживаемых языков
-export type SupportedLanguage = 'en' | 'ru' | 'kk' | 'uk' | 'zh' | 'ar' | 'de' | 'fr' | 'hi' | 'tr' | 'el' | 'it' | 'pl';
+export type SupportedLanguage =
+  | 'en' | 'ru' | 'kk' | 'uk' | 'zh' | 'ar'
+  | 'de' | 'fr' | 'hi' | 'tr' | 'el' | 'it' | 'pl';
 
-// Доступные языки
-export const LANGUAGES: Record<SupportedLanguage, { code: SupportedLanguage; name: string; nativeName: string }> = {
+export const LANGUAGES: Record<
+  SupportedLanguage,
+  { code: SupportedLanguage; name: string; nativeName: string }
+> = {
   en: { code: 'en', name: 'English', nativeName: 'English' },
   ru: { code: 'ru', name: 'Russian', nativeName: 'Русский' },
   kk: { code: 'kk', name: 'Kazakh', nativeName: 'Қазақша' },
@@ -34,65 +37,49 @@ export const LANGUAGES: Record<SupportedLanguage, { code: SupportedLanguage; nam
   pl: { code: 'pl', name: 'Polish', nativeName: 'Polski' },
 };
 
-// Создаем экземпляр i18n
-const i18n = new I18n({
-  en,
-  ru,
-  kk,
-  uk,
-  zh,
-  ar,
-  de,
-  fr,
-  hi,
-  tr,
-  el,
-  it,
-  pl,
-});
-
-// Настройка i18n
+const i18n = new I18n({ en, ru, kk, uk, zh, ar, de, fr, hi, tr, el, it, pl });
 i18n.enableFallback = true;
 i18n.defaultLocale = 'en';
 
-// Инициализация языка
+/** Безопасно получить код языка устройства ('en', 'ru', ...) */
+const getDeviceLanguage = (): string => {
+  try {
+    const locales = Localization.getLocales?.() ?? [];
+    // languageTag: 'en-US', 'ru-RU', ...
+    const tag =
+      (locales[0]?.languageTag ||
+        // web-полифил может иметь другие поля
+        (locales as any)[0]?.localeIdentifier ||
+        'en-US') as string;
+    return (tag.split('-')[0] || 'en').toLowerCase();
+  } catch {
+    return 'en';
+  }
+};
+
 export const initializeI18n = async (): Promise<void> => {
   try {
-    // Всегда определяем язык устройства
-    const fullLocale = Localization.locale;
-    const deviceLanguage = fullLocale.split('-')[0];
-    
-    // Проверяем, поддерживается ли язык устройства
+    const deviceLanguage = getDeviceLanguage();
     if (deviceLanguage in LANGUAGES) {
-      i18n.locale = deviceLanguage;
+      i18n.locale = deviceLanguage as SupportedLanguage;
     } else {
-      // Если язык не поддерживается, используем английский
       i18n.locale = 'en';
     }
-    
-    // НЕ сохраняем язык при инициализации - позволяем приложению
-    // всегда открываться на языке телефона
-  } catch (error) {
-    console.error('Error initializing i18n:', error);
+  } catch (e) {
+    console.error('Error initializing i18n:', e);
     i18n.locale = 'en';
   }
 };
 
-// Изменить язык
 export const changeLanguage = async (language: SupportedLanguage): Promise<void> => {
   i18n.locale = language;
-  // НЕ сохраняем язык - приложение всегда будет открываться на языке телефона
 };
 
-// Получить текущий язык
 export const getCurrentLanguage = (): SupportedLanguage => {
-  return i18n.locale as SupportedLanguage;
+  const l = (i18n.locale || 'en') as string;
+  return (l in LANGUAGES ? l : 'en') as SupportedLanguage;
 };
 
-// Хелпер для перевода
-export const t = (key: string, options?: any): string => {
-  return i18n.t(key, options);
-};
+export const t = (key: string, options?: any): string => i18n.t(key, options);
 
-// Экспортируем объект i18n для прямого использования если нужно
-export default i18n; 
+export default i18n;

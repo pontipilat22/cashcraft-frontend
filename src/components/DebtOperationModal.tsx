@@ -401,6 +401,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
     value={datePicker.selectedDate}
     mode="date"
     display="default"
+    maximumDate={new Date()}
     locale="ru"
     onChange={datePicker.handleDateChange}
   />
@@ -431,6 +432,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
           value={datePicker.selectedDate}
           mode="date"
           display="spinner"
+          maximumDate={new Date()}
           locale="ru"
           onChange={datePicker.handleDateChange}
           textColor={colors.text}

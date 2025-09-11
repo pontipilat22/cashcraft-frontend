@@ -439,6 +439,7 @@ export default {
     delete: 'Удалить',
   },
   debts: {
+    debt: 'Долги',
     selectOperation: 'Выберите операцию',
     iGive: 'Я даю',
     theyGive: 'Мне дают',

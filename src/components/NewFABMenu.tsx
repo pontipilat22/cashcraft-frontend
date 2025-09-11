@@ -5,15 +5,12 @@ import {
   Text,
   StyleSheet,
   Modal,
-  TouchableWithoutFeedback,
-  Animated,
-  Dimensions,
+  Pressable,
+  StyleSheet as RNStyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 interface NewFABMenuProps {
   onIncomePress: () => void;
@@ -42,23 +39,16 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
   onAddSavingsPress,
   onAddCreditPress,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { t } = useLocalization();
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleMenuPress = () => {
-    setIsOpen(true);
-  };
-
-  const handleClose = () => {
-    setIsOpen(false);
-  };
+  const handleMenuPress = () => setIsOpen(true);
+  const handleClose = () => setIsOpen(false);
 
   const handleItemPress = (action: () => void) => {
     setIsOpen(false);
-    setTimeout(() => {
-      action();
-    }, 150);
+    setTimeout(action, 150);
   };
 
   const menuItems: MenuItem[] = [
@@ -99,7 +89,6 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
     },
   ];
 
-  // Добавляем опциональные элементы
   if (onAddSavingsPress) {
     menuItems.push({
       id: 'savings',
@@ -119,7 +108,6 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
       onPress: () => handleItemPress(onAddCreditPress),
     });
   }
-
 
   const styles = StyleSheet.create({
     fab: {
@@ -199,63 +187,54 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
 
   return (
     <>
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleMenuPress}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={styles.fab} onPress={handleMenuPress} activeOpacity={0.8}>
         <Ionicons name="add" size={28} color="#FFFFFF" />
       </TouchableOpacity>
 
       <Modal
         visible={isOpen}
-        transparent={true}
+        transparent
         animationType="slide"
         onRequestClose={handleClose}
       >
-        <TouchableWithoutFeedback onPress={handleClose}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={styles.menuContainer}>
+        <View style={styles.modalOverlay}>
+          {/* Подложка: клик вне меню закрывает модалку */}
+          <Pressable style={RNStyleSheet.absoluteFill} onPress={handleClose} />
+
+          {/* Контент меню */}
+          <View style={styles.menuContainer}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={styles.closeButton}
+              onPress={handleClose}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <Ionicons name="close" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            <Text style={styles.menuTitle}>{t('common.quickActions')}</Text>
+
+            <View style={styles.menuList}>
+              {menuItems.map((item, index) => (
                 <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={handleClose}
+                  key={item.id}
+                  style={[
+                    styles.menuItem,
+                    index === menuItems.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                  onPress={item.onPress}
+                  activeOpacity={0.6}
                 >
-                  <Ionicons name="close" size={18} color={colors.textSecondary} />
+                  <View style={[styles.menuItemIcon, { backgroundColor: item.color }]}>
+                    <Ionicons name={item.icon} size={20} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.menuItemText}>{item.title}</Text>
                 </TouchableOpacity>
-
-                <Text style={styles.menuTitle}>
-                  {t('common.quickActions')}
-                </Text>
-
-                <View style={styles.menuList}>
-                  {menuItems.map((item, index) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[
-                        styles.menuItem,
-                        index === menuItems.length - 1 && { borderBottomWidth: 0 }
-                      ]}
-                      onPress={item.onPress}
-                      activeOpacity={0.6}
-                    >
-                      <View style={[styles.menuItemIcon, { backgroundColor: item.color }]}>
-                        <Ionicons 
-                          name={item.icon} 
-                          size={20} 
-                          color="#FFFFFF" 
-                        />
-                      </View>
-                      <Text style={styles.menuItemText}>
-                        {item.title}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
+              ))}
+            </View>
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
     </>
   );

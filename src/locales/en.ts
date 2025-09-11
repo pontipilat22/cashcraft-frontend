@@ -78,6 +78,7 @@ export default {
     dataResetError: 'Failed to reset data',
     optional: 'optional',
     featureNotAvailable: 'This feature is not available yet',
+    quickActions: "Quick actions"
   },
   auth: {
     login: 'Login',
@@ -152,7 +153,7 @@ export default {
     authRequired: 'Authorization required',
     signIn: 'Sign In',
     getPremium: 'Get Premium',
-    cardsAndAccounts: 'Cards and accounts',
+    cardsAndAccounts: 'Accounts',
     savingsAccounts: 'Goals',
     debts: 'Debts',
     credits: 'Credits',
@@ -196,6 +197,8 @@ export default {
     perMonth: '/mo',
     remainingPayment: 'Remaining payment:',
     inSavings: 'in savings',
+    available: 'Available',
+    inGoals: 'In savings goals',
     addToSavings: 'Add to savings',
     withdrawFromSavings: 'Withdraw from savings',
     availableOnAccount: 'Available on account "{{account}}": {{amount}}',
@@ -453,6 +456,7 @@ export default {
     no: 'No',
   },
   debts: {
+    debt: "Debts",
     selectOperation: 'Select operation',
     iGive: 'I give',
     theyGive: 'They give me',

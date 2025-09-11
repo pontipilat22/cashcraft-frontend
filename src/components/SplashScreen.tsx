@@ -51,7 +51,7 @@ export const SplashScreen: React.FC = () => {
   const fadeInAnim = useRef(new Animated.Value(0)).current;
 
   // Определяем язык устройства для отображения правильного текста
-  const deviceLanguage = Localization.locale?.split('-')[0] || 'en';
+  const deviceLanguage = Localization.getLocales()[0].languageCode || 'en';
   
   // Словарь тагланов для всех поддерживаемых языков
   const loadingTexts: Record<string, string> = {
