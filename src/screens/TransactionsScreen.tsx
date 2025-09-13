@@ -596,8 +596,6 @@ export const TransactionsScreen = () => {
           onTransferPress={handleQuickTransfer}
           onDebtPress={handleQuickDebt}
           onAddAccountPress={() => {
-            // TODO: Add account creation functionality
-            console.log('Add account pressed');
           }}
         />
       )}
