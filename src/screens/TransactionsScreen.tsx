@@ -24,7 +24,7 @@ import { NewFABMenu } from '../components/NewFABMenu';
 import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { TransferModal } from '../components/TransferModal';
-import { Transaction } from '../types';
+import { Transaction } from '../types/index';
 import { useLocalization } from '../context/LocalizationContext';
 import { getCurrentLanguage } from '../services/i18n';
 import { CURRENCIES } from '../config/currencies';

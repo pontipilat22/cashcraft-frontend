@@ -8,6 +8,8 @@ import Debt from './models/Debt';
 import ExchangeRate from './models/ExchangeRate';
 import Setting from './models/Setting';
 import SyncMetadata from './models/SyncMetadata';
+import Goal from './models/Goal';
+import GoalTransfer from './models/GoalTransfer';
 
 // Create the adapter
 const adapter = new SQLiteAdapter({
@@ -29,6 +31,8 @@ const database = new Database({
     ExchangeRate,
     Setting,
     SyncMetadata,
+    Goal,
+    GoalTransfer,
   ],
 });
 

@@ -11,7 +11,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
-import { Transaction, Category, Account } from '../types';
+import { Transaction, Category, Account } from '../types/index';
 import { CURRENCIES } from '../config/currencies';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 

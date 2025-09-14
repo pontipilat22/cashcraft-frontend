@@ -15,7 +15,7 @@ import { EditAccountModal } from '../components/EditAccountModal';
 import { AccountTypeSelector } from '../components/AccountTypeSelector';
 import { AccountActionsModal } from '../components/AccountActionsModal';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { AccountType, Account, Debt } from '../types';
+import { AccountType, Account, Debt } from '../types/index';
 import { AddTransactionModal } from '../components/AddTransactionModal';
 import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
@@ -24,9 +24,9 @@ import { AccountsStackParamList } from '../navigation/AccountsNavigator';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { useFocusEffect } from '@react-navigation/native';
 import { TransferModal } from '../components/TransferModal';
-import { SavingsActionModal } from '../components/SavingsActionModal';
 import { StatisticsCard } from '../components/StatisticsCard';
 import { SubscriptionScreen } from './SubscriptionScreen';
+import { AddGoalModal } from '../components/AddGoalModal';
 
 type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
 
@@ -36,7 +36,7 @@ interface AccountsScreenProps {
 
 export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
-  const { accounts, isLoading, createAccount, updateAccount, deleteAccount, addToSavings, withdrawFromSavings, refreshData } = useData();
+  const { accounts, goals, isLoading, createAccount, updateAccount, deleteAccount, createGoal, refreshData } = useData();
   const { checkIfPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
@@ -55,10 +55,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [sectionToAdd, setSectionToAdd] = useState<'cards' | 'savings' | 'debts' | 'credits'>('cards');
   const [debts, setDebts] = useState<Debt[]>([]);
-  const [showSavingsActionModal, setShowSavingsActionModal] = useState(false);
-  const [savingsAction, setSavingsAction] = useState<'add' | 'withdraw'>('add');
-  const [selectedSavings, setSelectedSavings] = useState<Account | null>(null);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showGoalModal, setShowGoalModal] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('cards');
 
   // Загружаем долги при фокусе экрана
@@ -116,10 +114,9 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     return { owed, owe };
   }, [debts]);
 
-  // Группируем счета по типам
+  // Группируем счета по типам (исключаем savings, так как теперь есть независимые цели)
   const groupedAccounts = {
-    cards: accounts.filter(a => a.type === 'cash' || a.type === 'card'),
-    savings: accounts.filter(a => a.type === 'savings'),
+    cards: accounts.filter(a => a.type === 'cash' || a.type === 'card' || a.type === 'bank' || a.type === 'investment'),
     debts: accounts.filter(a => a.type === 'debt'),
     credits: accounts.filter(a => a.type === 'credit'),
   };
@@ -237,7 +234,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       
       await createAccount({
         ...data,
-        type: selectedAccountType
+        type: selectedAccountType,
+        currency: defaultCurrency
       });
       setModalVisible(false);
     } catch (error) {
@@ -371,30 +369,31 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     setShowTransferModal(true);
   };
 
-  const handleSavingsAction = (savings: Account, action: 'add' | 'withdraw') => {
-    setSelectedSavings(savings);
-    setSavingsAction(action);
-    setShowSavingsActionModal(true);
-  };
 
-  const handleSavingsActionConfirm = async (amount: number) => {
-    if (!selectedSavings) return;
-    
-    try {
-      if (savingsAction === 'add') {
-        await addToSavings(selectedSavings.id, amount);
-      } else {
-        await withdrawFromSavings(selectedSavings.id, amount);
-      }
-      setShowSavingsActionModal(false);
-    } catch (error) {
-      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('common.error'));
-    }
-  };
 
   const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
     setDebtOperationType(type);
     setShowDebtOperationModal(true);
+  };
+
+  const handleCreateGoal = async (data: {
+    name: string;
+    targetAmount: number;
+    currency: string;
+    color?: string;
+    icon?: string;
+    description?: string;
+  }) => {
+    try {
+      await createGoal(data);
+      setShowGoalModal(false);
+    } catch (error) {
+      console.error('Error creating goal:', error);
+    }
+  };
+
+  const handleAddGoal = () => {
+    setShowGoalModal(true);
   };
 
   if (isLoading) {
@@ -433,18 +432,40 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
 
         {activeTab === 'goals' && (
           <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
-          {Array.isArray(groupedAccounts.savings) && groupedAccounts.savings.length > 0
-            ? groupedAccounts.savings.map(account => (
-                <AccountCard
-                  key={account.id}
-                  account={account}
-                  onPress={() => {}}
-                  onLongPress={() => handleAccountLongPress(account)}
-                  onAddToSavings={() => handleSavingsAction(account, 'add')}
-                  onWithdrawFromSavings={() => handleSavingsAction(account, 'withdraw')}
-                />
-              ))
-            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noSavings')}</Text>}
+          {goals.length > 0
+            ? goals.map(goal => {
+                // Преобразуем Goal в Account-подобный объект для совместимости с AccountCard
+                const goalAsAccount = {
+                  id: goal.id,
+                  name: goal.name,
+                  type: 'savings' as const,
+                  balance: goal.currentAmount,
+                  currency: goal.currency,
+                  color: goal.color,
+                  icon: goal.icon,
+                  isDefault: false,
+                  isIncludedInTotal: false,
+                  targetAmount: goal.targetAmount,
+                  savedAmount: goal.currentAmount,
+                  isTargetedSavings: true,
+                  createdAt: goal.createdAt,
+                  updatedAt: goal.updatedAt,
+                  syncedAt: goal.syncedAt,
+                };
+                
+                return (
+                  <AccountCard
+                    key={goal.id}
+                    account={goalAsAccount}
+                    onPress={() => {}}
+                    onLongPress={() => {
+                      // Можно добавить меню действий для целей
+                      console.log('Goal long press:', goal.name);
+                    }}
+                  />
+                );
+              })
+            : <Text style={{color: colors.textSecondary, textAlign: 'center', marginVertical: 12}}>{t('accounts.noGoals')}</Text>}
           </View>
         )}
 
@@ -463,6 +484,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   currency: defaultCurrency,
                   icon: 'trending-up-outline' as any,
                   isDefault: false,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
                 }}
                 onPress={() => navigation.navigate('DebtList', { type: 'owed_to_me' })}
                 onLongPress={() => {}}
@@ -476,6 +499,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   currency: defaultCurrency,
                   icon: 'trending-down-outline' as any,
                   isDefault: false,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
                 }}
                 onPress={() => navigation.navigate('DebtList', { type: 'owed_by_me' })}
                 onLongPress={() => {}}
@@ -509,7 +534,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         onTransferPress={handleQuickTransfer}
         onDebtPress={handleQuickDebt}
         onAddAccountPress={() => handleAddAccount('cards')}
-        onAddSavingsPress={() => handleAddAccount('savings')}
+        onAddSavingsPress={handleAddGoal}
         onAddCreditPress={() => handleAddAccount('credits')}
       />
 
@@ -570,16 +595,6 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         }}
       />
 
-      {selectedSavings && selectedSavings.linkedAccountId && (
-        <SavingsActionModal
-          visible={showSavingsActionModal}
-          onClose={() => setShowSavingsActionModal(false)}
-          onConfirm={handleSavingsActionConfirm}
-          action={savingsAction}
-          savings={selectedSavings}
-          linkedAccount={accounts.find(acc => acc.id === selectedSavings.linkedAccountId)}
-        />
-      )}
 
       <Modal
         visible={showSubscriptionModal}
@@ -594,6 +609,13 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
           checkIfPremium();
         }} />
       </Modal>
+
+      <AddGoalModal
+        visible={showGoalModal}
+        onClose={() => setShowGoalModal(false)}
+        onSave={handleCreateGoal}
+      />
+
     </View>
   );
 };

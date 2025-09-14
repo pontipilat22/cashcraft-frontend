@@ -29,7 +29,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   onClose,
 }) => {
   const { colors, isDark } = useTheme();
-  const { accounts, createTransaction } = useData();
+  const { accounts, goals, createTransaction, transferToGoal } = useData();
   const { formatAmount, defaultCurrency } = useCurrency();
   const { t } = useLocalization();
   
@@ -53,7 +53,22 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   
   // Фильтруем счета
   const sourceAccounts = accounts.filter(acc => acc.type !== 'savings');
-  const targetAccounts = accounts.filter(acc => acc.id !== fromAccountId);
+  
+  // Создаем список целей как псевдо-счетов для выбора
+  const goalTargets = goals.map(goal => ({
+    id: `goal-${goal.id}`,
+    name: `🎯 ${goal.name}`,
+    type: 'goal' as any,
+    balance: goal.currentAmount,
+    currency: goal.currency,
+    isGoal: true,
+    goalData: goal
+  }));
+  
+  const targetAccounts = [
+    ...accounts.filter(acc => acc.id !== fromAccountId),
+    ...goalTargets
+  ];
   
   // Проверяем, достаточно ли счетов для перевода
   const canTransfer = accounts.length >= 2;
@@ -90,43 +105,58 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     
     try {
       const fromAccount = accounts.find(a => a.id === fromAccountId);
-      const toAccount = accounts.find(a => a.id === toAccountId);
-      
-      if (!fromAccount || !toAccount) {
-        console.error('Account not found');
-        return;
-      }
-      
       const transferAmount = parseFloat(amount);
       const transferDate = selectedDate.toISOString();
       const transferDescription = description.trim() || t('transactions.transfer');
       
-      // Конвертируем сумму в валюту счета-получателя если валюты разные
-      let toAmount = transferAmount;
-      if (fromAccount.currency !== toAccount.currency) {
-        // TODO: Использовать курсы обмена
-        toAmount = transferAmount; // Пока без конвертации
+      if (!fromAccount) {
+        console.error('Source account not found');
+        return;
       }
       
-      // Создаем расходную транзакцию (в валюте счета-источника)
-      await createTransaction({
-        amount: transferAmount,
-        type: 'expense',
-        accountId: fromAccountId,
-        categoryId: 'other_expense',
-        description: `${transferDescription} → ${toAccount.name}`,
-        date: transferDate,
-      });
+      // Проверяем, это перевод в цель или между счетами
+      const isGoalTransfer = toAccountId.startsWith('goal-');
       
-      // Создаем доходную транзакцию (в валюте счета-получателя)
-      await createTransaction({
-        amount: toAmount,
-        type: 'income',
-        accountId: toAccountId,
-        categoryId: 'other_income',
-        description: `${transferDescription} ← ${fromAccount.name}`,
-        date: transferDate,
-      });
+      if (isGoalTransfer) {
+        // Перевод в цель
+        const goalId = toAccountId.replace('goal-', '');
+        await transferToGoal(goalId, fromAccountId, transferAmount, transferDescription);
+      } else {
+        // Обычный перевод между счетами
+        const toAccount = accounts.find(a => a.id === toAccountId);
+        
+        if (!toAccount) {
+          console.error('Target account not found');
+          return;
+        }
+        
+        // Конвертируем сумму в валюту счета-получателя если валюты разные
+        let toAmount = transferAmount;
+        if (fromAccount.currency !== toAccount.currency) {
+          // TODO: Использовать курсы обмена
+          toAmount = transferAmount; // Пока без конвертации
+        }
+        
+        // Создаем расходную транзакцию (в валюте счета-источника)
+        await createTransaction({
+          amount: transferAmount,
+          type: 'expense',
+          accountId: fromAccountId,
+          categoryId: 'other_expense',
+          description: `${transferDescription} → ${toAccount.name}`,
+          date: transferDate,
+        });
+        
+        // Создаем доходную транзакцию (в валюте счета-получателя)
+        await createTransaction({
+          amount: toAmount,
+          type: 'income',
+          accountId: toAccountId,
+          categoryId: 'other_income',
+          description: `${transferDescription} ← ${fromAccount.name}`,
+          date: transferDate,
+        });
+      }
       
       handleClose();
     } catch (error) {
@@ -181,7 +211,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
   
   const fromAccount = accounts.find(a => a.id === fromAccountId);
-  const toAccount = accounts.find(a => a.id === toAccountId);
+  const toAccount = targetAccounts.find(a => a.id === toAccountId);
   
   // Получаем символ валюты из счета-источника
   const accountCurrency = fromAccount?.currency || defaultCurrency;
@@ -370,7 +400,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 { backgroundColor: colors.primary }
               ]}
               onPress={handleSave}
-              disabled={!amount || parseFloat(amount) === 0 || !fromAccountId || !toAccountId || fromAccountId === toAccountId}
+              disabled={!amount || parseFloat(amount) === 0 || !fromAccountId || !toAccountId || (fromAccountId === toAccountId && !toAccountId.startsWith('goal-'))}
             >
               <Text style={[styles.buttonText, { color: '#fff' }]}>
                 {t('common.save')}
@@ -490,23 +520,61 @@ export const TransferModal: React.FC<TransferModalProps> = ({
               </TouchableOpacity>
             </View>
             <ScrollView>
-              {targetAccounts.map(account => (
-                <TouchableOpacity
-                  key={account.id}
-                  style={[styles.pickerItem, { backgroundColor: colors.background }]}
-                  onPress={() => {
-                    setToAccountId(account.id);
-                    setShowToAccountPicker(false);
-                  }}
-                >
-                  <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                    {account.name}
-                  </Text>
-                  <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
-                    {formatAmount(account.balance)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {/* Секция счетов */}
+              {accounts.filter(acc => acc.id !== fromAccountId).length > 0 && (
+                <>
+                  <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                      {t('accounts.accounts')}
+                    </Text>
+                  </View>
+                  {accounts.filter(acc => acc.id !== fromAccountId).map(account => (
+                    <TouchableOpacity
+                      key={account.id}
+                      style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                      onPress={() => {
+                        setToAccountId(account.id);
+                        setShowToAccountPicker(false);
+                      }}
+                    >
+                      <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                        {account.name}
+                      </Text>
+                      <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
+                        {formatAmount(account.balance)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+              
+              {/* Секция целей */}
+              {goals.length > 0 && (
+                <>
+                  <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                      {t('accounts.goals')}
+                    </Text>
+                  </View>
+                  {goalTargets.map(goal => (
+                    <TouchableOpacity
+                      key={goal.id}
+                      style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                      onPress={() => {
+                        setToAccountId(goal.id);
+                        setShowToAccountPicker(false);
+                      }}
+                    >
+                      <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                        {goal.name}
+                      </Text>
+                      <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
+                        {formatAmount(goal.balance)} / {formatAmount(goal.goalData?.targetAmount || 0)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -678,5 +746,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF4444',
     marginTop: 4,
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
 });

@@ -8,6 +8,8 @@ import Debt from '../database/models/Debt';
 import ExchangeRate from '../database/models/ExchangeRate';
 import Setting from '../database/models/Setting';
 import SyncMetadata from '../database/models/SyncMetadata';
+import Goal from '../database/models/Goal';
+import GoalTransfer from '../database/models/GoalTransfer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Константы для дефолтного счёта и флага инициализации
@@ -1126,6 +1128,104 @@ export class WatermelonDatabaseService {
       throw error;
     }
   }
+
+  // Методы для работы с целями
+  static async getGoals(): Promise<any[]> {
+    const goals = await database.get<Goal>('goals').query().fetch();
+    return goals.map(goal => ({
+      id: goal._raw.id,
+      name: goal.name,
+      targetAmount: goal.targetAmount,
+      currentAmount: goal.currentAmount,
+      currency: goal.currency,
+      color: goal.color,
+      icon: goal.icon,
+      description: goal.description,
+      createdAt: new Date(goal.createdAt).toISOString(),
+      updatedAt: new Date(goal.updatedAt).toISOString(),
+      syncedAt: goal.syncedAt ? new Date(goal.syncedAt).toISOString() : undefined,
+    }));
+  }
+
+  static async createGoal(goalData: any): Promise<void> {
+    await database.write(async () => {
+      await database.get<Goal>('goals').create(goal => {
+        goal._raw.id = goalData.id || uuidv4();
+        goal.name = goalData.name;
+        goal.targetAmount = goalData.targetAmount;
+        goal.currentAmount = goalData.currentAmount || 0;
+        goal.currency = goalData.currency;
+        goal.color = goalData.color;
+        goal.icon = goalData.icon;
+        goal.description = goalData.description;
+      });
+    });
+  }
+
+  static async updateGoal(id: string, updates: any): Promise<void> {
+    await database.write(async () => {
+      const goal = await database.get<Goal>('goals').find(id);
+      await goal.update(g => {
+        if (updates.name !== undefined) g.name = updates.name;
+        if (updates.targetAmount !== undefined) g.targetAmount = updates.targetAmount;
+        if (updates.currentAmount !== undefined) g.currentAmount = updates.currentAmount;
+        if (updates.currency !== undefined) g.currency = updates.currency;
+        if (updates.color !== undefined) g.color = updates.color;
+        if (updates.icon !== undefined) g.icon = updates.icon;
+        if (updates.description !== undefined) g.description = updates.description;
+      });
+    });
+  }
+
+  static async deleteGoal(id: string): Promise<void> {
+    await database.write(async () => {
+      // Сначала удаляем все переводы связанные с этой целью
+      const transfers = await database.get<GoalTransfer>('goal_transfers')
+        .query(Q.where('goal_id', id))
+        .fetch();
+      
+      for (const transfer of transfers) {
+        await transfer.destroyPermanently();
+      }
+      
+      // Затем удаляем саму цель
+      const goal = await database.get<Goal>('goals').find(id);
+      await goal.destroyPermanently();
+    });
+  }
+
+  // Методы для работы с переводами в цели
+  static async getGoalTransfers(): Promise<any[]> {
+    const transfers = await database.get<GoalTransfer>('goal_transfers')
+      .query(Q.sortBy('date', Q.desc))
+      .fetch();
+    
+    return transfers.map(transfer => ({
+      id: transfer._raw.id,
+      goalId: transfer.goalId,
+      accountId: transfer.accountId,
+      amount: transfer.amount,
+      description: transfer.description,
+      date: transfer.date,
+      createdAt: new Date(transfer.createdAt).toISOString(),
+      updatedAt: new Date(transfer.updatedAt).toISOString(),
+      syncedAt: transfer.syncedAt ? new Date(transfer.syncedAt).toISOString() : undefined,
+    }));
+  }
+
+  static async createGoalTransfer(transferData: any): Promise<void> {
+    await database.write(async () => {
+      await database.get<GoalTransfer>('goal_transfers').create(transfer => {
+        transfer._raw.id = transferData.id || uuidv4();
+        transfer.goalId = transferData.goalId;
+        transfer.accountId = transferData.accountId;
+        transfer.amount = transferData.amount;
+        transfer.description = transferData.description;
+        transfer.date = transferData.date;
+      });
+    });
+  }
+
 }
 
 // Экспортируем как LocalDatabaseService для обратной совместимости

@@ -35,7 +35,7 @@ export interface Transaction {
   amount: number;
   type: 'income' | 'expense';
   accountId: string;
-  categoryId?: string;
+  categoryId: string;
   description?: string;
   date: string;
   createdAt: string;
@@ -52,6 +52,46 @@ export interface Category {
 }
 
 export type AccountType = 'cash' | 'card' | 'bank' | 'savings' | 'investment' | 'debt' | 'credit';
+
+// Новые интерфейсы для системы целей
+export interface Goal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  currency: string;
+  color?: string;
+  icon?: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  syncedAt?: string;
+}
+
+export interface GoalTransfer {
+  id: string;
+  goalId: string;
+  accountId: string;
+  amount: number;
+  description?: string;
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+  syncedAt?: string;
+}
+
+export interface Debt {
+  id: string;
+  type: 'owed_to_me' | 'owed_by_me'; // 'owed_to_me' — мне должны, 'owed_by_me' — я должен
+  name: string;
+  amount: number;
+  currency?: string; // Валюта долга
+  exchangeRate?: number; // Курс обмена к основной валюте
+  isIncludedInTotal?: boolean;
+  dueDate?: string; // Дата возврата долга
+  createdAt: string;
+  updatedAt: string;
+}
 
 export const AccountTypeLabels: Record<AccountType, string> = {
   cash: 'Наличные',

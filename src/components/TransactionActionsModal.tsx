@@ -11,7 +11,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { Transaction, Category } from '../types';
+import { Transaction, Category, Account } from '../types/index';
 import { CURRENCIES } from '../config/currencies';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 
@@ -19,7 +19,7 @@ interface TransactionActionsModalProps {
   visible: boolean;
   transaction: Transaction | null;
   category?: Category;
-  account?: any; // Account type
+  account?: Account;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Account, Transaction, Category, Debt } from '../types';
+import { Account, Transaction, Category, Debt, Goal, GoalTransfer } from '../types/index';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { ApiService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +11,8 @@ interface DataContextType {
   transactions: Transaction[];
   categories: Category[];
   debts: Debt[];
+  goals: Goal[];
+  goalTransfers: GoalTransfer[];
   totalBalance: number;
   isLoading: boolean;
   
@@ -29,9 +31,14 @@ interface DataContextType {
   updateDebt: (id: string, updates: Partial<Debt>) => Promise<void>;
   deleteDebt: (id: string) => Promise<void>;
   
-  // Метод для пополнения накоплений
-  addToSavings: (savingsId: string, amount: number) => Promise<void>;
-  withdrawFromSavings: (savingsId: string, amount: number) => Promise<void>;
+  // Методы для работы с целями
+  createGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt' | 'currentAmount'>) => Promise<void>;
+  updateGoal: (id: string, updates: Partial<Goal>) => Promise<void>;
+  deleteGoal: (id: string) => Promise<void>;
+  
+  // Методы для переводов в цели
+  transferToGoal: (goalId: string, accountId: string, amount: number, description?: string) => Promise<void>;
+  transferFromGoal: (goalId: string, accountId: string, amount: number, description?: string) => Promise<void>;
   
   // Методы для работы с категориями
   createCategory: (category: Omit<Category, 'id'>) => Promise<void>;
@@ -49,6 +56,9 @@ interface DataContextType {
     income: number;
     expense: number;
   };
+  
+  // Вспомогательные методы
+  getAccountReservedAmount: (accountId: string) => number;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -58,6 +68,8 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalTransfers, setGoalTransfers] = useState<GoalTransfer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalBalance, setTotalBalance] = useState(0);
 
@@ -71,6 +83,8 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       setTransactions([]);
       setCategories([]);
       setDebts([]);
+      setGoals([]);
+      setGoalTransfers([]);
       setTotalBalance(0);
     }
   }, [userId]);
@@ -129,11 +143,13 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       
       console.log('🗄️ [DataContext] Проверка готовности базы данных в refreshData:', true);
       
-      const [accountsFromDb, transactionsFromDb, categoriesFromDb, debtsFromDb] = await Promise.all([
+      const [accountsFromDb, transactionsFromDb, categoriesFromDb, debtsFromDb, goalsFromDb, goalTransfersFromDb] = await Promise.all([
         LocalDatabaseService.getAccounts(),
         LocalDatabaseService.getTransactions(),
         LocalDatabaseService.getCategories(),
-        LocalDatabaseService.getDebts()
+        LocalDatabaseService.getDebts(),
+        LocalDatabaseService.getGoals(),
+        LocalDatabaseService.getGoalTransfers()
       ]);
 
       console.log('📊 [DataContext] Данные из базы:');
@@ -141,6 +157,8 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       console.log('  - Транзакции:', transactionsFromDb.length);
       console.log('  - Категории:', categoriesFromDb.length);
       console.log('  - Долги:', debtsFromDb.length);
+      console.log('  - Цели:', goalsFromDb.length);
+      console.log('  - Переводы в цели:', goalTransfersFromDb.length);
 
       console.log('📊 [DataContext] Счета из базы:', accountsFromDb);
 
@@ -182,6 +200,8 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       setTransactions(transactionsFromDb);
       setCategories(categoriesFromDb);
       setDebts(debtsFromDb);
+      setGoals(goalsFromDb);
+      setGoalTransfers(goalTransfersFromDb);
 
       // Вычисляем общий баланс с конвертацией валют
       const total = accountsWithRates
@@ -363,45 +383,122 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
-  const addToSavings = async (savingsId: string, amount: number) => {
+  // Методы для работы с целями
+  const createGoal = async (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt' | 'currentAmount'>) => {
     try {
-      console.log('💰 [DataContext] Пополняем накопления:', savingsId, 'на сумму:', amount);
+      console.log('🎯 [DataContext] Создаем новую цель:', goal.name);
       
-      const savingsAccount = accounts.find(acc => acc.id === savingsId);
-      if (!savingsAccount) throw new Error('Savings account not found');
-      
-      await LocalDatabaseService.updateAccount(savingsId, {
-        savedAmount: (savingsAccount.savedAmount || 0) + amount
-      });
+      await LocalDatabaseService.createGoal({ ...goal, currentAmount: 0 });
       await refreshData();
       
-      console.log('✅ [DataContext] Накопления успешно пополнены');
+      console.log('✅ [DataContext] Цель успешно создана');
     } catch (error) {
-      console.error('❌ [DataContext] Ошибка пополнения накоплений:', error);
+      console.error('❌ [DataContext] Ошибка создания цели:', error);
       throw error;
     }
   };
 
-  const withdrawFromSavings = async (savingsId: string, amount: number) => {
+  const updateGoal = async (id: string, updates: Partial<Goal>) => {
     try {
-      console.log('💸 [DataContext] Снимаем с накоплений:', savingsId, 'сумму:', amount);
+      console.log('✏️ [DataContext] Обновляем цель:', id);
       
-      const savingsAccount = accounts.find(acc => acc.id === savingsId);
-      if (!savingsAccount) throw new Error('Savings account not found');
-      
-      const currentSavedAmount = savingsAccount.savedAmount || 0;
-      if (currentSavedAmount < amount) {
-        throw new Error('Insufficient savings amount');
-      }
-      
-      await LocalDatabaseService.updateAccount(savingsId, {
-        savedAmount: currentSavedAmount - amount
-      });
+      await LocalDatabaseService.updateGoal(id, updates);
       await refreshData();
       
-      console.log('✅ [DataContext] С накоплений успешно снято');
+      console.log('✅ [DataContext] Цель успешно обновлена');
     } catch (error) {
-      console.error('❌ [DataContext] Ошибка снятия с накоплений:', error);
+      console.error('❌ [DataContext] Ошибка обновления цели:', error);
+      throw error;
+    }
+  };
+
+  const deleteGoal = async (id: string) => {
+    try {
+      console.log('🗑️ [DataContext] Удаляем цель:', id);
+      
+      await LocalDatabaseService.deleteGoal(id);
+      await refreshData();
+      
+      console.log('✅ [DataContext] Цель успешно удалена');
+    } catch (error) {
+      console.error('❌ [DataContext] Ошибка удаления цели:', error);
+      throw error;
+    }
+  };
+
+  const transferToGoal = async (goalId: string, accountId: string, amount: number, description?: string) => {
+    try {
+      console.log('💰 [DataContext] Перевод в цель:', goalId, 'со счета:', accountId, 'сумма:', amount);
+      
+      const account = accounts.find(acc => acc.id === accountId);
+      const goal = goals.find(g => g.id === goalId);
+      
+      if (!account) throw new Error('Account not found');
+      if (!goal) throw new Error('Goal not found');
+      
+      // Проверяем доступную сумму (баланс минус уже зарезервированное в целях)
+      const reservedAmount = getAccountReservedAmount(accountId);
+      const availableAmount = account.balance - reservedAmount;
+      if (availableAmount < amount) throw new Error('Insufficient available funds');
+      
+      // Создаем перевод в цель (деньги остаются на счете, просто резервируются)
+      await LocalDatabaseService.createGoalTransfer({
+        goalId,
+        accountId,
+        amount,
+        description: description || `Перевод в цель "${goal.name}"`,
+        date: new Date().toISOString()
+      });
+      
+      // Обновляем сумму цели (НЕ трогаем баланс счета!)
+      await LocalDatabaseService.updateGoal(goalId, {
+        currentAmount: goal.currentAmount + amount
+      });
+      
+      await refreshData();
+      
+      console.log('✅ [DataContext] Перевод в цель успешно выполнен');
+    } catch (error) {
+      console.error('❌ [DataContext] Ошибка перевода в цель:', error);
+      throw error;
+    }
+  };
+
+  const transferFromGoal = async (goalId: string, accountId: string, amount: number, description?: string) => {
+    try {
+      console.log('💸 [DataContext] Перевод из цели:', goalId, 'на счет:', accountId, 'сумма:', amount);
+      
+      const account = accounts.find(acc => acc.id === accountId);
+      const goal = goals.find(g => g.id === goalId);
+      
+      if (!account) throw new Error('Account not found');
+      if (!goal) throw new Error('Goal not found');
+      if (goal.currentAmount < amount) throw new Error('Insufficient goal amount');
+      
+      // Создаем отрицательный перевод из цели
+      await LocalDatabaseService.createGoalTransfer({
+        goalId,
+        accountId,
+        amount: -amount,
+        description: description || `Перевод из цели "${goal.name}"`,
+        date: new Date().toISOString()
+      });
+      
+      // Обновляем баланс счета
+      await LocalDatabaseService.updateAccount(accountId, {
+        balance: account.balance + amount
+      });
+      
+      // Обновляем сумму цели
+      await LocalDatabaseService.updateGoal(goalId, {
+        currentAmount: goal.currentAmount - amount
+      });
+      
+      await refreshData();
+      
+      console.log('✅ [DataContext] Перевод из цели успешно выполнен');
+    } catch (error) {
+      console.error('❌ [DataContext] Ошибка перевода из цели:', error);
       throw error;
     }
   };
@@ -482,11 +579,20 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
+  // Вспомогательный метод для расчета зарезервированной суммы по счету
+  const getAccountReservedAmount = useCallback((accountId: string): number => {
+    return goalTransfers
+      .filter(transfer => transfer.accountId === accountId && transfer.amount > 0)
+      .reduce((sum, transfer) => sum + transfer.amount, 0);
+  }, [goalTransfers]);
+
   const value: DataContextType = {
     accounts,
     transactions,
     categories,
     debts,
+    goals,
+    goalTransfers,
     totalBalance,
     isLoading,
     createAccount,
@@ -498,14 +604,18 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     createCategory,
     updateCategory,
     deleteCategory,
-    addToSavings,
-    withdrawFromSavings,
+    createGoal,
+    updateGoal,
+    deleteGoal,
+    transferToGoal,
+    transferFromGoal,
     refreshData,
     resetAllData,
     createDebt,
     updateDebt,
     deleteDebt,
     getStatistics,
+    getAccountReservedAmount,
   };
 
   return (

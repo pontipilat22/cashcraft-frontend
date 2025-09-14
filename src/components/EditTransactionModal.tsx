@@ -16,7 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
-import { Transaction } from '../types';
+import { Transaction } from '../types/index';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 import { CURRENCIES } from '../config/currencies';
 import { LocalDatabaseService } from '../services/localDatabase';

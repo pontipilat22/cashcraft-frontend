@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 2,
+  version: 3,
   tables: [
     tableSchema({
       name: 'accounts',
@@ -90,6 +90,34 @@ export default appSchema({
       columns: [
         { name: 'last_sync_at', type: 'string', isOptional: true },
         { name: 'sync_token', type: 'string', isOptional: true },
+      ]
+    }),
+    tableSchema({
+      name: 'goals',
+      columns: [
+        { name: 'name', type: 'string' },
+        { name: 'target_amount', type: 'number' },
+        { name: 'current_amount', type: 'number' },
+        { name: 'currency', type: 'string' },
+        { name: 'color', type: 'string', isOptional: true },
+        { name: 'icon', type: 'string', isOptional: true },
+        { name: 'description', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+        { name: 'synced_at', type: 'number', isOptional: true },
+      ]
+    }),
+    tableSchema({
+      name: 'goal_transfers',
+      columns: [
+        { name: 'goal_id', type: 'string', isIndexed: true },
+        { name: 'account_id', type: 'string', isIndexed: true },
+        { name: 'amount', type: 'number' },
+        { name: 'description', type: 'string', isOptional: true },
+        { name: 'date', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+        { name: 'synced_at', type: 'number', isOptional: true },
       ]
     }),
   ]

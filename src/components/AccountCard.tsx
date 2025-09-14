@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Vibration, Platform
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Defs, RadialGradient, Stop, Circle, Mask } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
-import { Account } from '../types';
+import { Account } from '../types/index';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
@@ -80,21 +80,17 @@ interface AccountCardProps {
   account: Account;
   onPress: () => void;
   onLongPress?: () => void;
-  onAddToSavings?: () => void;
-  onWithdrawFromSavings?: () => void;
 }
 
 export const AccountCard: React.FC<AccountCardProps> = ({
   account,
   onPress,
   onLongPress,
-  onAddToSavings,
-  onWithdrawFromSavings,
 }) => {
   const { colors, isDark } = useTheme();
   const { defaultCurrency, formatAmount, getCurrencyInfo } = useCurrency();
   const { t } = useLocalization();
-  const { accounts } = useData();
+  const { accounts, getAccountReservedAmount } = useData();
   const [isPressed, setIsPressed] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   
@@ -204,13 +200,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     return Math.min((saved / account.targetAmount) * 100, 100);
   };
   
-  // Получаем сумму зарезервированную в накоплениях для данного счета
+  // Получаем сумму зарезервированную в целях для данного счета
   const getReservedAmount = () => {
     if (account.type === 'savings') return 0;
-    const linkedSavings = accounts.filter(acc => 
-      acc.type === 'savings' && acc.linkedAccountId === account.id
-    );
-    return linkedSavings.reduce((sum, saving) => sum + (saving.savedAmount || 0), 0);
+    return getAccountReservedAmount(account.id);
   };
 
   const calculateMonthlyPayment = () => {
@@ -379,29 +372,6 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     >
                       {Math.floor(getProgress())}%
                     </Text>
-                    {/* Компактные кнопки */}
-                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-                      <TouchableOpacity 
-                        style={[styles.compactButton, { 
-                          backgroundColor: isDark ? colors.card : '#f0f0f0',
-                          borderWidth: 1,
-                          borderColor: colors.border,
-                        }]}
-                        onPress={onAddToSavings}
-                      >
-                        <Ionicons name="add" size={16} color={colors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.compactButton, { 
-                          backgroundColor: isDark ? colors.card : '#f0f0f0',
-                          borderWidth: 1,
-                          borderColor: colors.border,
-                        }]}
-                        onPress={onWithdrawFromSavings}
-                      >
-                        <Ionicons name="remove" size={16} color={colors.textSecondary} />
-                      </TouchableOpacity>
-                    </View>
                   </View>
                 </View>
               </View>

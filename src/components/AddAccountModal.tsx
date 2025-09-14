@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
-import { AccountType, AccountTypeLabels } from '../types';
+import { AccountType, AccountTypeLabels } from '../types/index';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';

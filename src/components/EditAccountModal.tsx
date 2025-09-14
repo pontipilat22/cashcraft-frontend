@@ -14,7 +14,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
-import { Account, AccountType } from '../types';
+import { Account, AccountType } from '../types/index';
 
 interface EditAccountModalProps {
   visible: boolean;
