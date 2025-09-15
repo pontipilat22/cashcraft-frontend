@@ -1226,6 +1226,62 @@ export class WatermelonDatabaseService {
     });
   }
 
+  // ==========================================
+  // Методы для поиска записей по имени (для импорта CSV)
+  // ==========================================
+
+  static async findAccountByName(name: string): Promise<any> {
+    try {
+      const accounts = await database.get<Account>('accounts')
+        .query(Q.where('name', name))
+        .fetch();
+
+      return accounts.length > 0 ? accounts[0] : null;
+    } catch (error) {
+      console.error('Error finding account by name:', error);
+      return null;
+    }
+  }
+
+  static async findCategoryByName(name: string): Promise<any> {
+    try {
+      const categories = await database.get<Category>('categories')
+        .query(Q.where('name', name))
+        .fetch();
+
+      return categories.length > 0 ? categories[0] : null;
+    } catch (error) {
+      console.error('Error finding category by name:', error);
+      return null;
+    }
+  }
+
+  static async findDebtByName(name: string): Promise<any> {
+    try {
+      const debts = await database.get<Debt>('debts')
+        .query(Q.where('name', name))
+        .fetch();
+
+      return debts.length > 0 ? debts[0] : null;
+    } catch (error) {
+      console.error('Error finding debt by name:', error);
+      return null;
+    }
+  }
+
+  static async findGoalByName(name: string): Promise<any> {
+    try {
+      const goals = await database.get<Goal>('goals')
+        .query(Q.where('name', name))
+        .fetch();
+
+      return goals.length > 0 ? goals[0] : null;
+    } catch (error) {
+      console.error('Error finding goal by name:', error);
+      return null;
+    }
+  }
+
 }
 
 // Экспортируем как LocalDatabaseService для обратной совместимости

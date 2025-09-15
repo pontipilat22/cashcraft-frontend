@@ -1,5 +1,5 @@
 import { LocalDatabaseService } from './localDatabase';
-import { Account, Transaction, Category, Debt } from '../types';
+import { Account, Transaction, Category, Debt, Goal } from '../types';
 import { Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -9,11 +9,12 @@ export class DataExportImportService {
   static async exportToCSV(): Promise<string> {
     try {
       // Получаем все данные
-      const [accounts, transactions, categories, debts] = await Promise.all([
+      const [accounts, transactions, categories, debts, goals] = await Promise.all([
         LocalDatabaseService.getAccounts(),
         LocalDatabaseService.getTransactions(),
         LocalDatabaseService.getCategories(),
-        LocalDatabaseService.getDebts()
+        LocalDatabaseService.getDebts(),
+        LocalDatabaseService.getGoals()
       ]);
 
       let csvContent = '';
@@ -42,6 +43,11 @@ export class DataExportImportService {
       // Добавляем долги
       csvContent += '### DEBTS ###\n';
       csvContent += this.createDebtsCSV(debts);
+      csvContent += '\n\n';
+
+      // Добавляем цели
+      csvContent += '### GOALS ###\n';
+      csvContent += this.createGoalsCSV(goals);
 
       return csvContent;
     } catch (error) {
@@ -116,6 +122,23 @@ export class DataExportImportService {
     return this.arrayToCSV([headers, ...rows]);
   }
 
+  // Создание CSV для целей
+  private static createGoalsCSV(goals: Goal[]): string {
+    const headers = ['ID', 'Name', 'Target Amount', 'Current Amount', 'Currency', 'Icon', 'Description', 'Created At'];
+    const rows = goals.map(goal => [
+      goal.id,
+      goal.name,
+      goal.targetAmount,
+      goal.currentAmount,
+      goal.currency || 'USD',
+      goal.icon || '',
+      goal.description || '',
+      goal.createdAt
+    ]);
+
+    return this.arrayToCSV([headers, ...rows]);
+  }
+
   // Преобразование массива в CSV строку
   private static arrayToCSV(data: any[][]): string {
     return data.map(row => 
@@ -181,9 +204,14 @@ export class DataExportImportService {
         await this.importTransactions(sections.transactions);
       }
       
-      // И наконец долги
+      // Затем долги
       if (sections.debts) {
         await this.importDebts(sections.debts);
+      }
+
+      // И наконец цели
+      if (sections.goals) {
+        await this.importGoals(sections.goals);
       }
       
     } catch (error) {
@@ -347,26 +375,51 @@ export class DataExportImportService {
     }
   }
 
+  // Импорт целей
+  private static async importGoals(csvContent: string): Promise<void> {
+    const rows = this.parseCSV(csvContent);
+    const dataRows = rows.slice(1);
+
+    for (const row of dataRows) {
+      const goalData = {
+        name: row[1],
+        targetAmount: parseFloat(row[2]) || 0,
+        currentAmount: parseFloat(row[3]) || 0,
+        currency: row[4] || 'USD',
+        icon: row[5] || undefined,
+        description: row[6] || undefined
+      };
+
+      // Проверяем, не существует ли уже такая цель
+      const existing = await LocalDatabaseService.findGoalByName(goalData.name);
+      if (!existing) {
+        await LocalDatabaseService.createGoal(goalData);
+      }
+    }
+  }
+
   // Форматирование данных для отображения в UI
-  static formatExportPreview(csvContent: string): { 
-    accounts: number; 
-    transactions: number; 
-    categories: number; 
+  static formatExportPreview(csvContent: string): {
+    accounts: number;
+    transactions: number;
+    categories: number;
     debts: number;
+    goals: number;
     totalSize: string;
   } {
     const sections = this.parseSections(csvContent);
-    
+
     const countRows = (section: string | undefined): number => {
       if (!section) return 0;
       return this.parseCSV(section).length - 1; // Минус заголовки
     };
-    
+
     return {
       accounts: countRows(sections.accounts),
       transactions: countRows(sections.transactions),
       categories: countRows(sections.categories),
       debts: countRows(sections.debts),
+      goals: countRows(sections.goals),
       totalSize: `${(csvContent.length / 1024).toFixed(1)} KB`
     };
   }

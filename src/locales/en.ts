@@ -303,6 +303,7 @@ export default {
     enterName: 'Enter name',
     cannotDeleteDefault: 'Default category "Other" cannot be deleted',
     deleteCategory: 'Delete category?',
+    deleteCategoryMessage: 'All transactions in "{{name}}" category will be moved to "Other"',
     deleteError: 'Failed to delete category',
     addCategory: 'Add category',
   },

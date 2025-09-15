@@ -281,6 +281,7 @@ export default {
     enterName: 'Введите название',
     cannotDeleteDefault: 'Базовую категорию "Другое" нельзя удалить',
     deleteCategory: 'Удалить категорию?',
+    deleteCategoryMessage: 'Все транзакции категории "{{name}}" будут перемещены в "Другое"',
     deleteError: 'Не удалось удалить категорию',
     addCategory: 'Добавить категорию',
   },

@@ -270,6 +270,14 @@ export const ExportImportScreen: React.FC = () => {
                 </View>
                 <View style={styles.statRow}>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                    {t('goals.title') || 'Цели'}:
+                  </Text>
+                  <Text style={[styles.statValue, { color: colors.text }]}>
+                    {getExportPreview()!.goals}
+                  </Text>
+                </View>
+                <View style={styles.statRow}>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
                     {t('export.size') || 'Размер'}:
                   </Text>
                   <Text style={[styles.statValue, { color: colors.text }]}>

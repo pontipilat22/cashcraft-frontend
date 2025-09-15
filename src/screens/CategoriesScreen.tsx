@@ -110,9 +110,12 @@ export const CategoriesScreen: React.FC = () => {
                   {localizedCategory.name}
                 </Text>
                 {(category.id !== 'other_income' && category.id !== 'other_expense') && (
-                  <View style={styles.deleteHint}>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteCategory(category)}
+                  >
                     <Ionicons name="trash-outline" size={16} color={colors.textSecondary} />
-                  </View>
+                  </TouchableOpacity>
                 )}
               </TouchableOpacity>
             );
@@ -189,11 +192,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  deleteHint: {
+  deleteButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    opacity: 0.5,
+    top: 4,
+    right: 4,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
   },
   addButton: {
     borderStyle: 'dashed',
