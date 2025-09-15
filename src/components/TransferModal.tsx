@@ -71,7 +71,8 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   ];
   
   // Проверяем, достаточно ли счетов для перевода
-  const canTransfer = accounts.length >= 2;
+  // Для переводов в цели нужен только 1 счет, для переводов между счетами - 2
+  const canTransfer = accounts.length >= 1;
   
   useEffect(() => {
     if (!fromAccountId && sourceAccounts.length > 0) {

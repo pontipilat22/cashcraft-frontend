@@ -16,6 +16,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { TransactionItem } from '../components/TransactionItem';
 import { TransactionActionsModal } from '../components/TransactionActionsModal';
 import { EditTransactionModal } from '../components/EditTransactionModal';
@@ -24,7 +26,10 @@ import { NewFABMenu } from '../components/NewFABMenu';
 import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { TransferModal } from '../components/TransferModal';
-import { Transaction } from '../types/index';
+import { AddAccountModal } from '../components/AddAccountModal';
+import { AccountTypeSelector } from '../components/AccountTypeSelector';
+import { AddGoalModal } from '../components/AddGoalModal';
+import { Transaction, AccountType } from '../types/index';
 import { useLocalization } from '../context/LocalizationContext';
 import { getCurrentLanguage } from '../services/i18n';
 import { CURRENCIES } from '../config/currencies';
@@ -128,9 +133,11 @@ const ListHeader = React.memo(({
 
 export const TransactionsScreen = () => {
   const { colors } = useTheme();
-  const { transactions, accounts, categories, totalBalance, isLoading, deleteTransaction, refreshData } = useData();
+  const { transactions, accounts, categories, goals, totalBalance, isLoading, deleteTransaction, refreshData, createAccount, createGoal } = useData();
   const { t } = useLocalization();
   const { defaultCurrency } = useCurrency();
+  const { user } = useAuth();
+  const { isPremium, checkIfPremium } = useSubscription();
   const currentLanguage = getCurrentLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -153,6 +160,12 @@ export const TransactionsScreen = () => {
   const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
+
+  // Состояния для создания счетов и целей
+  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
+  const [showAddGoalModal, setShowAddGoalModal] = useState(false);
+  const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
+  const [selectedAccountType, setSelectedAccountType] = useState<AccountType>('card');
 
   const handleDateFilterChange = (filter: string) => {
     setDateFilter(filter as 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom');
@@ -450,6 +463,144 @@ export const TransactionsScreen = () => {
     setShowDebtOperationModal(true);
   }, []);
 
+  const handleAddAccount = useCallback(async (section: AccountType) => {
+    // Всегда проверяем актуальный статус подписки
+    const hasPremium = await checkIfPremium();
+
+    // Простая логика: без подписки - максимум 2 счета ВСЕГО
+    const MAX_FREE_ACCOUNTS = 2;
+
+    if (!hasPremium && accounts.length >= MAX_FREE_ACCOUNTS) {
+      if (user?.isGuest) {
+        Alert.alert(
+          'Требуется авторизация',
+          `Гостевые пользователи могут создать только ${MAX_FREE_ACCOUNTS} счета. Войдите в аккаунт и оформите подписку для неограниченного количества счетов.`,
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: 'Войти в аккаунт',
+              onPress: () => {
+                // Здесь можно добавить навигацию к экрану входа
+              },
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Лимит счетов',
+          `В бесплатной версии можно создать только ${MAX_FREE_ACCOUNTS} счета. Оформите подписку для неограниченного количества счетов.`,
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: 'Подписка',
+              onPress: () => {
+                // Здесь можно добавить навигацию к экрану подписки
+              },
+            }
+          ]
+        );
+      }
+      return;
+    }
+
+    setSelectedAccountType(section);
+    setShowAddAccountModal(true);
+  }, [checkIfPremium, accounts.length, user, t]);
+
+  const handleAddGoal = useCallback(async () => {
+    // Всегда проверяем актуальный статус подписки
+    const hasPremium = await checkIfPremium();
+
+    // Простая логика: без подписки - максимум 2 цели ВСЕГО
+    const MAX_FREE_GOALS = 2;
+
+    if (!hasPremium && goals.length >= MAX_FREE_GOALS) {
+      if (user?.isGuest) {
+        Alert.alert(
+          'Требуется авторизация',
+          `Гостевые пользователи могут создать только ${MAX_FREE_GOALS} цели. Войдите в аккаунт и оформите подписку для неограниченного количества целей.`,
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: 'Войти в аккаунт',
+              onPress: () => {
+                // Здесь можно добавить навигацию к экрану входа
+              },
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Лимит целей',
+          `В бесплатной версии можно создать только ${MAX_FREE_GOALS} цели. Оформите подписку для неограниченного количества целей.`,
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: 'Подписка',
+              onPress: () => {
+                // Здесь можно добавить навигацию к экрану подписки
+              },
+            }
+          ]
+        );
+      }
+      return;
+    }
+
+    setShowAddGoalModal(true);
+  }, [checkIfPremium, goals.length, user, t]);
+
+  const handleCreateAccount = useCallback(async (data: {
+    name: string;
+    balance: number;
+    currency?: string;
+    exchangeRate?: number;
+    cardNumber?: string;
+  }) => {
+    try {
+      await createAccount({
+        name: data.name,
+        type: selectedAccountType,
+        balance: data.balance,
+        currency: data.currency || defaultCurrency,
+        exchangeRate: data.exchangeRate,
+        cardNumber: data.cardNumber,
+      });
+      setShowAddAccountModal(false);
+    } catch (error) {
+      console.error('Error creating account:', error);
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'));
+    }
+  }, [createAccount, selectedAccountType, defaultCurrency, t]);
+
+  const handleCreateGoal = useCallback(async (data: {
+    name: string;
+    targetAmount: number;
+    currency: string;
+    icon?: string;
+    description?: string;
+  }) => {
+    try {
+      await createGoal(data);
+      setShowAddGoalModal(false);
+    } catch (error) {
+      console.error('Error creating goal:', error);
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'));
+    }
+  }, [createGoal, t]);
+
   const clearSearch = useCallback(() => {
     setSearchQuery('');
   }, []);
@@ -595,8 +746,9 @@ export const TransactionsScreen = () => {
           onExpensePress={handleQuickExpense}
           onTransferPress={handleQuickTransfer}
           onDebtPress={handleQuickDebt}
-          onAddAccountPress={() => {
-          }}
+          onAddAccountPress={() => handleAddAccount('card')}
+          onAddSavingsPress={handleAddGoal}
+          onAddCreditPress={() => handleAddAccount('credit')}
         />
       )}
 
@@ -682,6 +834,32 @@ export const TransactionsScreen = () => {
         }}
         initialStartDate={customStartDate}
         initialEndDate={customEndDate}
+      />
+
+      {showAddAccountModal && (
+        <AddAccountModal
+          visible={showAddAccountModal}
+          onClose={() => setShowAddAccountModal(false)}
+          accountType={selectedAccountType}
+          onSave={handleCreateAccount}
+        />
+      )}
+
+      {showAddGoalModal && (
+        <AddGoalModal
+          visible={showAddGoalModal}
+          onClose={() => setShowAddGoalModal(false)}
+          onSave={handleCreateGoal}
+        />
+      )}
+
+      <AccountTypeSelector
+        visible={typeSelectorVisible}
+        onClose={() => setTypeSelectorVisible(false)}
+        onSelect={(type) => {
+          setTypeSelectorVisible(false);
+          handleAddAccount(type);
+        }}
       />
     </View>
   );

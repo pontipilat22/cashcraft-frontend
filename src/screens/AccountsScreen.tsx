@@ -15,7 +15,7 @@ import { EditAccountModal } from '../components/EditAccountModal';
 import { AccountTypeSelector } from '../components/AccountTypeSelector';
 import { AccountActionsModal } from '../components/AccountActionsModal';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { AccountType, Account, Debt } from '../types/index';
+import { AccountType, Account, Debt, Goal } from '../types/index';
 import { AddTransactionModal } from '../components/AddTransactionModal';
 import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
@@ -350,11 +350,13 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   };
 
   const handleQuickTransfer = () => {
-    // Проверяем количество счетов
-    if (accounts.length < 2) {
+    // Проверяем возможность перевода: нужен минимум 1 счет и либо еще один счет, либо цели
+    const canTransfer = accounts.length >= 1 && (accounts.length >= 2 || goals.length > 0);
+
+    if (!canTransfer) {
       Alert.alert(
         t('transactions.transfer'),
-        t('accounts.needTwoAccountsForTransfer') || 'Для перевода необходимо иметь минимум два счета',
+        t('accounts.needAccountsOrGoalsForTransfer') || 'Для перевода необходимо иметь минимум один счет и еще один счет или цель для перевода',
         [
           {
             text: t('common.close') || 'Закрыть',
@@ -371,6 +373,31 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       );
       return;
     }
+    setShowTransferModal(true);
+  };
+
+  const handleGoalPress = (goal: Goal) => {
+    // Проверяем, есть ли счета для перевода в цель
+    if (accounts.length < 1) {
+      Alert.alert(
+        t('transactions.transfer'),
+        t('accounts.needAccountForGoalTransfer') || 'Для перевода в цель необходимо иметь минимум один счет',
+        [
+          {
+            text: t('common.close') || 'Закрыть',
+            style: 'cancel'
+          },
+          {
+            text: t('accounts.openAccount') || 'Открыть счет',
+            onPress: () => {
+              setTypeSelectorVisible(true);
+            }
+          }
+        ]
+      );
+      return;
+    }
+    // Открываем модалку переводов
     setShowTransferModal(true);
   };
 
@@ -576,7 +603,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                   <AccountCard
                     key={goal.id}
                     account={goalAsAccount}
-                    onPress={() => {}}
+                    onPress={() => handleGoalPress(goal)}
                     onLongPress={() => handleGoalLongPress(goal)}
                   />
                 );
