@@ -96,7 +96,13 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({
   }, [goal, visible]);
 
   const handleSave = async () => {
-    if (!goal) return;
+    console.log('💾 [EditGoalModal] handleSave called');
+    if (!goal) {
+      console.log('❌ [EditGoalModal] No goal selected');
+      return;
+    }
+
+    console.log('📋 [EditGoalModal] Current goal:', goal);
 
     const newErrors: {[key: string]: boolean} = {};
 
@@ -112,22 +118,27 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
+      console.log('❌ [EditGoalModal] Validation errors:', newErrors);
       setShowErrors(true);
       return;
     }
 
-    try {
-      await onSave(goal.id, {
-        name: name.trim(),
-        targetAmount: amount,
-        currency: defaultCurrency,
-        icon: selectedIcon,
-        description: description.trim() || undefined,
-      });
+    const updateData = {
+      name: name.trim(),
+      targetAmount: amount,
+      currency: defaultCurrency,
+      icon: selectedIcon,
+      description: description.trim() || undefined,
+    };
 
+    console.log('📤 [EditGoalModal] Sending update data:', updateData);
+
+    try {
+      await onSave(goal.id, updateData);
+      console.log('✅ [EditGoalModal] Goal updated successfully');
       handleClose();
     } catch (error) {
-      console.error('Error updating goal:', error);
+      console.error('❌ [EditGoalModal] Error updating goal:', error);
       Alert.alert(t('common.error'), t('common.somethingWentWrong'));
     }
   };
@@ -315,7 +326,10 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({
 
           <TouchableOpacity
             style={[styles.saveButton, { backgroundColor: colors.primary }]}
-            onPress={handleSave}
+            onPress={() => {
+              console.log('🔘 [EditGoalModal] Save button pressed');
+              handleSave();
+            }}
           >
             <Text style={styles.saveButtonText}>
               {t('common.save')}

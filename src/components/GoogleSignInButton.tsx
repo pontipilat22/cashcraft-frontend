@@ -24,6 +24,7 @@ interface GoogleSignInButtonProps {
   onError?: (error: Error) => void;
   showSignOut?: boolean;
   forceAccountSelection?: boolean;
+  onPress?: () => boolean; // Returns true if validation passes, false otherwise
 }
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
@@ -31,6 +32,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   onError,
   showSignOut = false,
   forceAccountSelection = false,
+  onPress,
 }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -164,10 +166,22 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     );
   }
 
+  const handlePress = () => {
+    // If there's an external onPress handler, call it first (for validation)
+    if (onPress) {
+      const shouldProceed = onPress();
+      if (!shouldProceed) {
+        return; // Validation failed, don't proceed
+      }
+    }
+    // If no external handler or validation passed, proceed with Google Sign-In
+    handleGoogleSignIn();
+  };
+
   return (
     <TouchableOpacity
       style={[styles.button, { backgroundColor: '#FFFFFF', borderColor: '#DADCE0' }]}
-      onPress={handleGoogleSignIn}
+      onPress={handlePress}
       disabled={loading}
     >
       {loading ? (

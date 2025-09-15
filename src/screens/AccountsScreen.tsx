@@ -492,7 +492,13 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
 
   const handleEditGoal = () => {
     setShowGoalActionsModal(false);
+    // Не сбрасываем selectedGoal здесь, так как он нужен для EditGoalModal
     setShowEditGoalModal(true);
+  };
+
+  const handleGoalActionsClose = () => {
+    setShowGoalActionsModal(false);
+    setSelectedGoal(null);
   };
 
   const handleDeleteGoal = async () => {
@@ -532,12 +538,14 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     icon?: string;
     description?: string;
   }) => {
+    console.log('🎯 [AccountsScreen] handleUpdateGoal called:', { goalId, data });
     try {
       await updateGoal(goalId, data);
+      console.log('✅ [AccountsScreen] Goal updated successfully');
       setShowEditGoalModal(false);
       setSelectedGoal(null);
     } catch (error) {
-      console.error('Error updating goal:', error);
+      console.error('❌ [AccountsScreen] Error updating goal:', error);
       Alert.alert(t('common.error'), t('common.somethingWentWrong'));
     }
   };
@@ -772,10 +780,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       <GoalActionsModal
         visible={showGoalActionsModal}
         goalName={selectedGoal?.name || ''}
-        onClose={() => {
-          setShowGoalActionsModal(false);
-          setSelectedGoal(null);
-        }}
+        onClose={handleGoalActionsClose}
         onEdit={handleEditGoal}
         onDelete={handleDeleteGoal}
       />

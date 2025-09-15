@@ -31,7 +31,6 @@ import { AccountTypeSelector } from '../components/AccountTypeSelector';
 import { AddGoalModal } from '../components/AddGoalModal';
 import { Transaction, AccountType } from '../types/index';
 import { useLocalization } from '../context/LocalizationContext';
-import { getCurrentLanguage } from '../services/i18n';
 import { CURRENCIES } from '../config/currencies';
 import { SectionHeader } from '../components/SectionHeader';
 import { DateRangePicker } from '../components/DateRangePicker';
@@ -134,11 +133,12 @@ const ListHeader = React.memo(({
 export const TransactionsScreen = () => {
   const { colors } = useTheme();
   const { transactions, accounts, categories, goals, totalBalance, isLoading, deleteTransaction, refreshData, createAccount, createGoal } = useData();
-  const { t } = useLocalization();
+  const { t, currentLanguage } = useLocalization();
   const { defaultCurrency } = useCurrency();
   const { user } = useAuth();
+
+  console.log('🌐 [TransactionsScreen] Current language:', currentLanguage);
   const { isPremium, checkIfPremium } = useSubscription();
-  const currentLanguage = getCurrentLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showActionsModal, setShowActionsModal] = useState(false);
@@ -642,20 +642,26 @@ export const TransactionsScreen = () => {
     );
   }, [categories, accounts, handleLongPress, handleTransactionPress, selectedIds, isSelectionMode]);
 
-  const ListEmptyComponent = useMemo(() => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="receipt-outline" size={64} color={colors.textSecondary} />
-      <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-        {debouncedSearchQuery ? t('transactions.notFound') : t('transactions.noTransactions')}
-      </Text>
-      <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-        {debouncedSearchQuery 
-          ? t('transactions.changeSearchQuery') 
-          : t('transactions.addFirstTransaction')
-        }
-      </Text>
-    </View>
-  ), [colors, debouncedSearchQuery, t]);
+  const ListEmptyComponent = useMemo(() => {
+    const noTransactionsText = t('transactions.noTransactions');
+    const addFirstTransactionText = t('transactions.addFirstTransaction');
+    console.log('🔍 [TransactionsScreen] Empty component texts:', { noTransactionsText, addFirstTransactionText });
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="receipt-outline" size={64} color={colors.textSecondary} />
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          {debouncedSearchQuery ? t('transactions.notFound') : noTransactionsText}
+        </Text>
+        <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+          {debouncedSearchQuery
+            ? t('transactions.changeSearchQuery')
+            : addFirstTransactionText
+          }
+        </Text>
+      </View>
+    );
+  }, [colors, debouncedSearchQuery, t]);
 
   if (isLoading) {
     return (

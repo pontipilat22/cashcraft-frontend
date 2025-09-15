@@ -21,9 +21,11 @@ import { SubscriptionProvider } from './src/context/SubscriptionContext';
 import { LocalizationProvider } from './src/context/LocalizationContext';
 import { CurrencyProvider, useCurrency } from './src/context/CurrencyContext';
 
-import { AuthScreen } from './src/screens/AuthScreen';
+import { AuthNavigator } from './src/navigation/AuthNavigator';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { SplashScreen } from './src/components/SplashScreen';
 import { LocalDatabaseService } from './src/services/localDatabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Предотвращаем автоматическое скрытие нативного splash screen
 SplashScreenExpo.preventAutoHideAsync();
@@ -35,10 +37,29 @@ function AppContent() {
   const { defaultCurrency } = useCurrency();
   const [dataProviderKey, setDataProviderKey] = useState(0);
   const [showSplash, setShowSplash] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(true);
 
   // Скрываем нативный сплэш-скрин сразу
   useEffect(() => {
     SplashScreenExpo.hideAsync();
+  }, []);
+
+  // Проверяем, был ли пройден onboarding
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      try {
+        const onboardingCompleted = await AsyncStorage.getItem('onboardingCompleted');
+        setShowOnboarding(!onboardingCompleted);
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+        setShowOnboarding(true); // Показываем onboarding в случае ошибки
+      } finally {
+        setOnboardingLoading(false);
+      }
+    };
+
+    checkOnboardingStatus();
   }, []);
 
   // Показываем кастомный сплэш-скрин на 10 секунд
@@ -64,15 +85,29 @@ function AppContent() {
     }
   }, [user, isPreparing, defaultCurrency]);
 
+  // Обработчик завершения onboarding
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
+
   // Показываем сплэш-скрин в течение 10 секунд или пока идет загрузка
-  if (showSplash || authLoading || isPreparing) {
+  if (showSplash || authLoading || isPreparing || onboardingLoading) {
     return <SplashScreen />;
+  }
+
+  // Показываем onboarding для новых пользователей
+  if (showOnboarding) {
+    return (
+      <SafeAreaProvider>
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+      </SafeAreaProvider>
+    );
   }
 
   return (
     <SafeAreaProvider>
       {!user ? (
-        <AuthScreen />
+        <AuthNavigator />
       ) : (
         <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
           <SubscriptionProvider userId={user.id} isGuest={user.isGuest}>

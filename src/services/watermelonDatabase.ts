@@ -1163,18 +1163,28 @@ export class WatermelonDatabaseService {
   }
 
   static async updateGoal(id: string, updates: any): Promise<void> {
-    await database.write(async () => {
-      const goal = await database.get<Goal>('goals').find(id);
-      await goal.update(g => {
-        if (updates.name !== undefined) g.name = updates.name;
-        if (updates.targetAmount !== undefined) g.targetAmount = updates.targetAmount;
-        if (updates.currentAmount !== undefined) g.currentAmount = updates.currentAmount;
-        if (updates.currency !== undefined) g.currency = updates.currency;
-        if (updates.color !== undefined) g.color = updates.color;
-        if (updates.icon !== undefined) g.icon = updates.icon;
-        if (updates.description !== undefined) g.description = updates.description;
+    console.log('🔧 [LocalDatabaseService] updateGoal called with:', { id, updates });
+    try {
+      await database.write(async () => {
+        const goal = await database.get<Goal>('goals').find(id);
+        console.log('📝 [LocalDatabaseService] Found goal:', goal._raw);
+
+        await goal.update(g => {
+          if (updates.name !== undefined) g.name = updates.name;
+          if (updates.targetAmount !== undefined) g.targetAmount = updates.targetAmount;
+          if (updates.currentAmount !== undefined) g.currentAmount = updates.currentAmount;
+          if (updates.currency !== undefined) g.currency = updates.currency;
+          if (updates.color !== undefined) g.color = updates.color;
+          if (updates.icon !== undefined) g.icon = updates.icon;
+          if (updates.description !== undefined) g.description = updates.description;
+        });
+
+        console.log('✅ [LocalDatabaseService] Goal updated successfully');
       });
-    });
+    } catch (error) {
+      console.error('❌ [LocalDatabaseService] Error updating goal:', error);
+      throw error;
+    }
   }
 
   static async deleteGoal(id: string): Promise<void> {

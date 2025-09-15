@@ -31,6 +31,7 @@ import { CurrencyDiagnostics } from '../components/CurrencyDiagnostics';
 import { ApiService } from '../services/api';
 import { AuthService } from '../services/auth';
 import { pinService } from '../services/pinService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 type ExchangeRates = { [accountId: string]: { 
@@ -146,6 +147,7 @@ export const SettingsScreen: React.FC = () => {
       console.error('Logout error:', error);
     }
   };
+
 
 
 
@@ -461,7 +463,8 @@ export const SettingsScreen: React.FC = () => {
             undefined,
             () => {}
           )}
-          
+
+
           {/* Только для разработки - тест соединения */}
           {__DEV__ && renderSettingItem(
             'bug-outline',

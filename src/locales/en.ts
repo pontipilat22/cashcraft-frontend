@@ -116,6 +116,17 @@ export default {
     invalidData: 'Please check entered data',
     emailExists: 'User with this email already exists',
     guestLoginError: 'Failed to sign in as guest',
+    welcomeTitle: 'Welcome',
+    welcomeSubtitle: 'Sign in to continue',
+    agreeToTerms: 'I agree to the',
+    and: 'and',
+    termsRequired: 'Terms Required',
+    pleaseAcceptTerms: 'Please accept the terms of service and privacy policy to continue',
+    terms: 'Terms of Service',
+    privacy: 'Privacy Policy',
+    termsOfService: 'Terms of Service',
+    privacyPolicy: 'Privacy Policy',
+    signOutGoogle: 'Sign Out from Google',
   },
   navigation: {
     transactions: 'Transactions',
@@ -226,6 +237,7 @@ export default {
     selectColor: 'Select Color',
     tapToSelectIcon: 'Tap to select icon',
     tapToSelectColor: 'Tap to select color',
+    goalNameRequired: 'Goal name is required',
   },
   transactions: {
     title: 'Transactions',
@@ -368,7 +380,7 @@ export default {
         message: 'Tokens cleared. Please login again.'
       },
       error: 'Error clearing tokens'
-    }
+    },
   },
   currencies: {
     USD: 'US Dollar',

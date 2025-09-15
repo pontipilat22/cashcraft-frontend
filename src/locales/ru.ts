@@ -76,6 +76,17 @@ export default {
     invalidData: 'Проверьте введенные данные',
     emailExists: 'Пользователь с таким email уже существует',
     guestLoginError: 'Не удалось войти как гость',
+    welcomeTitle: 'Добро пожаловать',
+    welcomeSubtitle: 'Войдите, чтобы продолжить',
+    agreeToTerms: 'Я согласен с',
+    and: 'и',
+    termsRequired: 'Требуется согласие',
+    pleaseAcceptTerms: 'Пожалуйста, примите условия использования и политику конфиденциальности для продолжения',
+    terms: 'Условия использования',
+    privacy: 'Политика конфиденциальности',
+    termsOfService: 'Условия использования',
+    privacyPolicy: 'Политика конфиденциальности',
+    signOutGoogle: 'Выйти из Google',
   },
   navigation: {
     transactions: 'Операции',
@@ -196,6 +207,7 @@ export default {
     selectColor: 'Выбрать цвет',
     tapToSelectIcon: 'Нажмите для выбора иконки',
     tapToSelectColor: 'Нажмите для выбора цвета',
+    goalNameRequired: 'Название цели обязательно',
   },
   transactions: {
     title: 'Операции',
@@ -299,6 +311,7 @@ export default {
     shareApp: 'Поделиться',
     privacyPolicy: 'Политика конфиденциальности',
     termsOfService: 'Условия использования',
+    terms: 'Условия использования',
     enterExchangeRates: 'Введите курсы обмена',
     exchangeRatesDescription: 'Пожалуйста, введите курсы обмена для ваших счетов в других валютах к {{currency}}',
     success: 'Успешно',
@@ -346,7 +359,7 @@ export default {
         message: 'Токены очищены. Теперь войдите заново.'
       },
       error: 'Ошибка при очистке токенов'
-    }
+    },
   },
   currencies: {
     USD: 'Доллар США',

@@ -5,6 +5,7 @@ import { MoreScreen } from '../screens/MoreScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { CategoriesScreen } from '../screens/CategoriesScreen';
 import { PrivacyPolicyScreen } from '../screens/PrivacyPolicyScreen';
+import { TermsOfServiceScreen } from '../screens/TermsOfServiceScreen';
 import { HelpScreen } from '../screens/HelpScreen';
 import { ExportImportScreen } from '../screens/ExportImportScreen';
 import { SetPinScreen } from '../screens/SetPinScreen';
@@ -15,6 +16,7 @@ export type MoreStackParamList = {
   Categories: undefined;
   Statistics: undefined;
   PrivacyPolicy: undefined;
+  TermsOfService: undefined;
   Help: undefined;
   ExportImport: undefined;
   SetPin: { isChangingPin?: boolean } | undefined;
@@ -53,6 +55,11 @@ export const MoreNavigator: React.FC = () => {
       <Stack.Screen
         name="PrivacyPolicy"
         component={PrivacyPolicyScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="TermsOfService"
+        component={TermsOfServiceScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
