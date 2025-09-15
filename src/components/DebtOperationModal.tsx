@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Switch,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -51,6 +52,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   const [existingDebts, setExistingDebts] = useState<Debt[]>([]);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [transactionDate, setTransactionDate] = useState(new Date());
+  const [createNewDebt, setCreateNewDebt] = useState(false);
 
   // ⬇️ единый хук выбора даты: он будет управлять модалкой и датой
   const datePicker = useDatePicker({
@@ -62,6 +64,15 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
   useEffect(() => {
     if (visible && (operationType === 'return' || operationType === 'payback')) {
       loadExistingDebts();
+    }
+
+    if (!visible) {
+      // Сбрасываем состояние при закрытии модала
+      setCreateNewDebt(false);
+      setSelectedDebt(null);
+      setAmount('');
+      setPerson('');
+      setDescription('');
     }
   }, [visible, operationType]);
 
@@ -118,7 +129,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
       return;
     }
 
-    if (!person.trim() && !selectedDebt) {
+    if (!person.trim() && !selectedDebt && !createNewDebt) {
       Alert.alert(t('common.error'), t('debts.personNameError'));
       return;
     }
@@ -146,25 +157,37 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
         });
       } else {
         // Погашаем долг
-        if (!selectedDebt) {
+        if (!selectedDebt && !createNewDebt) {
           Alert.alert(t('common.error'), t('debts.selectDebtForPayment'));
           return;
         }
 
-        if (amountNum > selectedDebt.amount) {
-          Alert.alert(t('common.error'), t('debts.amountExceedsDebt', { 
-            amount: selectedDebt.amount.toLocaleString('ru-RU'), 
-            currency: currencySymbol 
-          }));
-          return;
-        }
-
-        // Обновляем или удаляем долг
-        const newAmount = selectedDebt.amount - amountNum;
-        if (newAmount <= 0) {
-          await LocalDatabaseService.deleteDebt(selectedDebt.id);
+        if (createNewDebt) {
+          // Создаем новый долг с отрицательной суммой (уже погашенный)
+          // Это означает, что долг был взят в прошлом и сейчас возвращается
+          await LocalDatabaseService.createDebt({
+            type: operationType === 'return' ? 'owed_to_me' : 'owed_by_me',
+            name: personName,
+            amount: 0, // Сразу создаем погашенный долг
+            isIncludedInTotal: true
+          });
         } else {
-          await LocalDatabaseService.updateDebt(selectedDebt.id, { amount: newAmount });
+          // Работаем с существующим долгом
+          if (amountNum > selectedDebt.amount) {
+            Alert.alert(t('common.error'), t('debts.amountExceedsDebt', {
+              amount: selectedDebt.amount.toLocaleString('ru-RU'),
+              currency: currencySymbol
+            }));
+            return;
+          }
+
+          // Обновляем или удаляем долг
+          const newAmount = selectedDebt.amount - amountNum;
+          if (newAmount <= 0) {
+            await LocalDatabaseService.deleteDebt(selectedDebt.id);
+          } else {
+            await LocalDatabaseService.updateDebt(selectedDebt.id, { amount: newAmount });
+          }
         }
 
         // Создаем транзакцию
@@ -294,7 +317,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
               <Text style={[styles.label, { color: colors.textSecondary }]}>
                 {getPersonLabel()}
               </Text>
-              {isReturnOperation && existingDebts.length > 0 ? (
+              {isReturnOperation && existingDebts.length > 0 && !createNewDebt ? (
                 <TouchableOpacity
                   style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
                   onPress={() => setShowPersonPicker(true)}
@@ -316,6 +339,33 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
                   placeholder={t('debts.personPlaceholder')}
                   placeholderTextColor={colors.textSecondary}
                 />
+              )}
+
+              {/* Чекбокс для создания нового долга при возврате */}
+              {isReturnOperation && (
+                <View style={[styles.switchContainer, { borderTopColor: colors.border }]}>
+                  <View style={styles.switchContent}>
+                    <View style={styles.switchTextContainer}>
+                      <Text style={[styles.switchLabel, { color: colors.text }]}>
+                        Создать новый долг
+                      </Text>
+                      <Text style={[styles.switchDescription, { color: colors.textSecondary }]}>
+                        Если нужно вернуть забытый долг, не создавая его заранее
+                      </Text>
+                    </View>
+                    <Switch
+                      value={createNewDebt}
+                      onValueChange={(value) => {
+                        setCreateNewDebt(value);
+                        if (value) {
+                          setSelectedDebt(null); // Сбрасываем выбранный долг
+                        }
+                      }}
+                      trackColor={{ false: colors.border, true: colors.primary + '40' }}
+                      thumbColor={createNewDebt ? colors.primary : colors.textSecondary}
+                    />
+                  </View>
+                </View>
               )}
             </View>
 
@@ -387,7 +437,7 @@ export const DebtOperationModal: React.FC<DebtOperationModalProps> = ({
             <TouchableOpacity
               style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
               onPress={handleSave}
-              disabled={!amount || parseFloat(amount) === 0 || (!person.trim() && !selectedDebt)}
+              disabled={!amount || parseFloat(amount) === 0 || (!person.trim() && !selectedDebt && !createNewDebt)}
             >
               <Text style={[styles.buttonText, { color: '#fff' }]}>{t('common.save')}</Text>
             </TouchableOpacity>
@@ -722,5 +772,28 @@ const styles = StyleSheet.create({
   datePickerButton: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  switchContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  switchContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  switchTextContainer: {
+    flex: 1,
+    marginRight: 16,
+  },
+  switchLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  switchDescription: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

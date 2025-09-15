@@ -185,6 +185,8 @@ export default {
   },
   goals: {
     createGoal: 'Создать цель',
+    addGoal: 'Добавить цель',
+    goal: 'цель',
     goalName: 'Название цели',
     goalNamePlaceholder: 'Например: Отпуск в Италию',
     targetAmount: 'Целевая сумма',

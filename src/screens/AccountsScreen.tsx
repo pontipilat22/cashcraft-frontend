@@ -27,6 +27,8 @@ import { TransferModal } from '../components/TransferModal';
 import { StatisticsCard } from '../components/StatisticsCard';
 import { SubscriptionScreen } from './SubscriptionScreen';
 import { AddGoalModal } from '../components/AddGoalModal';
+import { EditGoalModal } from '../components/EditGoalModal';
+import { GoalActionsModal } from '../components/GoalActionsModal';
 
 type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
 
@@ -36,7 +38,7 @@ interface AccountsScreenProps {
 
 export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
-  const { accounts, goals, isLoading, createAccount, updateAccount, deleteAccount, createGoal, refreshData } = useData();
+  const { accounts, goals, isLoading, createAccount, updateAccount, deleteAccount, createGoal, updateGoal, deleteGoal, refreshData } = useData();
   const { checkIfPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
@@ -57,6 +59,9 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [debts, setDebts] = useState<Debt[]>([]);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showGoalModal, setShowGoalModal] = useState(false);
+  const [showEditGoalModal, setShowEditGoalModal] = useState(false);
+  const [showGoalActionsModal, setShowGoalActionsModal] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('cards');
 
   // Загружаем долги при фокусе экрана
@@ -392,8 +397,122 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     }
   };
 
-  const handleAddGoal = () => {
+  const handleAddGoal = async () => {
+    // Всегда проверяем актуальный статус подписки
+    const hasPremium = await checkIfPremium();
+
+    console.log('🎯 [AccountsScreen] handleAddGoal called');
+    console.log('📊 [AccountsScreen] Current goals state:');
+    console.log('  - hasPremium:', hasPremium);
+    console.log('  - total goals:', goals.length);
+    console.log('  - user:', user);
+    console.log('  - isGuest:', user?.isGuest);
+
+    // Простая логика: без подписки - максимум 2 цели ВСЕГО
+    const MAX_FREE_GOALS = 2;
+
+    if (!hasPremium && goals.length >= MAX_FREE_GOALS) {
+      console.log('⚠️ [AccountsScreen] Goal limit reached!');
+      console.log('  - Current goals:', goals.length);
+      console.log('  - Limit:', MAX_FREE_GOALS);
+
+      if (user?.isGuest) {
+        Alert.alert(
+          'Требуется авторизация',
+          `Гостевые пользователи могут создать только ${MAX_FREE_GOALS} цели. Войдите в аккаунт и оформите подписку для неограниченного количества целей.`,
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: 'Войти в аккаунт',
+              onPress: () => {
+                navigation.navigate('More' as any);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Требуется подписка Premium',
+          `Бесплатная версия позволяет создать только ${MAX_FREE_GOALS} цели. Оформите подписку для неограниченного количества целей.`,
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: 'Оформить подписку',
+              onPress: () => {
+                setShowSubscriptionModal(true);
+              },
+            },
+          ]
+        );
+      }
+      return;
+    }
+
+    // Если проверка пройдена, показываем модал создания цели
     setShowGoalModal(true);
+  };
+
+  const handleGoalLongPress = (goal: any) => {
+    setSelectedGoal(goal);
+    setShowGoalActionsModal(true);
+  };
+
+  const handleEditGoal = () => {
+    setShowGoalActionsModal(false);
+    setShowEditGoalModal(true);
+  };
+
+  const handleDeleteGoal = async () => {
+    if (!selectedGoal) return;
+
+    Alert.alert(
+      'Удалить цель',
+      `Удалить цель "${selectedGoal.name}"? Все связанные переводы также будут удалены.`,
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteGoal(selectedGoal.id);
+              setShowGoalActionsModal(false);
+              setSelectedGoal(null);
+            } catch (error) {
+              console.error('Error deleting goal:', error);
+              Alert.alert(t('common.error'), t('common.somethingWentWrong'));
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleUpdateGoal = async (goalId: string, data: {
+    name: string;
+    targetAmount: number;
+    currency: string;
+    icon?: string;
+    description?: string;
+  }) => {
+    try {
+      await updateGoal(goalId, data);
+      setShowEditGoalModal(false);
+      setSelectedGoal(null);
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'));
+    }
   };
 
   if (isLoading) {
@@ -458,10 +577,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                     key={goal.id}
                     account={goalAsAccount}
                     onPress={() => {}}
-                    onLongPress={() => {
-                      // Можно добавить меню действий для целей
-                      console.log('Goal long press:', goal.name);
-                    }}
+                    onLongPress={() => handleGoalLongPress(goal)}
                   />
                 );
               })
@@ -614,6 +730,27 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         visible={showGoalModal}
         onClose={() => setShowGoalModal(false)}
         onSave={handleCreateGoal}
+      />
+
+      <EditGoalModal
+        visible={showEditGoalModal}
+        goal={selectedGoal}
+        onClose={() => {
+          setShowEditGoalModal(false);
+          setSelectedGoal(null);
+        }}
+        onSave={handleUpdateGoal}
+      />
+
+      <GoalActionsModal
+        visible={showGoalActionsModal}
+        goalName={selectedGoal?.name || ''}
+        onClose={() => {
+          setShowGoalActionsModal(false);
+          setSelectedGoal(null);
+        }}
+        onEdit={handleEditGoal}
+        onDelete={handleDeleteGoal}
       />
 
     </View>

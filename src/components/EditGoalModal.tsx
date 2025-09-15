@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { Goal } from '../types/index';
 
-interface AddGoalModalProps {
+interface EditGoalModalProps {
   visible: boolean;
+  goal: Goal | null;
   onClose: () => void;
-  onSave: (data: {
+  onSave: (goalId: string, data: {
     name: string;
     targetAmount: number;
     currency: string;
@@ -64,8 +66,9 @@ const GOAL_ICONS = [
 
 type GoalIcon = typeof GOAL_ICONS[number];
 
-export const AddGoalModal: React.FC<AddGoalModalProps> = ({
+export const EditGoalModal: React.FC<EditGoalModalProps> = ({
   visible,
+  goal,
   onClose,
   onSave,
 }) => {
@@ -81,7 +84,20 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
   const [errors, setErrors] = useState<{[key: string]: boolean}>({});
   const [showErrors, setShowErrors] = useState(false);
 
+  useEffect(() => {
+    if (goal && visible) {
+      setName(goal.name);
+      setTargetAmount(goal.targetAmount.toString());
+      setDescription(goal.description || '');
+      setSelectedIcon((goal.icon as GoalIcon) || GOAL_ICONS[0]);
+      setErrors({});
+      setShowErrors(false);
+    }
+  }, [goal, visible]);
+
   const handleSave = async () => {
+    if (!goal) return;
+
     const newErrors: {[key: string]: boolean} = {};
 
     if (!name.trim()) {
@@ -101,7 +117,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
     }
 
     try {
-      await onSave({
+      await onSave(goal.id, {
         name: name.trim(),
         targetAmount: amount,
         currency: defaultCurrency,
@@ -109,27 +125,14 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
         description: description.trim() || undefined,
       });
 
-      // Сбрасываем форму
-      setName('');
-      setTargetAmount('');
-      setDescription('');
-      setSelectedIcon(GOAL_ICONS[0]);
-      setErrors({});
-      setShowErrors(false);
-
-      onClose();
+      handleClose();
     } catch (error) {
-      console.error('Error saving goal:', error);
+      console.error('Error updating goal:', error);
       Alert.alert(t('common.error'), t('common.somethingWentWrong'));
     }
   };
 
   const handleClose = () => {
-    // Сбрасываем форму при закрытии
-    setName('');
-    setTargetAmount('');
-    setDescription('');
-    setSelectedIcon(GOAL_ICONS[0]);
     setErrors({});
     setShowErrors(false);
     onClose();
@@ -184,6 +187,8 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
     </Modal>
   );
 
+  if (!goal) return null;
+
   return (
     <Modal
       visible={visible}
@@ -198,7 +203,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              {t('goals.addGoal') || 'Добавить цель'}
+              {t('common.edit')} {t('goals.goal')}
             </Text>
             <TouchableOpacity onPress={handleClose}>
               <Ionicons name="close" size={24} color={colors.text} />
