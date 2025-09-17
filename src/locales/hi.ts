@@ -120,7 +120,7 @@ export default {
     authRequired: 'प्राधिकरण आवश्यक है',
     signIn: 'साइन इन करें',
     getPremium: 'प्रीमियम प्राप्त करें',
-    cardsAndAccounts: 'कार्ड और खाते',
+    cardsAndAccounts: 'खाते',
     savingsAccounts: 'बचत',
     debts: 'उधार',
     credits: 'क्रेडिट',

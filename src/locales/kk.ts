@@ -112,7 +112,7 @@ export default {
     authRequired: 'Авторизация қажет',
     signIn: 'Кіру',
     getPremium: 'Premium алу',
-    cardsAndAccounts: 'Карталар және шоттар',
+    cardsAndAccounts: 'Шоттар',
     savingsAccounts: 'Жинақтар',
     debts: 'Қарыздар',
     credits: 'Несиелер',

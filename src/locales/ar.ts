@@ -120,7 +120,7 @@ export default {
     authRequired: 'مطلوب تسجيل الدخول',
     signIn: 'تسجيل الدخول',
     getPremium: 'احصل على بريميوم',
-    cardsAndAccounts: 'البطاقات والحسابات',
+    cardsAndAccounts: 'الحسابات',
     savingsAccounts: 'المدخرات',
     debts: 'الديون',
     credits: 'الائتمانات',

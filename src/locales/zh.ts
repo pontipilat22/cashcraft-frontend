@@ -112,7 +112,7 @@ export default {
     authRequired: '需要授权',
     signIn: '登录',
     getPremium: '获取高级版',
-    cardsAndAccounts: '卡片和账户',
+    cardsAndAccounts: '账户',
     savingsAccounts: '储蓄账户',
     debts: '债务',
     credits: '贷款',

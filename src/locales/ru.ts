@@ -129,7 +129,7 @@ export default {
     authRequired: 'Требуется авторизация',
     signIn: 'Войти',
     getPremium: 'Оформить Premium',
-    cardsAndAccounts: 'Карты и счета',
+    cardsAndAccounts: 'Счета',
     savingsAccounts: 'Цели',
     debts: 'Долги',
     credits: 'Кредиты',

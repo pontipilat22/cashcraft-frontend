@@ -120,7 +120,7 @@ export default {
     authRequired: 'Authentification requise',
     signIn: 'Se connecter',
     getPremium: 'Obtenir Premium',
-    cardsAndAccounts: 'Cartes et comptes',
+    cardsAndAccounts: 'Comptes',
     savingsAccounts: 'Épargne',
     debts: 'Dettes',
     credits: 'Crédits',

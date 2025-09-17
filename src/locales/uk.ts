@@ -115,7 +115,7 @@ export default {
     authRequired: 'Потрібна авторизація',
     signIn: 'Увійти',
     getPremium: 'Оформити Premium',
-    cardsAndAccounts: 'Картки та рахунки',
+    cardsAndAccounts: 'Рахунки',
     savingsAccounts: 'Накопичення',
     debts: 'Борги',
     credits: 'Кредити',

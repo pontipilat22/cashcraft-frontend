@@ -62,6 +62,15 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [showEditGoalModal, setShowEditGoalModal] = useState(false);
   const [showGoalActionsModal, setShowGoalActionsModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<any>(null);
+
+  // Логирование состояния модалок
+  React.useEffect(() => {
+    console.log('🔍 [AccountsScreen] Modal states:', {
+      showEditGoalModal,
+      showGoalActionsModal,
+      selectedGoalId: selectedGoal?.id
+    });
+  }, [showEditGoalModal, showGoalActionsModal, selectedGoal]);
   const [activeTab, setActiveTab] = useState<string>('cards');
 
   // Загружаем долги при фокусе экрана
@@ -486,14 +495,19 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   };
 
   const handleGoalLongPress = (goal: any) => {
+    console.log('🔄 [AccountsScreen] handleGoalLongPress called:', goal.id);
     setSelectedGoal(goal);
     setShowGoalActionsModal(true);
+    console.log('📂 [AccountsScreen] GoalActionsModal opened');
   };
 
   const handleEditGoal = () => {
+    console.log('✏️ [AccountsScreen] handleEditGoal called');
     setShowGoalActionsModal(false);
+    console.log('📂 [AccountsScreen] GoalActionsModal closed');
     // Не сбрасываем selectedGoal здесь, так как он нужен для EditGoalModal
     setShowEditGoalModal(true);
+    console.log('✨ [AccountsScreen] EditGoalModal opened');
   };
 
   const handleGoalActionsClose = () => {

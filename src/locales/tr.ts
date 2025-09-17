@@ -115,7 +115,7 @@ export default {
     authRequired: 'Yetkilendirme gerekli',
     signIn: 'Giriş Yap',
     getPremium: 'Premium al',
-    cardsAndAccounts: 'Kartlar ve hesaplar',
+    cardsAndAccounts: 'Hesaplar',
     savingsAccounts: 'Birikim hesapları',
     debts: 'Borçlar',
     credits: 'Krediler',

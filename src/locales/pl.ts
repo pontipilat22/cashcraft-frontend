@@ -117,7 +117,7 @@ export default {
     authRequired: 'Wymagana autoryzacja',
     signIn: 'Zaloguj się',
     getPremium: 'Uzyskaj Premium',
-    cardsAndAccounts: 'Karty i konta',
+    cardsAndAccounts: 'Konta',
     savingsAccounts: 'Konta oszczędnościowe',
     debts: 'Długi',
     credits: 'Kredyty',

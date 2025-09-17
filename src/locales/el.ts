@@ -120,7 +120,7 @@ export default {
     authRequired: 'Απαιτείται έλεγχος ταυτότητας',
     signIn: 'Σύνδεση',
     getPremium: 'Αποκτήστε Premium',
-    cardsAndAccounts: 'Κάρτες και λογαριασμοί',
+    cardsAndAccounts: 'Λογαριασμοί',
     savingsAccounts: 'Αποταμιεύσεις',
     debts: 'Οφειλές',
     credits: 'Πιστώσεις',

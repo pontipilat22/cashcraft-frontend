@@ -117,7 +117,7 @@ export default {
     authRequired: 'Autorisierung erforderlich',
     signIn: 'Anmelden',
     getPremium: 'Premium erhalten',
-    cardsAndAccounts: 'Karten und Konten',
+    cardsAndAccounts: 'Konten',
     savingsAccounts: 'Sparkonten',
     debts: 'Schulden',
     credits: 'Kredite',
