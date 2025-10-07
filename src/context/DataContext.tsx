@@ -524,11 +524,17 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   const resetAllData = async () => {
     try {
       console.log('🗑️ [DataContext] Начинаем полный сброс данных...');
-      
+
       if (userId) {
         await LocalDatabaseService.clearAllData(defaultCurrency);
+
+        // Сбрасываем данные бюджета из AsyncStorage
+        console.log('🗑️ [DataContext] Сброс данных бюджетирования...');
+        await AsyncStorage.removeItem('@cashcraft_budget_settings');
+        await AsyncStorage.removeItem('@cashcraft_budget_tracking');
+
         await refreshData();
-        
+
         console.log('✅ [DataContext] Все данные успешно сброшены');
       }
     } catch (error) {

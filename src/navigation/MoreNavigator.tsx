@@ -9,11 +9,13 @@ import { TermsOfServiceScreen } from '../screens/TermsOfServiceScreen';
 import { HelpScreen } from '../screens/HelpScreen';
 import { ExportImportScreen } from '../screens/ExportImportScreen';
 import { SetPinScreen } from '../screens/SetPinScreen';
+import { CategorySettingsScreen } from '../screens/CategorySettingsScreen';
 
 export type MoreStackParamList = {
   MoreMain: undefined;
   Settings: undefined;
   Categories: undefined;
+  CategorySettings: undefined;
   Statistics: undefined;
   PrivacyPolicy: undefined;
   TermsOfService: undefined;
@@ -50,6 +52,11 @@ export const MoreNavigator: React.FC = () => {
       <Stack.Screen
         name="Categories"
         component={CategoriesScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="CategorySettings"
+        component={CategorySettingsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

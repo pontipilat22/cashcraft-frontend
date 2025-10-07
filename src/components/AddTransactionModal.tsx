@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
-  Alert,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -19,6 +18,7 @@ import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useDatePicker } from '../hooks/useDatePicker';
+import { useBudgetContext } from '../context/BudgetContext';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 import { CURRENCIES } from '../config/currencies';
 import { AddCategoryModal } from './AddCategoryModal';
@@ -27,16 +27,19 @@ interface AddTransactionModalProps {
   visible: boolean;
   onClose: () => void;
   initialType?: 'income' | 'expense';
+  isBudgetEnabled?: boolean;
 }
 
 export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   visible,
   onClose,
   initialType,
+  isBudgetEnabled = false,
 }) => {
   const { colors, isDark } = useTheme();
   const { accounts, categories, createTransaction } = useData();
   const { t } = useLocalization();
+  const { processIncome, recordExpense, reloadData } = useBudgetContext();
   
   // Используем новый хук для DatePicker
   const datePicker = useDatePicker({
@@ -51,6 +54,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [includeBudget, setIncludeBudget] = useState(false);
   
   // Состояние для валидации
   const [errors, setErrors] = useState<{
@@ -63,9 +67,28 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   // Устанавливаем тип транзакции при открытии
   React.useEffect(() => {
     if (visible && initialType) {
+      console.log('📝 [AddTransactionModal] Opening with:', {
+        initialType,
+        isBudgetEnabled,
+        willSetIncludeBudget: initialType === 'income' && isBudgetEnabled
+      });
       setIsIncome(initialType === 'income');
+      // Если это доход и бюджет включен, сразу устанавливаем includeBudget
+      if (initialType === 'income' && isBudgetEnabled) {
+        setIncludeBudget(true);
+      }
     }
-  }, [visible, initialType]);
+  }, [visible, initialType, isBudgetEnabled]);
+
+  // Управляем includeBudget при смене типа транзакции
+  React.useEffect(() => {
+    if (!isIncome) {
+      setIncludeBudget(false);
+    } else if (isIncome && isBudgetEnabled && visible) {
+      // Автоматически включаем для доходов если система бюджета активна
+      setIncludeBudget(true);
+    }
+  }, [isIncome, isBudgetEnabled, visible]);
   
   // Устанавливаем счет по умолчанию при открытии модального окна
   React.useEffect(() => {
@@ -97,6 +120,27 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   }, [isIncome]);
   
+  // Function to determine if a category is essential
+  const isEssentialCategory = (category: any) => {
+    if (!category) return false;
+
+    // If category has budgetCategory field, use it
+    if (category.budgetCategory) {
+      return category.budgetCategory === 'essential';
+    }
+
+    // Otherwise, determine by category name (basic logic)
+    const essentialKeywords = [
+      'продукты', 'еда', 'food', 'groceries', 'utilities', 'коммунальные',
+      'аренда', 'rent', 'mortgage', 'ипотека', 'транспорт', 'transport',
+      'медицина', 'medicine', 'health', 'здоровье', 'образование', 'education',
+      'налоги', 'taxes', 'страховка', 'insurance'
+    ];
+
+    const categoryName = category.name?.toLowerCase() || '';
+    return essentialKeywords.some(keyword => categoryName.includes(keyword));
+  };
+
   const handleSave = async () => {
     // Валидация обязательных полей
     const newErrors: typeof errors = {};
@@ -123,24 +167,50 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     
     try {
       const selectedCategory = categories.find(c => c.id === selectedCategoryId);
-      
+      const transactionAmount = parseFloat(amount);
+
+      // If it's income and budget tracking is enabled, process the income distribution
+      if (isIncome && includeBudget) {
+        await processIncome(transactionAmount, true);
+      }
+
+      // If it's expense and budget is enabled, record the expense
+      if (!isIncome && isBudgetEnabled) {
+        // Determine if expense is essential or non-essential based on category
+        const isEssentialExpense = isEssentialCategory(selectedCategory);
+        console.log('🏷️ [AddTransactionModal] Category classification:', {
+          categoryName: selectedCategory?.name,
+          categoryBudgetCategory: selectedCategory?.budgetCategory,
+          isEssentialExpense,
+          transactionAmount
+        });
+        await recordExpense(transactionAmount, isEssentialExpense ? 'essential' : 'nonEssential');
+      }
+
       await createTransaction({
-        amount: parseFloat(amount),
+        amount: transactionAmount,
         type: isIncome ? 'income' : 'expense',
         accountId: selectedAccountId,
         categoryId: selectedCategoryId,
         description: description.trim() || undefined,
         date: datePicker.selectedDate.toISOString(),
+        includeBudget: isIncome ? includeBudget : undefined,
       });
-      
+
+      // Принудительно обновляем данные бюджета после создания транзакции
+      await reloadData();
+
+      console.log('✅ [AddTransactionModal] Transaction created and budget data reloaded');
+
       // Очищаем форму и ошибки
       setAmount('');
       setDescription('');
       setIsIncome(false);
-      datePicker.setSelectedDate(new Date());
-      setSelectedCategoryId('');
+      setIncludeBudget(false);
       setErrors({});
       setShowErrors(false);
+      datePicker.setSelectedDate(new Date());
+      setSelectedCategoryId('');
       onClose();
     } catch (error) {
       console.error('Error creating transaction:', error);
@@ -151,6 +221,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     setAmount('');
     setDescription('');
     setIsIncome(false);
+    setIncludeBudget(false);
+    setErrors({});
+    setShowErrors(false);
     datePicker.setSelectedDate(new Date());
     setSelectedCategoryId('');
     onClose();
@@ -243,7 +316,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               </View>
             </View>
 
-            {/* Сумма */}
+            {/* Amount */}
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
                 {t('transactions.amount')}
@@ -275,6 +348,40 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 </Text>
               )}
             </View>
+
+            {/* Budget System Toggle - только для доходов */}
+            {__DEV__ && (
+              <View style={{ padding: 8, backgroundColor: '#FF9800', borderRadius: 4, marginBottom: 8 }}>
+                <Text style={{ fontSize: 10, color: '#000', fontWeight: 'bold' }}>
+                  🐛 DEBUG: isIncome={isIncome ? '✓' : '✗'} | isBudgetEnabled={isBudgetEnabled ? '✓' : '✗'} | Show={isIncome && isBudgetEnabled ? '✓' : '✗'}
+                </Text>
+                {!isBudgetEnabled && (
+                  <Text style={{ fontSize: 10, color: '#F44336', marginTop: 4, fontWeight: 'bold' }}>
+                    ⚠️ Система бюджетирования ВЫКЛЮЧЕНА! Перейдите в Планы и включите её.
+                  </Text>
+                )}
+              </View>
+            )}
+            {isIncome && isBudgetEnabled && (
+              <View style={styles.inputContainer}>
+                <View style={[styles.budgetToggleContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View style={styles.budgetToggleInfo}>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>
+                      {t('plans.includeBudgetSystem')}
+                    </Text>
+                    <Text style={[styles.budgetToggleSubtitle, { color: colors.textSecondary }]}>
+                      {includeBudget ? t('plans.budgetTrackingEnabled') : t('plans.budgetTrackingDisabled')}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={includeBudget}
+                    onValueChange={setIncludeBudget}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor={Platform.OS === 'android' ? (includeBudget ? '#fff' : '#f4f3f4') : undefined}
+                  />
+                </View>
+              </View>
+            )}
 
             {/* Дата */}
             <View style={styles.inputContainer}>
@@ -460,6 +567,28 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             <ScrollView>
               {filteredCategories.map(category => {
                 const localizedCategory = getLocalizedCategory(category, t);
+                const getBudgetCategoryColor = (budgetCategory?: string) => {
+                  switch (budgetCategory) {
+                    case 'essential':
+                      return '#FF5722'; // Orange for essential
+                    case 'nonEssential':
+                      return '#9C27B0'; // Purple for non-essential
+                    default:
+                      return colors.textSecondary; // Gray for not set
+                  }
+                };
+
+                const getBudgetCategoryLabel = (budgetCategory?: string) => {
+                  switch (budgetCategory) {
+                    case 'essential':
+                      return t('plans.essential');
+                    case 'nonEssential':
+                      return t('plans.nonEssential');
+                    default:
+                      return null;
+                  }
+                };
+
                 return (
                   <TouchableOpacity
                     key={category.id}
@@ -472,9 +601,19 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
                       <Ionicons name={category.icon as any} size={20} color={category.color} />
                     </View>
-                    <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                      {localizedCategory.name}
-                    </Text>
+                    <View style={styles.categoryItemContent}>
+                      <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                        {localizedCategory.name}
+                      </Text>
+                      {category.type === 'expense' && category.budgetCategory && (
+                        <Text style={[styles.budgetCategoryChip, {
+                          color: getBudgetCategoryColor(category.budgetCategory),
+                          borderColor: getBudgetCategoryColor(category.budgetCategory)
+                        }]}>
+                          {getBudgetCategoryLabel(category.budgetCategory)}
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -658,6 +797,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
+  categoryItemContent: {
+    flex: 1,
+  },
+  budgetCategoryChip: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+    backgroundColor: 'transparent',
+  },
   footer: {
     flexDirection: 'row',
     marginTop: 20,
@@ -743,5 +896,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF4444',
     marginTop: 4,
+  },
+  budgetToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  budgetToggleInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  budgetToggleSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
   },
 }); 

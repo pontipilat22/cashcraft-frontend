@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useAuth } from '../context/AuthContext';
+import { useBudgetContext } from '../context/BudgetContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { TransactionItem } from '../components/TransactionItem';
 import { TransactionActionsModal } from '../components/TransactionActionsModal';
@@ -136,6 +137,15 @@ export const TransactionsScreen = () => {
   const { t, currentLanguage } = useLocalization();
   const { defaultCurrency } = useCurrency();
   const { user } = useAuth();
+  const { isEnabled: isBudgetEnabled, reloadData: reloadBudgetData, budgetSettings } = useBudgetContext();
+
+  // Debug бюджета
+  React.useEffect(() => {
+    console.log('🔍 [TransactionsScreen] Budget state:', {
+      isEnabled: isBudgetEnabled,
+      budgetSettings
+    });
+  }, [isBudgetEnabled, budgetSettings]);
 
   console.log('🌐 [TransactionsScreen] Current language:', currentLanguage);
   const { isPremium, checkIfPremium } = useSubscription();
@@ -181,7 +191,11 @@ export const TransactionsScreen = () => {
   useFocusEffect(
     useCallback(() => {
       refreshData();
-    }, [refreshData])
+      // Обновляем данные бюджета для актуального отображения в BalanceHeader
+      if (isBudgetEnabled) {
+        reloadBudgetData();
+      }
+    }, [refreshData, isBudgetEnabled, reloadBudgetData])
   );
 
   // Фильтрация и объединение парных транзакций переводов
@@ -763,6 +777,7 @@ export const TransactionsScreen = () => {
           visible={showAddModal}
           onClose={() => setShowAddModal(false)}
           initialType={transactionType}
+          isBudgetEnabled={isBudgetEnabled}
         />
       )}
       

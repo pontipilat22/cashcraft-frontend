@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 3,
+  version: 4,
   tables: [
     tableSchema({
       name: 'accounts',
@@ -51,6 +51,7 @@ export default appSchema({
         { name: 'type', type: 'string' },
         { name: 'icon', type: 'string' },
         { name: 'color', type: 'string' },
+        { name: 'budget_category', type: 'string', isOptional: true },
         { name: 'synced_at', type: 'number', isOptional: true },
       ]
     }),

@@ -2,7 +2,9 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AccountsScreen } from '../screens/AccountsScreen';
 import { DebtListScreen } from '../screens/DebtListScreen';
-import { BalanceHeader } from './BottomTabNavigator';
+import { BalanceHeader } from '../components/BalanceHeader';
+import { useTheme } from '../context/ThemeContext';
+import { useBudgetContext } from '../context/BudgetContext';
 
 export type AccountsStackParamList = {
   AccountsMain: undefined;
@@ -12,20 +14,58 @@ export type AccountsStackParamList = {
 const Stack = createStackNavigator<AccountsStackParamList>();
 
 export const AccountsNavigator: React.FC = () => {
+  const { colors } = useTheme();
+  const { isEnabled: isBudgetEnabled } = useBudgetContext();
+
   return (
-    <Stack.Navigator>
-      <Stack.Screen 
-        name="AccountsMain" 
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.background,
+          shadowColor: 'transparent',
+          elevation: 0,
+        },
+        headerTintColor: colors.text,
+      }}
+    >
+      <Stack.Screen
+        name="AccountsMain"
         component={AccountsScreen}
-        options={{ 
-          headerShown: false
+        options={{
+          headerShown: true,
+          headerTitle: () => (
+            <BalanceHeader
+              key={`accounts-header-budget-${isBudgetEnabled ? 'on' : 'off'}`} // Принудительное обновление
+              showDailyAllowance={true}
+              isBudgetEnabled={isBudgetEnabled}
+            />
+          ),
+          headerTitleAlign: 'left',
+          headerStyle: {
+            backgroundColor: colors.background,
+            shadowColor: 'transparent',
+            elevation: 0,
+          },
         }}
       />
-      <Stack.Screen 
-        name="DebtList" 
+      <Stack.Screen
+        name="DebtList"
         component={DebtListScreen}
-        options={{ 
-          headerShown: false
+        options={{
+          headerShown: true,
+          headerTitle: () => (
+            <BalanceHeader
+              key={`debt-header-budget-${isBudgetEnabled ? 'on' : 'off'}`} // Принудительное обновление
+              showDailyAllowance={true}
+              isBudgetEnabled={isBudgetEnabled}
+            />
+          ),
+          headerTitleAlign: 'left',
+          headerStyle: {
+            backgroundColor: colors.background,
+            shadowColor: 'transparent',
+            elevation: 0,
+          },
         }}
       />
     </Stack.Navigator>

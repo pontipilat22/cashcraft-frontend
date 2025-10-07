@@ -151,7 +151,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
           borderColor: selectedLanguage === item.code ? colors.primary : colors.border,
         },
       ]}
-      onPress={() => setSelectedLanguage(item.code)}
+      onPress={() => setSelectedLanguage(item.code as typeof currentLanguage)}
     >
       <Text style={styles.flag}>{item.flag}</Text>
       <Text style={[styles.optionText, { color: colors.text }]}>{item.name}</Text>

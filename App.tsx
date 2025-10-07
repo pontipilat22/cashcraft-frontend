@@ -20,6 +20,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { SubscriptionProvider } from './src/context/SubscriptionContext';
 import { LocalizationProvider } from './src/context/LocalizationContext';
 import { CurrencyProvider, useCurrency } from './src/context/CurrencyContext';
+import { BudgetProvider } from './src/context/BudgetContext';
 
 import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
@@ -62,14 +63,45 @@ function AppContent() {
     checkOnboardingStatus();
   }, []);
 
-  // Показываем кастомный сплэш-скрин на 10 секунд
+  // Адаптивная загрузка: минимум 3 секунды, затем ждем готовности данных
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const MINIMUM_SPLASH_TIME = 3000; // 3 секунды минимум
+    const splashStartTime = Date.now();
+    let minTimeReached = false;
+    let dataReady = false;
+
+    // Минимальное время показа сплэша
+    const minTimer = setTimeout(() => {
+      minTimeReached = true;
+      if (dataReady && !authLoading && !isPreparing && !onboardingLoading) {
+        setShowSplash(false);
+      }
+    }, MINIMUM_SPLASH_TIME);
+
+    // Проверяем готовность данных
+    const checkDataReady = () => {
+      if (!authLoading && !isPreparing && !onboardingLoading) {
+        dataReady = true;
+        if (minTimeReached) {
+          setShowSplash(false);
+        }
+      }
+    };
+
+    // Максимальное время показа сплэша (если что-то пошло не так)
+    const maxTimer = setTimeout(() => {
+      console.log('⏰ [App] Принудительное скрытие splash screen по таймауту');
       setShowSplash(false);
-    }, 10000);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    }, 10000); // 10 секунд максимум
+
+    // Проверяем состояние сразу
+    checkDataReady();
+
+    return () => {
+      clearTimeout(minTimer);
+      clearTimeout(maxTimer);
+    };
+  }, [authLoading, isPreparing, onboardingLoading]);
 
   // Пересоздаём DataProvider, если пользователь сменил валюту
   useEffect(() => {
@@ -110,15 +142,17 @@ function AppContent() {
         <AuthNavigator />
       ) : (
         <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
-          <SubscriptionProvider userId={user.id} isGuest={user.isGuest}>
-            <DataProvider
-              key={dataProviderKey}
-              userId={user.id}
-              defaultCurrency={defaultCurrency}
-            >
-              <BottomTabNavigator />
-            </DataProvider>
-          </SubscriptionProvider>
+          <BudgetProvider>
+            <SubscriptionProvider userId={user.id} isGuest={user.isGuest}>
+              <DataProvider
+                key={dataProviderKey}
+                userId={user.id}
+                defaultCurrency={defaultCurrency}
+              >
+                <BottomTabNavigator />
+              </DataProvider>
+            </SubscriptionProvider>
+          </BudgetProvider>
         </NavigationContainer>
       )}
     </SafeAreaProvider>

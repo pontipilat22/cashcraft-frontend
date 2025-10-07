@@ -179,40 +179,41 @@ export const StatisticsCard: React.FC<StatisticsCardProps> = ({ onPeriodPress })
 
 const styles = StyleSheet.create({
   statsCard: {
-    marginTop: 16,
+    marginTop: 8,
     marginHorizontal: 16,
     marginBottom: 16,
-    padding: 20,
+    padding: 24,
     borderRadius: 16,
   },
   periodSelector: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   statsTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
   },
   periodButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 8,
     gap: 4,
   },
   periodText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 8,
   },
   statItem: {
     flex: 1,
@@ -220,18 +221,18 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     color: '#fff',
-    fontSize: 14,
-    marginTop: 8,
-    marginBottom: 4,
+    fontSize: 15,
+    marginTop: 12,
+    marginBottom: 6,
   },
   statAmount: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '700',
   },
   statDivider: {
     width: 1,
-    height: 60,
+    height: 80,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 20,
   },

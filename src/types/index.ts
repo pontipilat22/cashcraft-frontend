@@ -41,6 +41,8 @@ export interface Transaction {
   createdAt: string;
   updatedAt: string;
   syncedAt?: string;
+  includeBudget?: boolean;
+  budgetCategory?: 'essential' | 'nonEssential' | 'savings';
 }
 
 export interface Category {
@@ -49,6 +51,7 @@ export interface Category {
   type: 'income' | 'expense';
   icon: string;
   color: string;
+  budgetCategory?: 'essential' | 'nonEssential';
 }
 
 export type AccountType = 'cash' | 'card' | 'bank' | 'savings' | 'investment' | 'debt' | 'credit';

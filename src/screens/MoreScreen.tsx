@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
+import { useBudgetContext } from '../context/BudgetContext';
 import { CategoriesScreen } from './CategoriesScreen';
 import { SubscriptionScreen } from './SubscriptionScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +19,7 @@ export const MoreScreen: React.FC = () => {
   const { resetAllData } = useData();
   const { user, logout } = useAuth();
   const { isPremium, checkIfPremium } = useSubscription();
+  const { reloadData: reloadBudgetData } = useBudgetContext();
   const [showCategories, setShowCategories] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const navigation = useNavigation<any>();
@@ -46,6 +48,8 @@ export const MoreScreen: React.FC = () => {
           onPress: async () => {
             try {
               await resetAllData();
+              // Принудительно перезагружаем данные бюджета
+              await reloadBudgetData();
               Alert.alert(t('common.success'), t('common.dataResetSuccess'));
             } catch (error) {
               Alert.alert(t('common.error'), t('common.dataResetError'));
@@ -69,6 +73,12 @@ export const MoreScreen: React.FC = () => {
       title: t('common.categories'),
       icon: 'grid-outline',
       onPress: () => setShowCategories(true),
+    },
+    {
+      id: 'category-settings',
+      title: t('categories.budgetSettings'),
+      icon: 'options-outline',
+      onPress: () => navigation.navigate('CategorySettings'),
     },
     {
       id: 'export-import',

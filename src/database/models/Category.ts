@@ -8,5 +8,6 @@ export default class Category extends Model {
   @field('type') type!: string;
   @field('icon') icon!: string;
   @field('color') color!: string;
+  @field('budget_category') budgetCategory?: string;
   @date('synced_at') syncedAt?: Date;
 } 

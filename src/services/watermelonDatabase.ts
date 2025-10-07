@@ -92,14 +92,17 @@ export class WatermelonDatabaseService {
           { id: uuidv4(), name: 'business',      type: 'income',  icon: 'briefcase-outline',       color: '#2196F3' },
           { id: uuidv4(), name: 'investments',   type: 'income',  icon: 'trending-up-outline',     color: '#FF9800' },
           { id: uuidv4(), name: 'other_income',  type: 'income',  icon: 'add-circle-outline',      color: '#9C27B0', isDefault: true },
-        
-          { id: uuidv4(), name: 'food',          type: 'expense', icon: 'cart-outline',            color: '#F44336' },
-          { id: uuidv4(), name: 'transport',     type: 'expense', icon: 'car-outline',             color: '#3F51B5' },
-          { id: uuidv4(), name: 'housing',       type: 'expense', icon: 'home-outline',            color: '#009688' },
-          { id: uuidv4(), name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63' },
-          { id: uuidv4(), name: 'health',        type: 'expense', icon: 'fitness-outline',         color: '#4CAF50' },
-          { id: uuidv4(), name: 'shopping',      type: 'expense', icon: 'bag-outline',             color: '#9C27B0' },
-          { id: uuidv4(), name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B', isDefault: true },
+
+          // Обязательные расходы
+          { id: uuidv4(), name: 'food',          type: 'expense', icon: 'cart-outline',            color: '#F44336', budgetCategory: 'essential' },
+          { id: uuidv4(), name: 'transport',     type: 'expense', icon: 'car-outline',             color: '#3F51B5', budgetCategory: 'essential' },
+          { id: uuidv4(), name: 'housing',       type: 'expense', icon: 'home-outline',            color: '#009688', budgetCategory: 'essential' },
+          { id: uuidv4(), name: 'health',        type: 'expense', icon: 'fitness-outline',         color: '#4CAF50', budgetCategory: 'essential' },
+
+          // Необязательные расходы
+          { id: uuidv4(), name: 'entertainment', type: 'expense', icon: 'game-controller-outline', color: '#E91E63', budgetCategory: 'nonEssential' },
+          { id: uuidv4(), name: 'shopping',      type: 'expense', icon: 'bag-outline',             color: '#9C27B0', budgetCategory: 'nonEssential' },
+          { id: uuidv4(), name: 'other_expense', type: 'expense', icon: 'ellipsis-horizontal-outline', color: '#607D8B', isDefault: true, budgetCategory: 'nonEssential' },
         ];
 
         await database.write(async () => {
@@ -111,9 +114,10 @@ export class WatermelonDatabaseService {
                 category.type  = cat.type;
                 category.icon  = cat.icon;
                 category.color = cat.color;
+                category.budgetCategory = cat.budgetCategory;
               })
             )
-          );          
+          );
         });
         console.log('[WatermelonDB] Базовые категории созданы');
       } else {
@@ -387,6 +391,7 @@ export class WatermelonDatabaseService {
       type: cat.type,
       icon: cat.icon,
       color: cat.color,
+      budgetCategory: cat.budgetCategory,
     }));
   }
 
@@ -399,6 +404,7 @@ export class WatermelonDatabaseService {
         category.type = categoryData.type;
         category.icon = categoryData.icon;
         category.color = categoryData.color;
+        category.budgetCategory = categoryData.budgetCategory;
       });
     });
 
@@ -782,6 +788,7 @@ export class WatermelonDatabaseService {
       type: cat.type,
       icon: cat.icon,
       color: cat.color,
+      budgetCategory: cat.budgetCategory,
       is_system: false, // Поле isSystem отсутствует в локальной модели Category
       created_at: cat.createdAt ? cat.createdAt.toISOString() : undefined,
       updated_at: cat.updatedAt ? cat.updatedAt.toISOString() : undefined,

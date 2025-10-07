@@ -6,6 +6,7 @@ import { useSubscription } from '../context/SubscriptionContext';
 import { useAuth } from '../context/AuthContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useBudgetContext } from '../context/BudgetContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
 import { AccountTabs } from '../components/AccountTabs';
@@ -43,6 +44,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const { user } = useAuth();
   const { t } = useLocalization();
   const { formatAmount, defaultCurrency } = useCurrency();
+  const { isEnabled: isBudgetEnabled, reloadData: reloadBudgetData } = useBudgetContext();
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -113,7 +115,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   useFocusEffect(
     React.useCallback(() => {
       refreshData();
-    }, [refreshData])
+      // Обновляем данные бюджета для актуального отображения в BalanceHeader
+      if (isBudgetEnabled) {
+        reloadBudgetData();
+      }
+    }, [refreshData, isBudgetEnabled, reloadBudgetData])
   );
 
   const loadDebts = async () => {
@@ -578,7 +584,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={colors.background}
       />
-      <ScrollView showsVerticalScrollIndicator={false}>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 0 }}>
         <StatisticsCard />
 
         <AccountTabs activeTab={activeTab} onTabChange={setActiveTab} />
@@ -735,6 +742,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         visible={transactionModalVisible}
         onClose={() => setTransactionModalVisible(false)}
         initialType={transactionType}
+        isBudgetEnabled={isBudgetEnabled}
       />
       
       <TransferModal
@@ -811,5 +819,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
 }); 

@@ -1,46 +1,30 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { useData } from '../context/DataContext';
 import { useLocalization } from '../context/LocalizationContext';
-import { useCurrency } from '../context/CurrencyContext';
+import { useBudgetContext } from '../context/BudgetContext';
+import { BalanceHeader } from '../components/BalanceHeader';
 
 import { AccountsNavigator } from './AccountsNavigator';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
+import { PlansScreen } from '../screens/PlansScreen';
 import { MoreNavigator } from './MoreNavigator';
 
 export type BottomTabParamList = {
   Accounts: undefined;
   Transactions: undefined;
+  Plans: undefined;
   More: undefined;
 };
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
-// Компонент для отображения баланса в заголовке
-export const BalanceHeader: React.FC = () => {
-  const { colors } = useTheme();
-  const { totalBalance } = useData();
-  const { t } = useLocalization();
-  const { formatAmount } = useCurrency();
-
-  return (
-    <View style={styles.balanceHeader}>
-      <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
-        {t('accounts.totalBalance')}
-      </Text>
-      <Text style={[styles.balanceAmount, { color: colors.text }]}>
-        {formatAmount(totalBalance)}
-      </Text>
-    </View>
-  );
-};
-
 export const BottomTabNavigator: React.FC = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { isEnabled: isBudgetEnabled } = useBudgetContext();
 
   return (
     <Tab.Navigator
@@ -52,6 +36,8 @@ export const BottomTabNavigator: React.FC = () => {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Transactions') {
             iconName = focused ? 'swap-horizontal' : 'swap-horizontal-outline';
+          } else if (route.name === 'Plans') {
+            iconName = focused ? 'pie-chart' : 'pie-chart-outline';
           } else if (route.name === 'More') {
             iconName = focused ? 'menu' : 'menu-outline';
           } else {
@@ -76,28 +62,40 @@ export const BottomTabNavigator: React.FC = () => {
         },
       })}
     >
-      <Tab.Screen 
-        name="Accounts" 
+      <Tab.Screen
+        name="Accounts"
         component={AccountsNavigator}
-        options={{ 
+        options={{
           title: t('navigation.accounts'),
-          headerTitle: () => <BalanceHeader />,
-          headerTitleAlign: 'left',
+          headerShown: false,
         }}
       />
-      <Tab.Screen 
-        name="Transactions" 
+      <Tab.Screen
+        name="Transactions"
         component={TransactionsScreen}
-        options={{ 
+        options={{
           title: t('navigation.transactions'),
-          headerTitle: () => <BalanceHeader />,
+          headerTitle: () => (
+            <BalanceHeader
+              key={`header-budget-${isBudgetEnabled ? 'on' : 'off'}`} // Принудительное обновление
+              showDailyAllowance={true}
+              isBudgetEnabled={isBudgetEnabled}
+            />
+          ),
           headerTitleAlign: 'left',
         }}
       />
-      <Tab.Screen 
-        name="More" 
+      <Tab.Screen
+        name="Plans"
+        component={PlansScreen}
+        options={{
+          title: t('navigation.plans'),
+        }}
+      />
+      <Tab.Screen
+        name="More"
         component={MoreNavigator}
-        options={{ 
+        options={{
           title: t('navigation.more'),
           headerShown: false,
         }}
@@ -106,17 +104,4 @@ export const BottomTabNavigator: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  balanceHeader: {
-    alignItems: 'flex-start',
-    paddingHorizontal: 5,
-    paddingTop: 4,
-  },
-  balanceLabel: {
-    fontSize: 12,
-  },
-  balanceAmount: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-}); 
+ 

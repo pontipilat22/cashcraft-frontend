@@ -36,9 +36,15 @@ const TILE_SHADOW = "rgba(0,23,58,0.35)";
 const HILITE      = "rgba(255,255,255,0.85)";
 const INNER_DARK  = "rgba(0,0,0,0.18)";
 
-export const SplashScreen: React.FC = () => {
-  const DURATION_MS = 10000; // 10 секунд
+interface SplashScreenProps {
+  /** Максимальное время показа в миллисекундах (по умолчанию 10 секунд) */
+  maxDuration?: number;
+}
+
+export const SplashScreen: React.FC<SplashScreenProps> = ({ maxDuration = 10000 }) => {
+  const DURATION_MS = maxDuration;
   const [leftSec, setLeftSec] = useState(DURATION_MS / 1000);
+  const [startTime] = useState(() => Date.now());
   const [isReady, setIsReady] = useState(false);
   
   // Определяем системную тему
@@ -93,19 +99,19 @@ export const SplashScreen: React.FC = () => {
 
   useEffect(() => {
     if (!isReady) return;
-    
+
     let interval: NodeJS.Timeout;
-    const t0 = Date.now();
-    
+
     interval = setInterval(() => {
-      const left = Math.max(0, Math.ceil((DURATION_MS - (Date.now() - t0)) / 1000));
+      const elapsed = Date.now() - startTime;
+      const left = Math.max(0, Math.ceil((DURATION_MS - elapsed) / 1000));
       setLeftSec(left);
     }, 200);
 
     return () => clearInterval(interval);
-  }, [isReady]);
+  }, [isReady, startTime, DURATION_MS]);
 
-  const progress = 1 - leftSec / (DURATION_MS / 1000); // 0..1
+  const progress = Math.min(1, (Date.now() - startTime) / DURATION_MS); // 0..1
   const mm = String(Math.floor(leftSec / 60)).padStart(2, "0");
   const ss = String(leftSec % 60).padStart(2, "0");
 

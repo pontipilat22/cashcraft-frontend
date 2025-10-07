@@ -11,6 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useBudgetContext } from '../context/BudgetContext';
+
 
 interface NewFABMenuProps {
   onIncomePress: () => void;
@@ -41,9 +43,13 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
 }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { reloadData } = useBudgetContext();
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleMenuPress = () => setIsOpen(true);
+  const handleMenuPress = () => {
+    reloadData(); // Обновляем данные бюджета при открытии меню
+    setIsOpen(true);
+  };
   const handleClose = () => setIsOpen(false);
 
   const handleItemPress = (action: () => void) => {

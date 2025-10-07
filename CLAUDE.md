@@ -23,7 +23,7 @@ Currently no automated testing or linting commands are configured. When implemen
 
 ### Database Layer
 - **Local Database**: WatermelonDB (SQLite-based ORM for React Native)
-- **Schema Version**: 3 (in `src/database/schema.ts`)
+- **Schema Version**: 4 (in `src/database/schema.ts`)
 - **Models**: Account, Transaction, Category, Debt, Goal, GoalTransfer, ExchangeRate, Setting, SyncMetadata
 - **Database Instance**: Exported from `src/database/index.ts`
 
@@ -34,7 +34,7 @@ The app uses React Context API for global state management with multiple special
 - **DataContext**: Core app data (accounts, transactions, categories, debts, goals)
 - **ThemeContext**: Dark/light theme switching
 - **CurrencyContext**: Multi-currency support with exchange rates
-- **LocalizationContext**: i18n support (14 languages)
+- **LocalizationContext**: i18n support (13 languages: en, ru, de, fr, it, tr, pl, zh, uk, kk, hi, ar, el)
 - **SubscriptionContext**: Premium features and in-app purchases
 
 ### Context Provider Hierarchy
@@ -75,7 +75,7 @@ ThemeProvider
 WatermelonDB UUID generation is configured globally in App.tsx using `react-native-get-random-values` polyfill. This must be imported before any other modules.
 
 ### Cyrillic Path Issues
-Metro config includes special handling for Windows systems with Cyrillic usernames in file paths. Use `npm run start:fix` if experiencing path-related issues.
+Metro config includes special handling for Windows systems with Cyrillic usernames in file paths. The configuration in `metro.config.js` overrides header handling to prevent encoding issues. Use `npm run start:fix` if experiencing path-related issues.
 
 ### Database Migrations
 When modifying the database schema:
