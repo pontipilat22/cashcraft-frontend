@@ -7,10 +7,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "packagerOpts": { "port": 8081 },
+    "newArchEnabled": false,
+    "packagerOpts": {
+      "port": 8081
+    },
     "scheme": "cashcraft",
-
     "splash": {
       "image": "./assets/splash-icon1.png",
       "resizeMode": "contain",
@@ -21,14 +22,12 @@
         "backgroundColor": "#0B1220"
       }
     },
-
     "ios": {
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.pontipilat.cashcraft",
       "buildNumber": "1"
     },
-
     "android": {
       "package": "com.pontipilat.cashcraft",
       "versionCode": 3,
@@ -52,22 +51,29 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "data": [{ "scheme": "cashcraft" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "cashcraft"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
-
     "web": {
       "favicon": "./assets/favicon.png"
     },
-
     "plugins": [
       "expo-web-browser",
       "expo-iap",
       [
         "@react-native-google-signin/google-signin",
-        { "iosUrlScheme": "com.googleusercontent.apps.457720015497-urkrpt05vv1q1vtdbps1fnancbb984of" }
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.457720015497-urkrpt05vv1q1vtdbps1fnancbb984of"
+        }
       ],
       "expo-localization",
       "expo-secure-store",
@@ -75,14 +81,15 @@
         "expo-build-properties",
         {
           "android": {
-            "ndkVersion": "26.2.11394342"
+            "kotlinVersion": "2.0.0"
           }
         }
       ]
     ],
-
     "extra": {
-      "eas": { "projectId": "993876aa-d5bf-411d-b069-94f585de32af" },
+      "eas": {
+        "projectId": "993876aa-d5bf-411d-b069-94f585de32af"
+      },
       "googleWebClientId": "457720015497-e98pchk5nluung53cjckq960qvjfdm7b.apps.googleusercontent.com",
       "googleAndroidClientId": "457720015497-8j7ru4jrrec7qe0l53pv0c8tkfnuv1ob.apps.googleusercontent.com",
       "googleIosClientId": "457720015497-0ac2v6rkqnb1gbv63vt44pvpv0g2igk9.apps.googleusercontent.com"
