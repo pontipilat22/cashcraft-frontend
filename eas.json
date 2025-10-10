@@ -19,6 +19,9 @@
       "android": {
         "buildType": "app-bundle",
         "autoIncrement": true
+      },
+      "env": {
+        "NO_DEV_CLIENT": "1"
       }
     }
   },

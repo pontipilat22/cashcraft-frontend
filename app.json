@@ -81,7 +81,8 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "2.0.0"
+            "kotlinVersion": "2.0.0",
+            "excludeExpoModules": ["expo-dev-launcher", "expo-dev-menu"]
           }
         }
       ]
