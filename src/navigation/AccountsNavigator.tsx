@@ -14,14 +14,14 @@ export type AccountsStackParamList = {
 const Stack = createStackNavigator<AccountsStackParamList>();
 
 export const AccountsNavigator: React.FC = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { isEnabled: isBudgetEnabled } = useBudgetContext();
 
   return (
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: colors.card,
+          backgroundColor: isDark ? '#232323' : '#FFFFFF',
           shadowColor: 'transparent',
           elevation: 0,
         },
@@ -42,7 +42,7 @@ export const AccountsNavigator: React.FC = () => {
           ),
           headerTitleAlign: 'left',
           headerStyle: {
-            backgroundColor: colors.card,
+            backgroundColor: isDark ? '#232323' : '#FFFFFF',
             shadowColor: 'transparent',
             elevation: 0,
           },
@@ -62,7 +62,7 @@ export const AccountsNavigator: React.FC = () => {
           ),
           headerTitleAlign: 'left',
           headerStyle: {
-            backgroundColor: colors.card,
+            backgroundColor: isDark ? '#232323' : '#FFFFFF',
             shadowColor: 'transparent',
             elevation: 0,
           },

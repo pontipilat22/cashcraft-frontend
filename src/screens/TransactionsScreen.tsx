@@ -132,7 +132,7 @@ const ListHeader = React.memo(({
 });
 
 export const TransactionsScreen = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { transactions, accounts, categories, goals, totalBalance, isLoading, deleteTransaction, refreshData, createAccount, createGoal } = useData();
   const { t, currentLanguage } = useLocalization();
   const { defaultCurrency } = useCurrency();
@@ -383,7 +383,7 @@ export const TransactionsScreen = () => {
   
   const deleteSelectedTransactions = useCallback(() => {
     if (selectedIds.size === 0) return;
-    
+
     Alert.alert(
       t('transactions.deleteTransaction'),
       `${t('transactions.deleteSelectedConfirm')} (${selectedIds.size})?`,
@@ -403,6 +403,9 @@ export const TransactionsScreen = () => {
                 await deleteTransaction(id);
               }
               console.log('✅ [TransactionsScreen] Все транзакции успешно удалены');
+              // Обновляем данные бюджета
+              await reloadBudgetData();
+              console.log('🔄 [TransactionsScreen] Данные бюджета обновлены после массового удаления');
               exitSelectionMode();
             } catch (error) {
               console.error('❌ [TransactionsScreen] Ошибка удаления транзакций:', error);
@@ -415,7 +418,7 @@ export const TransactionsScreen = () => {
         },
       ]
     );
-  }, [selectedIds, t, deleteTransaction, exitSelectionMode]);
+  }, [selectedIds, t, deleteTransaction, exitSelectionMode, reloadBudgetData]);
 
   const handleEdit = useCallback(() => {
     setShowEditModal(true);
@@ -423,7 +426,7 @@ export const TransactionsScreen = () => {
 
   const handleDelete = useCallback(() => {
     if (!selectedTransaction) return;
-    
+
     Alert.alert(
       t('transactions.deleteTransaction'),
       t('transactions.deleteTransactionConfirm'),
@@ -440,6 +443,9 @@ export const TransactionsScreen = () => {
               console.log('🗑️ [TransactionsScreen] Удаляем транзакцию:', selectedTransaction.id);
               await deleteTransaction(selectedTransaction.id);
               console.log('✅ [TransactionsScreen] Транзакция успешно удалена');
+              // Обновляем данные бюджета
+              await reloadBudgetData();
+              console.log('🔄 [TransactionsScreen] Данные бюджета обновлены после удаления');
               setShowActionsModal(false);
             } catch (error) {
               console.error('❌ [TransactionsScreen] Ошибка удаления транзакции:', error);
@@ -452,7 +458,7 @@ export const TransactionsScreen = () => {
         },
       ]
     );
-  }, [selectedTransaction, t, deleteTransaction]);
+  }, [selectedTransaction, t, deleteTransaction, reloadBudgetData]);
 
   const handleQuickIncome = useCallback(() => {
     setTransactionType('income');
@@ -688,7 +694,14 @@ export const TransactionsScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Поиск и кнопка удаления в одной строке */}
-      <View style={styles.searchWrapper}>
+      <View style={[
+        styles.searchWrapper,
+        {
+          backgroundColor: isDark ? '#232323' : '#FFFFFF',
+          borderBottomLeftRadius: 20,
+          borderBottomRightRadius: 20,
+        }
+      ]}>
         <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
           <Ionicons name="search" size={20} color={colors.textSecondary} />
           <TextInput
@@ -707,7 +720,7 @@ export const TransactionsScreen = () => {
             </TouchableOpacity>
           )}
         </View>
-        
+
         {!isSelectionMode ? (
           <TouchableOpacity
             style={[styles.deleteButton, { backgroundColor: colors.card }]}
@@ -899,8 +912,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   searchContainer: {
     flex: 1,
@@ -949,7 +967,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   filterButton: {
     flexDirection: 'row',

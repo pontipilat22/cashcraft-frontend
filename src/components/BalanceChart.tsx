@@ -497,12 +497,27 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
     return { tooltipY, tooltipText, changeText, tooltipWidth, tooltipX };
   }, [touchPosition, selectedPoint, balanceChange, formatAmount]);
 
+  // Вычисляем текущую дату для отображения
+  const displayDate = useMemo(() => {
+    if (selectedPoint) {
+      return formatDate(selectedPoint.date, selectedPeriod);
+    }
+    // Если нет выбранной точки, показываем дату последней точки
+    if (rawData && rawData.length > 0) {
+      return formatDate(rawData[rawData.length - 1].date, selectedPeriod);
+    }
+    return formatDate(Date.now(), selectedPeriod);
+  }, [selectedPoint, rawData, selectedPeriod]);
+
   return (
     <View style={styles.container}>
       {/* Заголовок */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
           {t('accounts.balanceDynamics') || 'Динамика баланса'}
+        </Text>
+        <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+          {displayDate}
         </Text>
       </View>
 
@@ -657,7 +672,7 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
               {
                 backgroundColor: selectedPeriod === period
                   ? colors.primary
-                  : isDark ? colors.border : colors.background,
+                  : 'rgba(255, 255, 255, 0.1)',
               },
             ]}
             onPress={() => handlePeriodChange(period)}
@@ -694,6 +709,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  dateText: {
+    fontSize: 12,
+    fontWeight: '400',
+    marginTop: 2,
   },
   chartContainer: {
     alignItems: 'center',

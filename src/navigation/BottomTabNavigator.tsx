@@ -9,7 +9,7 @@ import { BalanceHeader } from '../components/BalanceHeader';
 
 import { AccountsNavigator } from './AccountsNavigator';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
-import { PlansScreen } from '../screens/PlansScreen';
+import { PlansNavigator } from './PlansNavigator';
 import { MoreNavigator } from './MoreNavigator';
 
 export type BottomTabParamList = {
@@ -22,7 +22,7 @@ export type BottomTabParamList = {
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 export const BottomTabNavigator: React.FC = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const { isEnabled: isBudgetEnabled } = useBudgetContext();
 
@@ -83,13 +83,19 @@ export const BottomTabNavigator: React.FC = () => {
             />
           ),
           headerTitleAlign: 'left',
+          headerStyle: {
+            backgroundColor: isDark ? '#232323' : '#FFFFFF',
+            shadowColor: 'transparent',
+            elevation: 0,
+          },
         }}
       />
       <Tab.Screen
         name="Plans"
-        component={PlansScreen}
+        component={PlansNavigator}
         options={{
           title: t('navigation.plans'),
+          headerShown: false,
         }}
       />
       <Tab.Screen
