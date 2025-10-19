@@ -26,6 +26,7 @@ import { LocalDatabaseService } from '../services/localDatabase';
 import { useFocusEffect } from '@react-navigation/native';
 import { TransferModal } from '../components/TransferModal';
 import { StatisticsCard } from '../components/StatisticsCard';
+import { BalanceChart } from '../components/BalanceChart';
 import { SubscriptionScreen } from './SubscriptionScreen';
 import { AddGoalModal } from '../components/AddGoalModal';
 import { EditGoalModal } from '../components/EditGoalModal';
@@ -586,7 +587,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 0 }}>
-        <StatisticsCard />
+        {/* <StatisticsCard /> */}
+        <BalanceChart />
 
         <AccountTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
