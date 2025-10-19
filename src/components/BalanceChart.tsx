@@ -111,7 +111,7 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
     const interval = setInterval(() => {
       setPulseScale(prev => {
         if (growing) {
-          if (prev >= 1.4) {
+          if (prev >= 2.0) {
             growing = false;
             return prev - 0.05;
           }
@@ -672,7 +672,7 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
               {
                 backgroundColor: selectedPeriod === period
                   ? colors.primary
-                  : 'rgba(255, 255, 255, 0.1)',
+                  : 'transparent',
               },
             ]}
             onPress={() => handlePeriodChange(period)}
