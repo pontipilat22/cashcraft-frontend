@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, PanResponder } from 'react-native';
-import Svg, { Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Line } from 'react-native-svg';
+import Svg, { Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Line, Rect, Text as SvgText } from 'react-native-svg';
 import { curveBasis, line } from 'd3-shape';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -95,12 +95,39 @@ const formatDate = (timestamp: number, period: Period): string => {
 export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }) => {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
-  const { formatAmount, defaultCurrency, convertCurrency } = useCurrency();
+  const { formatAmount, defaultCurrency } = useCurrency();
   const { transactions, accounts } = useData();
 
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('1W');
   const [selectedPoint, setSelectedPoint] = useState<DataPoint | null>(null);
   const [touchPosition, setTouchPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Анимация пульсации для последней точки (используем простой счетчик)
+  const [pulseScale, setPulseScale] = useState(1);
+
+  // Запускаем пульсацию
+  useEffect(() => {
+    let growing = true;
+    const interval = setInterval(() => {
+      setPulseScale(prev => {
+        if (growing) {
+          if (prev >= 1.4) {
+            growing = false;
+            return prev - 0.05;
+          }
+          return prev + 0.05;
+        } else {
+          if (prev <= 1) {
+            growing = true;
+            return prev + 0.05;
+          }
+          return prev - 0.05;
+        }
+      });
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Вычисляем реальные данные баланса на основе транзакций
   const realBalanceData = useMemo(() => {
@@ -426,27 +453,56 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
 
   const periods: Period[] = ['24h', '1W', '1M', '3M', '1Y', 'ALL'];
 
-  // Отображаемое значение и дата
-  const displayValue = selectedPoint !== null ? selectedPoint.value : (rawData[rawData.length - 1]?.value ?? 0);
-  const displayDate = selectedPoint !== null ? selectedPoint.date : (rawData[rawData.length - 1]?.date ?? Date.now());
+  // Вычисляем изменение баланса для tooltip
+  const balanceChange = useMemo(() => {
+    if (!selectedPoint || !rawData || rawData.length < 2) return null;
+
+    // Находим индекс выбранной точки
+    const selectedIndex = rawData.findIndex(d => d.date === selectedPoint.date && d.value === selectedPoint.value);
+
+    if (selectedIndex <= 0) return null;
+
+    // Изменение относительно предыдущей точки
+    const previousValue = rawData[selectedIndex - 1].value;
+    const change = selectedPoint.value - previousValue;
+
+    return change;
+  }, [selectedPoint, rawData]);
 
   // Стиль для анимации контейнера
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: chartOpacity.value,
   }));
 
+  // Вычисляем позицию последней точки и проверяем, активна ли она
+  const lastPoint = chartData.length > 0 ? chartData[chartData.length - 1] : null;
+  const isLastPointActive = lastPoint && (!touchPosition || (
+    Math.abs(touchPosition.x - lastPoint.x) < 5 &&
+    Math.abs(touchPosition.y - lastPoint.y) < 5
+  ));
+
+  // Вычисляем параметры tooltip
+  const tooltipData = useMemo(() => {
+    if (!touchPosition || !selectedPoint) return null;
+
+    const tooltipY = Math.max(touchPosition.y - 50, 5);
+    const tooltipText = formatAmount(selectedPoint.value);
+    const changeText = balanceChange !== null && balanceChange !== 0
+      ? (balanceChange > 0 ? `+${formatAmount(balanceChange)}` : formatAmount(balanceChange))
+      : '';
+
+    const tooltipWidth = Math.max(tooltipText.length * 7 + 16, 80);
+    const tooltipX = Math.min(Math.max(touchPosition.x - tooltipWidth / 2, 5), CHART_WIDTH - tooltipWidth - 5);
+
+    return { tooltipY, tooltipText, changeText, tooltipWidth, tooltipX };
+  }, [touchPosition, selectedPoint, balanceChange, formatAmount]);
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
-      {/* Заголовок с текущим значением */}
+    <View style={styles.container}>
+      {/* Заголовок */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
           {t('accounts.balanceDynamics') || 'Динамика баланса'}
-        </Text>
-        <Text style={[styles.value, { color: colors.primary }]}>
-          {formatAmount(displayValue)}
-        </Text>
-        <Text style={[styles.date, { color: colors.textSecondary }]}>
-          {formatDate(displayDate, selectedPeriod)}
         </Text>
       </View>
 
@@ -457,7 +513,7 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
             <Defs>
               <SvgLinearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                 <Stop offset="0%" stopColor={colors.primary} stopOpacity="1" />
-                <Stop offset="100%" stopColor={colors.accent || colors.primary} stopOpacity="1" />
+                <Stop offset="100%" stopColor={colors.primary} stopOpacity="0.6" />
               </SvgLinearGradient>
             </Defs>
 
@@ -485,22 +541,106 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
               strokeLinejoin="round"
             />
 
-            {/* Курсор */}
-            {touchPosition && (
+            {/* Точка на последней позиции (видна только когда нет касания или касание на последней точке) */}
+            {lastPoint && (!touchPosition || isLastPointActive) && (
               <>
+                {/* Пульсирующий круг (только для последней точки) */}
+                {isLastPointActive && (
+                  <Circle
+                    cx={lastPoint.x}
+                    cy={lastPoint.y}
+                    r={8 * pulseScale}
+                    fill={colors.primary}
+                    opacity={0.3 / pulseScale}
+                  />
+                )}
+
+                {/* Основная точка */}
                 <Circle
-                  cx={touchPosition.x}
-                  cy={touchPosition.y}
+                  cx={lastPoint.x}
+                  cy={lastPoint.y}
                   r="8"
                   fill={colors.primary}
                   opacity="0.8"
                 />
                 <Circle
-                  cx={touchPosition.x}
-                  cy={touchPosition.y}
+                  cx={lastPoint.x}
+                  cy={lastPoint.y}
                   r="4"
                   fill={colors.card}
                 />
+              </>
+            )}
+
+            {/* Курсор и tooltip при касании */}
+            {touchPosition && selectedPoint && tooltipData && (
+              <>
+                {/* Вертикальная линия от точки вверх */}
+                <Line
+                  x1={touchPosition.x}
+                  y1={touchPosition.y}
+                  x2={touchPosition.x}
+                  y2={Math.max(touchPosition.y - 40, 10)}
+                  stroke={colors.primary}
+                  strokeWidth="2"
+                />
+
+                {/* Курсор на линии (только если не последняя точка) */}
+                {!isLastPointActive && (
+                  <>
+                    <Circle
+                      cx={touchPosition.x}
+                      cy={touchPosition.y}
+                      r="8"
+                      fill={colors.primary}
+                      opacity="0.8"
+                    />
+                    <Circle
+                      cx={touchPosition.x}
+                      cy={touchPosition.y}
+                      r="4"
+                      fill={colors.card}
+                    />
+                  </>
+                )}
+
+                {/* Фон tooltip */}
+                <Rect
+                  x={tooltipData.tooltipX}
+                  y={tooltipData.tooltipY}
+                  width={tooltipData.tooltipWidth}
+                  height={tooltipData.changeText ? 38 : 24}
+                  rx="6"
+                  ry="6"
+                  fill={colors.primary}
+                  opacity="0.95"
+                />
+
+                {/* Баланс */}
+                <SvgText
+                  x={tooltipData.tooltipX + tooltipData.tooltipWidth / 2}
+                  y={tooltipData.tooltipY + 16}
+                  fill="#FFFFFF"
+                  fontSize="12"
+                  fontWeight="bold"
+                  textAnchor="middle"
+                >
+                  {tooltipData.tooltipText}
+                </SvgText>
+
+                {/* Изменение */}
+                {tooltipData.changeText && (
+                  <SvgText
+                    x={tooltipData.tooltipX + tooltipData.tooltipWidth / 2}
+                    y={tooltipData.tooltipY + 31}
+                    fill={balanceChange! > 0 ? '#FFFFFF' : '#FFE5E5'}
+                    fontSize="10"
+                    fontWeight="600"
+                    textAnchor="middle"
+                  >
+                    {tooltipData.changeText}
+                  </SvgText>
+                )}
               </>
             )}
           </Svg>
@@ -545,35 +685,19 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
-    padding: 12,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    marginTop: 8,
+    marginBottom: 32,
   },
   header: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 6,
-  },
-  value: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 3,
-  },
-  date: {
-    fontSize: 11,
+    fontSize: 14,
+    fontWeight: '600',
   },
   chartContainer: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   periodSelector: {
     flexDirection: 'row',

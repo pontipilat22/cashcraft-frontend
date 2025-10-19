@@ -21,7 +21,7 @@ export const AccountsNavigator: React.FC = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: colors.background,
+          backgroundColor: colors.card,
           shadowColor: 'transparent',
           elevation: 0,
         },
@@ -42,7 +42,7 @@ export const AccountsNavigator: React.FC = () => {
           ),
           headerTitleAlign: 'left',
           headerStyle: {
-            backgroundColor: colors.background,
+            backgroundColor: colors.card,
             shadowColor: 'transparent',
             elevation: 0,
           },
@@ -62,7 +62,7 @@ export const AccountsNavigator: React.FC = () => {
           ),
           headerTitleAlign: 'left',
           headerStyle: {
-            backgroundColor: colors.background,
+            backgroundColor: colors.card,
             shadowColor: 'transparent',
             elevation: 0,
           },

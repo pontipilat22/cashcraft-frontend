@@ -75,7 +75,7 @@ export const AccountTabs: React.FC<AccountTabsProps> = ({ activeTab, onTabChange
   if (needsScroll) {
     // Маленькие экраны - используем ScrollView
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#2a2a2a' : '#F3F5F7' }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -106,7 +106,7 @@ export const AccountTabs: React.FC<AccountTabsProps> = ({ activeTab, onTabChange
   } else {
     // Большие экраны - равномерное распределение без скролла
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#2a2a2a' : '#F3F5F7' }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.flexContainer}>
           {tabs.map((tab) => (
             <TouchableOpacity

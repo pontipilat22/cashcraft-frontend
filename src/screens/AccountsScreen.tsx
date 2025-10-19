@@ -583,14 +583,19 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={colors.background}
+        backgroundColor={colors.card}
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 0 }}>
-        {/* <StatisticsCard /> */}
-        <BalanceChart />
+        {/* Белая карточка для верхнего контента */}
+        <View style={[styles.topCard, { backgroundColor: colors.card }]}>
+          {/* <StatisticsCard /> */}
+          <BalanceChart />
+        </View>
 
-        <AccountTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        <View style={{ marginTop: 16 }}>
+          <AccountTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        </View>
 
         {activeTab === 'cards' && (
           <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
@@ -820,5 +825,15 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  topCard: {
+    paddingBottom: 8,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
 }); 
