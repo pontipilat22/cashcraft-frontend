@@ -63,6 +63,12 @@ export const MoreScreen: React.FC = () => {
 
   const menuItems = [
     {
+      id: 'ai-assistant',
+      title: t('ai.title'),
+      icon: 'sparkles-outline',
+      onPress: () => navigation.navigate('AIAssistant'),
+    },
+    {
       id: 'settings',
       title: t('settings.title'),
       icon: 'settings-outline',

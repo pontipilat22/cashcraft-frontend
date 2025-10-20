@@ -821,4 +821,15 @@ export default {
     interest: 'Interest',
     remaining: 'Balance',
   },
+  ai: {
+    title: 'AI Financial Assistant',
+    subtitle: 'Smart assistant for financial management',
+    inputPlaceholder: 'Ask a question...',
+    thinking: 'AI is thinking...',
+    error: 'Error',
+    errorMessage: 'Failed to get response from AI. Please try again later.',
+    welcomeMessage: 'Hello! I\'m your AI financial assistant. How can I help you?',
+    noMessages: 'Start a conversation with AI assistant',
+    send: 'Send',
+  },
 }; 

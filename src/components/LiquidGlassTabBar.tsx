@@ -66,6 +66,18 @@ export const LiquidGlassTabBar: React.FC<LiquidGlassTabBarProps> = ({
 
   const midPoint = Math.floor(state.routes.length / 2);
 
+  // Проверяем, нужно ли скрыть tab bar (ПОСЛЕ всех хуков!)
+  const currentRoute = state.routes[state.index];
+  const { options } = descriptors[currentRoute.key];
+  const tabBarStyle = options.tabBarStyle;
+
+  // Если tabBarStyle содержит display: 'none', скрываем tab bar
+  if (tabBarStyle && typeof tabBarStyle === 'object' && 'display' in tabBarStyle) {
+    if (tabBarStyle.display === 'none') {
+      return null; // Теперь безопасно делать return null - все хуки уже вызваны
+    }
+  }
+
   return (
     <View style={styles.outerContainer}>
       <View style={[styles.container, {

@@ -10,6 +10,7 @@ import { HelpScreen } from '../screens/HelpScreen';
 import { ExportImportScreen } from '../screens/ExportImportScreen';
 import { SetPinScreen } from '../screens/SetPinScreen';
 import { CategorySettingsScreen } from '../screens/CategorySettingsScreen';
+import { AIAssistantScreen } from '../screens/AIAssistantScreen';
 
 export type MoreStackParamList = {
   MoreMain: undefined;
@@ -22,6 +23,7 @@ export type MoreStackParamList = {
   Help: undefined;
   ExportImport: undefined;
   SetPin: { isChangingPin?: boolean } | undefined;
+  AIAssistant: undefined;
 };
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -39,6 +41,7 @@ export const MoreNavigator: React.FC = () => {
         headerShadowVisible: false,
       }}
     >
+      {/* Все ваши существующие экраны остаются без изменений */}
       <Stack.Screen
         name="MoreMain"
         component={MoreScreen}
@@ -84,6 +87,24 @@ export const MoreNavigator: React.FC = () => {
         component={SetPinScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="AIAssistant"
+        component={AIAssistantScreen}
+        options={{
+          headerShown: false,
+          presentation: 'card',
+        }}
+        listeners={({ navigation }) => ({
+          focus: () => {
+            const parent = navigation.getParent();
+            if (parent) { parent.setOptions({ tabBarStyle: { display: 'none' } }); }
+          },
+          blur: () => {
+            const parent = navigation.getParent();
+            if (parent) { parent.setOptions({ tabBarStyle: { display: 'flex' } }); }
+          },
+        })}
+      />
     </Stack.Navigator>
   );
-}; 
+};

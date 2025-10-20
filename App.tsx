@@ -8,8 +8,9 @@ setGenerator(() => uuidv4());
 
 
 /* Остальной код приложения */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreenExpo from 'expo-splash-screen';
 
@@ -32,15 +33,91 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Предотвращаем автоматическое скрытие нативного splash screen
 SplashScreenExpo.preventAutoHideAsync();
 
+/* ─────────────── Error Boundary ─────────────── */
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    console.error('❌ [ErrorBoundary] Caught error:', error);
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('❌ [ErrorBoundary] Error details:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={errorStyles.container}>
+          <Text style={errorStyles.title}>❌ Ошибка приложения</Text>
+          <Text style={errorStyles.message}>{this.state.error?.message}</Text>
+          <Text style={errorStyles.stack}>{this.state.error?.stack}</Text>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+const errorStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#f00',
+  },
+  message: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#333',
+  },
+  stack: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
+  },
+});
+
 /* ─────────────── AppContent ─────────────── */
 function AppContent() {
+  console.log('🎬 [AppContent] Component mounting...');
+
   const { isDark } = useTheme();
+  console.log('✅ [AppContent] useTheme loaded');
+
   const { user, isLoading: authLoading, isPreparing } = useAuth();
+  console.log('✅ [AppContent] useAuth loaded, user:', !!user, 'authLoading:', authLoading);
+
   const { defaultCurrency } = useCurrency();
+  console.log('✅ [AppContent] useCurrency loaded, currency:', defaultCurrency);
+
   const [dataProviderKey, setDataProviderKey] = useState(0);
   const [showSplash, setShowSplash] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingLoading, setOnboardingLoading] = useState(true);
+
+  console.log('✅ [AppContent] All hooks initialized');
 
   // Скрываем нативный сплэш-скрин сразу
   useEffect(() => {
@@ -125,17 +202,21 @@ function AppContent() {
 
   // Показываем сплэш-скрин в течение 10 секунд или пока идет загрузка
   if (showSplash || authLoading || isPreparing || onboardingLoading) {
+    console.log('📱 [AppContent] Showing splash screen', { showSplash, authLoading, isPreparing, onboardingLoading });
     return <SplashScreen />;
   }
 
   // Показываем onboarding для новых пользователей
   if (showOnboarding) {
+    console.log('📱 [AppContent] Showing onboarding');
     return (
       <SafeAreaProvider>
         <OnboardingScreen onComplete={handleOnboardingComplete} />
       </SafeAreaProvider>
     );
   }
+
+  console.log('📱 [AppContent] Rendering main app, user:', !!user);
 
   return (
     <SafeAreaProvider>
@@ -162,17 +243,21 @@ function AppContent() {
 
 /* ─────────────── Корневой компонент ─────────────── */
 export default function App() {
+  console.log('🚀 [App] Starting application...');
+
   return (
-    <ThemeProvider>
-      <LocalizationProvider>
-        <CurrencyProvider>
-          <AuthProvider>
-            <FABProvider>
-              <AppContent />
-            </FABProvider>
-          </AuthProvider>
-        </CurrencyProvider>
-      </LocalizationProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <LocalizationProvider>
+          <CurrencyProvider>
+            <AuthProvider>
+              <FABProvider>
+                <AppContent />
+              </FABProvider>
+            </AuthProvider>
+          </CurrencyProvider>
+        </LocalizationProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

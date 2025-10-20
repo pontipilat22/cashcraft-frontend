@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -52,6 +53,7 @@ export const BottomTabNavigator: React.FC = () => {
         },
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
+        tabBarHideOnKeyboard: true, // Скрывает tab bar когда открывается клавиатура
         headerShown: true,
         headerStyle: {
           backgroundColor: colors.background,
@@ -100,9 +102,19 @@ export const BottomTabNavigator: React.FC = () => {
       <Tab.Screen
         name="More"
         component={MoreNavigator}
-        options={{
-          title: t('navigation.more'),
-          headerShown: false,
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route);
+
+          // Скрываем tab bar на следующих экранах:
+          const hideTabBarScreens = ['AIAssistant', 'Settings', 'Help', 'ExportImport', 'SetPin'];
+
+          return {
+            title: t('navigation.more'),
+            headerShown: false,
+            tabBarStyle: hideTabBarScreens.includes(routeName || '')
+              ? { display: 'none' }
+              : { display: 'flex' }, // Явно указываем display: flex
+          };
         }}
       />
     </Tab.Navigator>

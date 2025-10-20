@@ -2,8 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ClientEncryption } from '../utils/encryption';
 import { Platform } from 'react-native';
 
-// 🔥 Указываем IP напрямую (без __DEV__), чтобы работало даже в релизе
-const API_BASE_URL = 'https://cashcraft-backend-production.up.railway.app/api/v1';
+// 🔥 ЛОКАЛЬНЫЙ BACKEND ДЛЯ ТЕСТИРОВАНИЯ AI
+// Замените 192.168.1.100 на ваш локальный IP (найдите через ipconfig)
+const API_BASE_URL = 'http://10.0.2.2:3000/api/v1';
+
+// Если хотите вернуть на Railway, раскомментируйте:
+// const API_BASE_URL = 'https://cashcraft-backend-production.up.railway.app/api/v1';
 
 
 const ACCESS_TOKEN_KEY = '@cashcraft_access_token';
@@ -138,7 +142,7 @@ export class ApiService {
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
+      const timeout = setTimeout(() => controller.abort(), 30000); // Увеличили до 30 секунд
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
