@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 4,
+  version: 5,
   tables: [
     tableSchema({
       name: 'accounts',
@@ -116,6 +116,24 @@ export default appSchema({
         { name: 'amount', type: 'number' },
         { name: 'description', type: 'string', isOptional: true },
         { name: 'date', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+        { name: 'synced_at', type: 'number', isOptional: true },
+      ]
+    }),
+    tableSchema({
+      name: 'credit_payment_schedules',
+      columns: [
+        { name: 'account_id', type: 'string', isIndexed: true },
+        { name: 'payment_number', type: 'number' },
+        { name: 'payment_date', type: 'string' },
+        { name: 'total_payment', type: 'number' },
+        { name: 'principal_payment', type: 'number' },
+        { name: 'interest_payment', type: 'number' },
+        { name: 'remaining_balance', type: 'number' },
+        { name: 'status', type: 'string' }, // 'pending', 'paid', 'overdue', 'partial'
+        { name: 'paid_amount', type: 'number', isOptional: true },
+        { name: 'paid_date', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
         { name: 'synced_at', type: 'number', isOptional: true },

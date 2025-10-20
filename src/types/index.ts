@@ -105,4 +105,25 @@ export const AccountTypeLabels: Record<AccountType, string> = {
   investment: 'Инвестиции',
   debt: 'Долг',
   credit: 'Кредит',
-}; 
+};
+
+// Типы для кредитов
+export type CreditPaymentStatus = 'pending' | 'paid' | 'overdue' | 'partial';
+export type CreditStatus = 'active' | 'overdue' | 'paid_off' | 'archived';
+
+export interface CreditPaymentSchedule {
+  id: string;
+  accountId: string;
+  paymentNumber: number;
+  paymentDate: string;
+  totalPayment: number;
+  principalPayment: number;
+  interestPayment: number;
+  remainingBalance: number;
+  status: CreditPaymentStatus;
+  paidAmount?: number;
+  paidDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  syncedAt?: string;
+} 

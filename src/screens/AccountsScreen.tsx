@@ -416,7 +416,14 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     setShowTransferModal(true);
   };
 
-
+  const handleAccountPress = (account: Account) => {
+    // Если это кредит, открываем экран деталей кредита
+    if (account.type === 'credit') {
+      navigation.navigate('CreditDetails', { accountId: account.id });
+    }
+    // Для других типов счетов пока ничего не делаем
+    // В будущем можно добавить экраны деталей для других типов
+  };
 
   const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
     setDebtOperationType(type);
@@ -603,7 +610,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                 <AccountCard
                   key={account.id}
                   account={account}
-                  onPress={() => {}}
+                  onPress={() => handleAccountPress(account)}
                   onLongPress={() => handleAccountLongPress(account)}
                 />
               ))
@@ -695,7 +702,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
                 <AccountCard
                   key={account.id}
                   account={account}
-                  onPress={() => {}}
+                  onPress={() => handleAccountPress(account)}
                   onLongPress={() => handleAccountLongPress(account)}
                 />
               ))

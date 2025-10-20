@@ -11,6 +11,7 @@ import Setting from './models/Setting';
 import SyncMetadata from './models/SyncMetadata';
 import Goal from './models/Goal';
 import GoalTransfer from './models/GoalTransfer';
+import CreditPaymentSchedule from './models/CreditPaymentSchedule';
 
 // Define migrations
 const migrations = schemaMigrations({
@@ -23,6 +24,30 @@ const migrations = schemaMigrations({
           table: 'categories',
           columns: [
             { name: 'budget_category', type: 'string', isOptional: true },
+          ],
+        },
+      ],
+    },
+    {
+      toVersion: 5,
+      steps: [
+        {
+          type: 'create_table',
+          table: 'credit_payment_schedules',
+          columns: [
+            { name: 'account_id', type: 'string', isIndexed: true },
+            { name: 'payment_number', type: 'number' },
+            { name: 'payment_date', type: 'string' },
+            { name: 'total_payment', type: 'number' },
+            { name: 'principal_payment', type: 'number' },
+            { name: 'interest_payment', type: 'number' },
+            { name: 'remaining_balance', type: 'number' },
+            { name: 'status', type: 'string' },
+            { name: 'paid_amount', type: 'number', isOptional: true },
+            { name: 'paid_date', type: 'string', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+            { name: 'synced_at', type: 'number', isOptional: true },
           ],
         },
       ],
@@ -53,6 +78,7 @@ const database = new Database({
     SyncMetadata,
     Goal,
     GoalTransfer,
+    CreditPaymentSchedule,
   ],
 });
 
