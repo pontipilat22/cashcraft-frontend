@@ -69,7 +69,7 @@ export const LiquidGlassTabBar: React.FC<LiquidGlassTabBarProps> = ({
   return (
     <View style={styles.outerContainer}>
       <View style={[styles.container, {
-        backgroundColor: isDark ? 'rgba(28, 28, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: isDark ? '#232323' : colors.card,
       }]}>
         {state.routes.map((route, index) => {
           // Вставляем FAB кнопку в центр

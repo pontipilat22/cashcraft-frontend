@@ -9,7 +9,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { useData } from '../context/DataContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CHART_WIDTH = SCREEN_WIDTH - 32;
+const CHART_WIDTH = SCREEN_WIDTH;
 const CHART_HEIGHT = 140;
 const CHART_MARGIN = 15;
 
@@ -310,9 +310,9 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
   const chartOpacity = useSharedValue(1);
 
   // Вычисляем масштабы для отображения данных
-  const { chartData, pathString, zeroLineY } = useMemo(() => {
+  const { chartData, pathString, areaPathString, zeroLineY } = useMemo(() => {
     if (!rawData || rawData.length === 0) {
-      return { chartData: [], pathString: '', zeroLineY: null };
+      return { chartData: [], pathString: '', areaPathString: '', zeroLineY: null };
     }
 
     const values = rawData.map(d => d.value);
@@ -362,12 +362,25 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
 
     const path = lineGenerator(chartDataPoints) || '';
 
+    // Создаем path для области под графиком (для градиентной заливки)
+    const bottomY = CHART_HEIGHT - CHART_MARGIN;
+    let areaPath = path;
+
+    if (chartDataPoints.length > 0) {
+      const lastPoint = chartDataPoints[chartDataPoints.length - 1];
+      const firstPoint = chartDataPoints[0];
+
+      // Добавляем линию вниз от последней точки, потом влево по низу, потом вверх к первой точке
+      areaPath = path + ` L ${lastPoint.x} ${bottomY} L ${firstPoint.x} ${bottomY} Z`;
+    }
+
     // Вычисляем Y координату для линии нуля
     const zeroY = scaleY(0);
 
     return {
       chartData: chartDataPoints,
       pathString: path,
+      areaPathString: areaPath,
       zeroLineY: zeroY,
     };
   }, [rawData]);
@@ -530,7 +543,34 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
                 <Stop offset="0%" stopColor={colors.primary} stopOpacity="1" />
                 <Stop offset="100%" stopColor={colors.primary} stopOpacity="0.6" />
               </SvgLinearGradient>
+
+              {/* Вертикальный градиент для области под графиком */}
+              <SvgLinearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <Stop
+                  offset="0%"
+                  stopColor={isDark ? '#FF8C42' : '#4A90E2'}
+                  stopOpacity="0.4"
+                />
+                <Stop
+                  offset="80%"
+                  stopColor={isDark ? '#FF8C42' : '#4A90E2'}
+                  stopOpacity="0.05"
+                />
+                <Stop
+                  offset="100%"
+                  stopColor={isDark ? '#FF8C42' : '#4A90E2'}
+                  stopOpacity="0"
+                />
+              </SvgLinearGradient>
             </Defs>
+
+            {/* Область под графиком с градиентной заливкой */}
+            {areaPathString && (
+              <Path
+                d={areaPathString}
+                fill="url(#areaGradient)"
+              />
+            )}
 
             {/* Линия нуля (пунктирная) */}
             {zeroLineY !== null && zeroLineY >= CHART_MARGIN && zeroLineY <= CHART_HEIGHT - CHART_MARGIN && (
@@ -699,12 +739,12 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 32,
   },
   header: {
     marginBottom: 8,
+    marginHorizontal: 16,
   },
   title: {
     fontSize: 14,
@@ -723,6 +763,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
+    marginHorizontal: 16,
   },
   periodButton: {
     flex: 1,
