@@ -22,7 +22,10 @@
       "Bash(npm install --save-dev @types/d3-shape)",
       "Bash(npm install @shopify/react-native-skia@1.5.6 d3-shape --legacy-peer-deps)",
       "Bash(npm install --save-dev @types/d3-shape --legacy-peer-deps)",
-      "Bash(npm uninstall @bottom-tabs/react-navigation react-native-bottom-tabs)"
+      "Bash(npm uninstall @bottom-tabs/react-navigation react-native-bottom-tabs)",
+      "Bash(adb -s emulator-5554 shell pm list packages)",
+      "Bash(findstr cashcraft)",
+      "Bash(adb -s emulator-5554 shell \"df -h /data\")"
     ],
     "deny": [],
     "ask": []

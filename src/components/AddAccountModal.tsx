@@ -620,102 +620,93 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
               </>
             )}
 
-            {/* Поля для кредитов */}
+            {/* Поля для кредитов - оптимизированная форма */}
             {accountType === 'credit' && (
               <>
-                {/* Дата получения кредита */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditDate')}</Text>
-                  <TouchableOpacity
-                    style={[styles.dateButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                    onPress={creditDatePicker.openDatePicker}
-                  >
-                    <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                    <Text style={[styles.dateText, { color: colors.text }]}>
-                      {creditDatePicker.selectedDate.toLocaleDateString('ru-RU')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
                 {/* Сумма кредита */}
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditAmount')}</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>
+                    {t('accounts.creditAmount') || 'Сумма кредита'} 💰
+                  </Text>
                   <TextInput
-                    style={[styles.input, { 
+                    style={[styles.input, {
                       backgroundColor: colors.background,
                       color: colors.text,
-                      borderColor: colors.border,
+                      borderColor: showErrors && errors.balance ? '#FF4444' : colors.border,
                     }]}
                     value={balance}
                     onChangeText={setBalance}
-                    placeholder="0"
+                    placeholder="500000"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="numeric"
+                    autoFocus
                   />
+                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
+                    Какую сумму взяли в кредит
+                  </Text>
                 </View>
 
-                {/* Срок кредита */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditTerm')}</Text>
-                  <TextInput
-                    style={[styles.input, { 
-                      backgroundColor: colors.background,
-                      color: colors.text,
-                      borderColor: showErrors && errors.creditTerm ? '#FF4444' : colors.border,
-                    }]}
-                    value={creditTerm}
-                    onChangeText={(text) => {
-                      setCreditTerm(text);
-                      if (showErrors && errors.creditTerm && text && parseInt(text) > 0) {
-                        setErrors(prev => ({ ...prev, creditTerm: false }));
-                      }
-                    }}
-                    placeholder="12"
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="numeric"
-                  />
-                  {showErrors && errors.creditTerm && (
-                    <Text style={[styles.errorText, { color: '#FF4444' }]}>
-                      {t('validation.creditTermRequired')}
+                {/* Срок и ставка в одной строке */}
+                <View style={styles.rowContainer}>
+                  <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>
+                      {t('accounts.creditTerm') || 'Срок'} 📅
                     </Text>
-                  )}
-                </View>
+                    <TextInput
+                      style={[styles.input, {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderColor: showErrors && errors.creditTerm ? '#FF4444' : colors.border,
+                      }]}
+                      value={creditTerm}
+                      onChangeText={(text) => {
+                        setCreditTerm(text);
+                        if (showErrors && errors.creditTerm && text && parseInt(text) > 0) {
+                          setErrors(prev => ({ ...prev, creditTerm: false }));
+                        }
+                      }}
+                      placeholder="12"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                    />
+                    <Text style={[styles.hint, { color: colors.textSecondary }]}>месяцев</Text>
+                  </View>
 
-                {/* Процентная ставка */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.creditRate')}</Text>
-                  <TextInput
-                    style={[styles.input, { 
-                      backgroundColor: colors.background,
-                      color: colors.text,
-                      borderColor: showErrors && errors.creditRate ? '#FF4444' : colors.border,
-                    }]}
-                    value={creditRate}
-                    onChangeText={(text) => {
-                      setCreditRate(text);
-                      if (showErrors && errors.creditRate && text && parseFloat(text) >= 0) {
-                        setErrors(prev => ({ ...prev, creditRate: false }));
-                      }
-                    }}
-                    placeholder="15.5"
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="numeric"
-                  />
-                  {showErrors && errors.creditRate && (
-                    <Text style={[styles.errorText, { color: '#FF4444' }]}>
-                      {t('validation.creditRateRequired')}
+                  <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>
+                      {t('accounts.creditRate') || 'Ставка'} %
                     </Text>
-                  )}
+                    <TextInput
+                      style={[styles.input, {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderColor: showErrors && errors.creditRate ? '#FF4444' : colors.border,
+                      }]}
+                      value={creditRate}
+                      onChangeText={(text) => {
+                        setCreditRate(text);
+                        if (showErrors && errors.creditRate && text && parseFloat(text) >= 0) {
+                          setErrors(prev => ({ ...prev, creditRate: false }));
+                        }
+                      }}
+                      placeholder="15.5"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                    />
+                    <Text style={[styles.hint, { color: colors.textSecondary }]}>годовых</Text>
+                  </View>
                 </View>
 
-                {/* Тип платежей */}
+                {/* Тип платежей - компактный */}
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.paymentType')}</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>
+                    {t('accounts.paymentType') || 'Тип платежей'}
+                  </Text>
                   <View style={styles.paymentTypeContainer}>
                     <TouchableOpacity
                       style={[
-                        styles.paymentTypeButton,
-                        { 
+                        styles.paymentTypeButtonCompact,
+                        {
                           backgroundColor: creditPaymentType === 'annuity' ? colors.primary : colors.background,
                           borderColor: colors.border,
                         }
@@ -723,16 +714,22 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                       onPress={() => setCreditPaymentType('annuity')}
                     >
                       <Text style={[
-                        styles.paymentTypeText,
+                        styles.paymentTypeTextCompact,
                         { color: creditPaymentType === 'annuity' ? '#fff' : colors.text }
                       ]}>
-                        {t('accounts.annuity')}
+                        {t('accounts.annuity') || 'Аннуитет'}
+                      </Text>
+                      <Text style={[
+                        styles.paymentTypeHint,
+                        { color: creditPaymentType === 'annuity' ? 'rgba(255,255,255,0.7)' : colors.textSecondary }
+                      ]}>
+                        Равные платежи
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[
-                        styles.paymentTypeButton,
-                        { 
+                        styles.paymentTypeButtonCompact,
+                        {
                           backgroundColor: creditPaymentType === 'differentiated' ? colors.primary : colors.background,
                           borderColor: colors.border,
                         }
@@ -740,10 +737,16 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                       onPress={() => setCreditPaymentType('differentiated')}
                     >
                       <Text style={[
-                        styles.paymentTypeText,
+                        styles.paymentTypeTextCompact,
                         { color: creditPaymentType === 'differentiated' ? '#fff' : colors.text }
                       ]}>
-                        {t('accounts.differentiated')}
+                        {t('accounts.differentiated') || 'Дифференц.'}
+                      </Text>
+                      <Text style={[
+                        styles.paymentTypeHint,
+                        { color: creditPaymentType === 'differentiated' ? 'rgba(255,255,255,0.7)' : colors.textSecondary }
+                      ]}>
+                        Убывающие
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1208,5 +1211,31 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 12,
     marginTop: 4,
+  },
+  rowContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  hint: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  paymentTypeButtonCompact: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginHorizontal: 4,
+  },
+  paymentTypeTextCompact: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  paymentTypeHint: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 2,
   },
 }); 
