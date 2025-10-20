@@ -5,12 +5,15 @@ interface FABContextType {
   openFABMenu: () => void;
   closeFABMenu: () => void;
   toggleFABMenu: () => void;
+  targetTab: string | null;
+  setTargetTab: (tab: string | null) => void;
 }
 
 const FABContext = createContext<FABContextType | undefined>(undefined);
 
 export const FABProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isFABMenuOpen, setIsFABMenuOpen] = useState(false);
+  const [targetTab, setTargetTab] = useState<string | null>(null);
 
   const openFABMenu = () => setIsFABMenuOpen(true);
   const closeFABMenu = () => setIsFABMenuOpen(false);
@@ -23,6 +26,8 @@ export const FABProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         openFABMenu,
         closeFABMenu,
         toggleFABMenu,
+        targetTab,
+        setTargetTab,
       }}
     >
       {children}

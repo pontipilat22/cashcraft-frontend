@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useBudgetContext } from '../context/BudgetContext';
+import { useFAB } from '../context/FABContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
 import { AccountTabs } from '../components/AccountTabs';
@@ -45,6 +46,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const { t } = useLocalization();
   const { formatAmount, defaultCurrency } = useCurrency();
   const { isEnabled: isBudgetEnabled, reloadData: reloadBudgetData } = useBudgetContext();
+  const { targetTab, setTargetTab } = useFAB();
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -74,6 +76,15 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     });
   }, [showEditGoalModal, showGoalActionsModal, selectedGoal]);
   const [activeTab, setActiveTab] = useState<string>('cards');
+
+  // Автоматическое переключение на нужную вкладку
+  useEffect(() => {
+    if (targetTab) {
+      setActiveTab(targetTab);
+      // Сбрасываем targetTab после переключения
+      setTargetTab(null);
+    }
+  }, [targetTab, setTargetTab]);
 
   // Загружаем долги при фокусе экрана
   useFocusEffect(

@@ -17,7 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { AccountType } from '../types';
 
 export const BottomTabNavigatorWrapper: React.FC = () => {
-  const { isFABMenuOpen, closeFABMenu } = useFAB();
+  const { isFABMenuOpen, closeFABMenu, setTargetTab } = useFAB();
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { createAccount, createGoal } = useData();
@@ -90,6 +90,11 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
     await createAccount(accountData);
     await reloadBudgetData();
     setShowAddAccountModal(false);
+
+    // Если создали кредит, переключаем на вкладку кредитов
+    if (selectedAccountType === 'credit') {
+      setTargetTab('credits');
+    }
   };
 
   const handleSaveGoal = async (goalData: any) => {
