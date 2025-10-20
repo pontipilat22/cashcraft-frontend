@@ -70,6 +70,12 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
     setShowAddGoalModal(true);
   };
 
+  const handleAddCredit = () => {
+    closeFABMenu();
+    setSelectedAccountType('credit');
+    setShowAddAccountModal(true);
+  };
+
   const handleSelectDebtType = (type: 'owed_to_me' | 'owed_by_me') => {
     setSelectedDebtType(type);
     setShowDebtTypeSelector(false);
@@ -137,6 +143,13 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
       icon: 'flag' as keyof typeof Ionicons.glyphMap,
       color: colors.primary,
       onPress: handleAddGoal,
+    },
+    {
+      id: 'credit',
+      title: t('accounts.addCredit') || 'Добавить кредит',
+      icon: 'card' as keyof typeof Ionicons.glyphMap,
+      color: colors.primary,
+      onPress: handleAddCredit,
     },
   ];
 
