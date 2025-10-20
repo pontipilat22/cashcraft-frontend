@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Q } from '@nozbe/watermelondb';
 import { useTheme } from '../context/ThemeContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
@@ -47,8 +48,7 @@ export const CreditDetailsScreen: React.FC = () => {
       // Пытаемся загрузить существующий график из БД
       const scheduleCollection = database.get<CreditPaymentSchedule>('credit_payment_schedules');
       const scheduleItems = await scheduleCollection
-        .query()
-        .where('account_id', accountId)
+        .query(Q.where('account_id', accountId))
         .fetch();
 
       if (scheduleItems.length > 0) {
