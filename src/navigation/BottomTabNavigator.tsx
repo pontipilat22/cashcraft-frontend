@@ -5,7 +5,9 @@ import { StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useBudgetContext } from '../context/BudgetContext';
+import { useFAB } from '../context/FABContext';
 import { BalanceHeader } from '../components/BalanceHeader';
+import { LiquidGlassTabBar } from '../components/LiquidGlassTabBar';
 
 import { AccountsNavigator } from './AccountsNavigator';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
@@ -25,9 +27,11 @@ export const BottomTabNavigator: React.FC = () => {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const { isEnabled: isBudgetEnabled } = useBudgetContext();
+  const { toggleFABMenu } = useFAB();
 
   return (
     <Tab.Navigator
+      tabBar={(props) => <LiquidGlassTabBar {...props} onFABPress={toggleFABMenu} />}
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
@@ -55,11 +59,6 @@ export const BottomTabNavigator: React.FC = () => {
           elevation: 0,
         },
         headerTintColor: colors.text,
-        tabBarStyle: {
-          backgroundColor: colors.tabBar,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-        },
       })}
     >
       <Tab.Screen

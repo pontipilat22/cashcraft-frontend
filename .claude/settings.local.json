@@ -1,7 +1,28 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(gradlew.bat clean:*)",
+      "WebSearch",
+      "WebFetch(domain:stackoverflow.com)",
+      "Bash(npm install)",
+      "Bash(npm test:*)",
+      "Bash(adb devices:*)",
+      "Bash(npm run android:*)",
+      "Bash(npx expo prebuild:*)",
+      "Bash(.gradlew.bat clean)",
+      "Bash(cmd /c \"cd android && gradlew.bat clean\")",
+      "Bash(Remove-Item -Recurse -Force android.gradle -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force androidappbuild -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force androidbuild -ErrorAction SilentlyContinue)",
+      "Bash(Write-Host \"Gradle cache cleared\")",
+      "Bash(del RECOMMENDATIONS.md QUICK_WINS.md TESTING.md TEST_STATUS.md TEST_RESULTS.md TEST_PROBLEMS_EXPLAINED.md PROJECT_STRUCTURE.txt)",
+      "Bash(rm RECOMMENDATIONS.md QUICK_WINS.md TESTING.md TEST_STATUS.md TEST_RESULTS.md TEST_PROBLEMS_EXPLAINED.md PROJECT_STRUCTURE.txt)",
+      "Bash(npm install @shopify/react-native-skia d3-shape)",
+      "Bash(npm install --save-dev @types/d3-shape)",
+      "Bash(npm install @shopify/react-native-skia@1.5.6 d3-shape --legacy-peer-deps)",
+      "Bash(npm install --save-dev @types/d3-shape --legacy-peer-deps)",
+      "Bash(npm uninstall @bottom-tabs/react-navigation react-native-bottom-tabs)"
     ],
     "deny": [],
     "ask": []

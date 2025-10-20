@@ -32,8 +32,6 @@ export const AccountTabs: React.FC<AccountTabsProps> = ({ activeTab, onTabChange
   const styles = StyleSheet.create({
     container: {
       height: 48,
-      borderBottomWidth: 1,
-      borderBottomColor: 'rgba(0,0,0,0.1)',
     },
     scrollContent: {
       paddingHorizontal: needsScroll ? 16 : 0,

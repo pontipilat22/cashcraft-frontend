@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useBudgetContext } from '../context/BudgetContext';
 import { CURRENCIES } from '../config/currencies';
 
 interface TransferModalProps {
@@ -32,6 +33,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const { accounts, goals, createTransaction, transferToGoal } = useData();
   const { formatAmount, defaultCurrency } = useCurrency();
   const { t } = useLocalization();
+  const { reloadData: reloadBudgetData } = useBudgetContext();
   
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -158,7 +160,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           date: transferDate,
         });
       }
-      
+
+      // Обновляем данные бюджета после перевода
+      await reloadBudgetData();
+      console.log('🔄 [TransferModal] Данные бюджета обновлены после перевода');
+
       handleClose();
     } catch (error) {
       console.error('Error creating transfer:', error);

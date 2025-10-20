@@ -26,8 +26,6 @@ import { CURRENCIES } from '../config/currencies';
 import { useNavigation } from '@react-navigation/native';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { ExchangeRatesManager } from '../components/ExchangeRatesManager';
-import { TestConnection } from '../components/TestConnection';
-import { CurrencyDiagnostics } from '../components/CurrencyDiagnostics';
 import { ApiService } from '../services/api';
 import { AuthService } from '../services/auth';
 import { pinService } from '../services/pinService';
@@ -54,8 +52,6 @@ export const SettingsScreen: React.FC = () => {
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showExchangeRatesModal, setShowExchangeRatesModal] = useState(false);
   const [showExchangeRatesManager, setShowExchangeRatesManager] = useState(false);
-  const [showTestConnection, setShowTestConnection] = useState(false);
-  const [showCurrencyDiagnostics, setShowCurrencyDiagnostics] = useState(false);
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({});
   const [newCurrency, setNewCurrency] = useState(defaultCurrency);
   const [isAutoMode, setIsAutoMode] = useState(false);
@@ -108,37 +104,6 @@ export const SettingsScreen: React.FC = () => {
 
     return unsubscribe;
   }, [navigation]);
-
-  const testCurrencyConversion = async () => {
-    try {
-      // Тест 1: Получить курс USD->EUR
-      const rateUsdEur = await LocalDatabaseService.getExchangeRate('USD', 'EUR');
-      console.log('Test 1 - USD->EUR rate:', rateUsdEur);
-      
-      // Тест 2: Получить курс EUR->USD
-      const rateEurUsd = await LocalDatabaseService.getExchangeRate('EUR', 'USD');
-      console.log('Test 2 - EUR->USD rate:', rateEurUsd);
-      
-      // Тест 3: Конвертация суммы
-      const { ExchangeRateService } = await import('../services/exchangeRate');
-      const converted = await ExchangeRateService.convert(100, 'USD', 'EUR');
-      console.log('Test 3 - Convert $100 to EUR:', converted);
-      
-      // Тест 4: Проверить все сохраненные курсы
-      const allRates = await LocalDatabaseService.getAllExchangeRates();
-      console.log('Test 4 - All saved rates:', allRates);
-      
-      Alert.alert(
-        'Currency Test Results',
-        `USD->EUR: ${rateUsdEur || 'Not found'}\n` +
-        `EUR->USD: ${rateEurUsd || 'Not found'}\n` +
-        `$100 = €${converted.toFixed(2)}\n` +
-        `Total rates in DB: ${allRates.length}`
-      );
-    } catch (error) {
-      Alert.alert('Test Error', error instanceof Error ? error.message : String(error));
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -463,60 +428,6 @@ export const SettingsScreen: React.FC = () => {
             undefined,
             () => {}
           )}
-
-
-          {/* Только для разработки - тест соединения */}
-          {__DEV__ && renderSettingItem(
-            'bug-outline',
-            'Test Backend Connection',
-            undefined,
-            () => setShowTestConnection(true)
-          )}
-          
-          {/* Только для разработки - диагностика курсов валют */}
-          {__DEV__ && renderSettingItem(
-            'analytics-outline',
-            'Currency System Diagnostics',
-            undefined,
-            () => setShowCurrencyDiagnostics(true)
-          )}
-          
-          {/* Только для разработки - тест курсов */}
-          {__DEV__ && renderSettingItem(
-            'sync-outline',
-            'Test Currency Conversion',
-            undefined,
-            () => testCurrencyConversion()
-          )}
-          
-          {/* Только для разработки - сброс курсов */}
-          {__DEV__ && renderSettingItem(
-            'refresh-outline',
-            'Reset All Exchange Rates',
-            undefined,
-            async () => {
-              Alert.alert(
-                'Reset Exchange Rates',
-                'This will delete all saved exchange rates and fetch fresh ones. Continue?',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Reset',
-                    style: 'destructive',
-                    onPress: async () => {
-                      try {
-                        const { ExchangeRateService } = await import('../services/exchangeRate');
-                        await ExchangeRateService.clearAllRates();
-                        Alert.alert('Success', 'All exchange rates have been cleared. Restart the app to fetch fresh rates.');
-                      } catch (error) {
-                        Alert.alert('Error', 'Failed to reset exchange rates');
-                      }
-                    }
-                  }
-                ]
-              );
-            }
-          )}
         </View>
 
         {user && !user.isGuest && (
@@ -783,34 +694,6 @@ export const SettingsScreen: React.FC = () => {
           }
         }}
       />
-
-      {/* Test Connection */}
-      <TestConnection
-        visible={showTestConnection}
-        onClose={() => setShowTestConnection(false)}
-      />
-      
-      {/* Currency Diagnostics Modal */}
-      <Modal
-        visible={showCurrencyDiagnostics}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCurrencyDiagnostics(false)}
-      >
-        <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '80%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Currency System Diagnostics
-              </Text>
-              <TouchableOpacity onPress={() => setShowCurrencyDiagnostics(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-            <CurrencyDiagnostics />
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };

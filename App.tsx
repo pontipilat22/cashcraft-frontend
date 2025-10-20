@@ -13,7 +13,7 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreenExpo from 'expo-splash-screen';
 
-import { BottomTabNavigator } from './src/navigation/BottomTabNavigator';
+import { BottomTabNavigatorWrapper } from './src/navigation/BottomTabNavigatorWrapper';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { DataProvider } from './src/context/DataContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -21,6 +21,7 @@ import { SubscriptionProvider } from './src/context/SubscriptionContext';
 import { LocalizationProvider } from './src/context/LocalizationContext';
 import { CurrencyProvider, useCurrency } from './src/context/CurrencyContext';
 import { BudgetProvider } from './src/context/BudgetContext';
+import { FABProvider } from './src/context/FABContext';
 
 import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
@@ -149,7 +150,7 @@ function AppContent() {
                 userId={user.id}
                 defaultCurrency={defaultCurrency}
               >
-                <BottomTabNavigator />
+                <BottomTabNavigatorWrapper />
               </DataProvider>
             </SubscriptionProvider>
           </BudgetProvider>
@@ -166,7 +167,9 @@ export default function App() {
       <LocalizationProvider>
         <CurrencyProvider>
           <AuthProvider>
-            <AppContent />
+            <FABProvider>
+              <AppContent />
+            </FABProvider>
           </AuthProvider>
         </CurrencyProvider>
       </LocalizationProvider>

@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "packagerOpts": {
       "port": 8081
     },
@@ -31,7 +31,7 @@
     "android": {
       "package": "com.pontipilat.cashcraft",
       "versionCode": 3,
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -81,8 +81,8 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "2.0.0",
-            "excludeExpoModules": ["expo-dev-launcher", "expo-dev-menu"]
+            "minSdkVersion": 24,
+            "kotlinVersion": "2.0.21"
           }
         }
       ]

@@ -1,43 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Switch,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useBudgetContext } from '../context/BudgetContext';
+import { PlansStackParamList } from '../navigation/PlansNavigator';
+
+type PlansScreenNavigationProp = StackNavigationProp<PlansStackParamList, 'PlansMain'>;
 
 export const PlansScreen: React.FC = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { formatAmount } = useCurrency();
-  const { budgetSettings, saveBudgetSettings, getBudgetAmounts, trackingData, reloadData, getDailyAllowance, getDailyBudget, getSpentToday } = useBudgetContext();
-
-  const [showCustomization, setShowCustomization] = useState(false);
-  const [tempPercentages, setTempPercentages] = useState({
-    essential: budgetSettings.essentialPercentage.toString(),
-    nonEssential: budgetSettings.nonEssentialPercentage.toString(),
-    savings: budgetSettings.savingsPercentage.toString(),
-  });
-
-  // Update temp percentages when budget settings change
-  useEffect(() => {
-    setTempPercentages({
-      essential: budgetSettings.essentialPercentage.toString(),
-      nonEssential: budgetSettings.nonEssentialPercentage.toString(),
-      savings: budgetSettings.savingsPercentage.toString(),
-    });
-  }, [budgetSettings]);
+  const navigation = useNavigation<PlansScreenNavigationProp>();
+  const { budgetSettings, trackingData, reloadData, getDailyAllowance, getDailyBudget, getSpentToday } = useBudgetContext();
 
   // Reload data when screen focuses
   useFocusEffect(
@@ -55,47 +41,6 @@ export const PlansScreen: React.FC = () => {
       dailyBudget: trackingData.dailyBudget
     });
   }, [budgetSettings.enabled, trackingData.totalIncomeThisMonth, trackingData.dailyBudget]);
-
-  const toggleBudgetSystem = async () => {
-    const newSettings = { ...budgetSettings, enabled: !budgetSettings.enabled };
-    await saveBudgetSettings(newSettings);
-    // Перезагружаем данные для немедленного обновления UI
-    await reloadData();
-  };
-
-
-  const getCurrentTotal = () => {
-    const essential = parseFloat(tempPercentages.essential) || 0;
-    const nonEssential = parseFloat(tempPercentages.nonEssential) || 0;
-    const savings = parseFloat(tempPercentages.savings) || 0;
-    return essential + nonEssential + savings;
-  };
-
-  const saveCustomPercentages = async () => {
-    const total = getCurrentTotal();
-    if (total !== 100) {
-      Alert.alert(t('plans.totalMustBe100'), `${t('plans.currentTotal')}: ${total}%`);
-      return;
-    }
-
-    const newSettings = {
-      ...budgetSettings,
-      essentialPercentage: parseFloat(tempPercentages.essential),
-      nonEssentialPercentage: parseFloat(tempPercentages.nonEssential),
-      savingsPercentage: parseFloat(tempPercentages.savings),
-    };
-
-    await saveBudgetSettings(newSettings);
-    setShowCustomization(false);
-  };
-
-  const resetToDefault = () => {
-    setTempPercentages({
-      essential: '50',
-      nonEssential: '30',
-      savings: '20',
-    });
-  };
 
   const calculateAmount = (percentage: number) => {
     return (trackingData.totalIncomeThisMonth * percentage) / 100;
@@ -123,122 +68,35 @@ export const PlansScreen: React.FC = () => {
     </View>
   );
 
-  const renderCustomizationModal = () => (
-    <View style={[styles.customizationCard, { backgroundColor: colors.card }]}>
-      <Text style={[styles.customizationTitle, { color: colors.text }]}>
-        {t('plans.customizePercentages')}
-      </Text>
-
-      <View style={styles.inputRow}>
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
-          {t('plans.essentialExpenses')}:
-        </Text>
-        <TextInput
-          style={[styles.percentageInput, { backgroundColor: colors.background, color: colors.text }]}
-          value={tempPercentages.essential}
-          onChangeText={(value) => setTempPercentages(prev => ({ ...prev, essential: value }))}
-          keyboardType="numeric"
-          maxLength={3}
-        />
-        <Text style={[styles.percentSign, { color: colors.textSecondary }]}>%</Text>
-      </View>
-
-      <View style={styles.inputRow}>
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
-          {t('plans.nonEssentialExpenses')}:
-        </Text>
-        <TextInput
-          style={[styles.percentageInput, { backgroundColor: colors.background, color: colors.text }]}
-          value={tempPercentages.nonEssential}
-          onChangeText={(value) => setTempPercentages(prev => ({ ...prev, nonEssential: value }))}
-          keyboardType="numeric"
-          maxLength={3}
-        />
-        <Text style={[styles.percentSign, { color: colors.textSecondary }]}>%</Text>
-      </View>
-
-      <View style={styles.inputRow}>
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
-          {t('plans.savings')}:
-        </Text>
-        <TextInput
-          style={[styles.percentageInput, { backgroundColor: colors.background, color: colors.text }]}
-          value={tempPercentages.savings}
-          onChangeText={(value) => setTempPercentages(prev => ({ ...prev, savings: value }))}
-          keyboardType="numeric"
-          maxLength={3}
-        />
-        <Text style={[styles.percentSign, { color: colors.textSecondary }]}>%</Text>
-      </View>
-
-      <Text style={[styles.totalText, {
-        color: getCurrentTotal() === 100 ? colors.success || '#4CAF50' : colors.error || '#F44336'
-      }]}>
-        {t('plans.currentTotal')}: {getCurrentTotal()}%
-      </Text>
-
-      <View style={styles.customizationButtons}>
-        <TouchableOpacity
-          style={[styles.customButton, { backgroundColor: colors.border }]}
-          onPress={() => setShowCustomization(false)}
-        >
-          <Text style={[styles.customButtonText, { color: colors.text }]}>
-            {t('common.cancel')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.customButton, { backgroundColor: colors.textSecondary }]}
-          onPress={resetToDefault}
-        >
-          <Text style={[styles.customButtonText, { color: '#fff' }]}>
-            {t('common.reset')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.customButton, { backgroundColor: colors.primary }]}
-          onPress={saveCustomPercentages}
-        >
-          <Text style={[styles.customButtonText, { color: '#fff' }]}>
-            {t('common.save')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{t('plans.title')}</Text>
-        </View>
-
-        {/* Budget System Toggle */}
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
+        {/* Budget System Card - Clickable */}
+        <TouchableOpacity
+          style={[styles.card, styles.firstCard, { backgroundColor: colors.card }]}
+          onPress={() => navigation.navigate('BudgetSystemSettings')}
+          activeOpacity={0.7}
+        >
           <View style={styles.toggleRow}>
             <View style={styles.toggleInfo}>
               <Text style={[styles.toggleTitle, { color: colors.text }]}>
                 {t('plans.budgetSystem')}
               </Text>
               <Text style={[styles.toggleSubtitle, { color: colors.textSecondary }]}>
-                {budgetSettings.enabled ? t('plans.budgetEnabled') : t('plans.budgetDisabled')}
+                {budgetSettings.enabled
+                  ? t('plans.budgetEnabled')
+                  : t('plans.budgetDisabled')
+                }
               </Text>
             </View>
-            <Switch
-              value={budgetSettings.enabled}
-              onValueChange={toggleBudgetSystem}
-              trackColor={{ false: colors.border, true: colors.primary }}
-            />
+            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
           </View>
-        </View>
+        </TouchableOpacity>
 
         {budgetSettings.enabled && (
           <>
             {/* Income Summary */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <View style={[styles.card, styles.regularCard, { backgroundColor: colors.card }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>
                 {t('plans.currentMonth')}
               </Text>
@@ -308,20 +166,6 @@ export const PlansScreen: React.FC = () => {
                 )}
               </View>
             )}
-
-            {/* Customize Button */}
-            <TouchableOpacity
-              style={[styles.customizeButton, { backgroundColor: colors.primary }]}
-              onPress={() => setShowCustomization(true)}
-            >
-              <Ionicons name="settings-outline" size={20} color="#fff" />
-              <Text style={styles.customizeButtonText}>
-                {t('plans.customizePercentages')}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Customization Panel */}
-            {showCustomization && renderCustomizationModal()}
           </>
         )}
       </ScrollView>
@@ -335,20 +179,20 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    padding: 16,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingBottom: 16,
   },
   card: {
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
+  },
+  firstCard: {
+    marginTop: 60,
+  },
+  regularCard: {
+    marginTop: 16,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -370,29 +214,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 16,
-  },
-  incomeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  incomeInput: {
-    flex: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  setIncomeButton: {
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  setIncomeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   incomeHint: {
     fontSize: 14,
@@ -446,72 +267,5 @@ const styles = StyleSheet.create({
   budgetAmount: {
     fontSize: 18,
     fontWeight: '500',
-  },
-  customizeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
-  customizeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  customizationCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  customizationTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  inputLabel: {
-    flex: 1,
-    fontSize: 16,
-  },
-  percentageInput: {
-    width: 80,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    textAlign: 'center',
-    marginRight: 8,
-  },
-  percentSign: {
-    fontSize: 16,
-    width: 20,
-  },
-  totalText: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginVertical: 16,
-  },
-  customizationButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  customButton: {
-    flex: 1,
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-  },
-  customButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

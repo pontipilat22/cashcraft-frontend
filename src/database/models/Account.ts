@@ -23,6 +23,7 @@ export default class Account extends Model {
   @field('credit_rate') creditRate?: number;
   @field('credit_payment_type') creditPaymentType?: string;
   @field('credit_initial_amount') creditInitialAmount?: number;
+  @field('credit_paid_amount') creditPaidAmount?: number;
   @readonly @date('created_at') createdAt!: Date;
   @readonly @date('updated_at') updatedAt!: Date;
   @date('synced_at') syncedAt?: Date;

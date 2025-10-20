@@ -10,7 +10,6 @@ import { useBudgetContext } from '../context/BudgetContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
 import { AccountTabs } from '../components/AccountTabs';
-import { NewFABMenu } from '../components/NewFABMenu';
 import { AddAccountModal } from '../components/AddAccountModal';
 import { EditAccountModal } from '../components/EditAccountModal';
 import { AccountTypeSelector } from '../components/AccountTypeSelector';
@@ -583,12 +582,12 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={colors.card}
+        backgroundColor={isDark ? '#232323' : '#FFFFFF'}
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 0 }}>
         {/* Белая карточка для верхнего контента */}
-        <View style={[styles.topCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.topCard, { backgroundColor: isDark ? '#232323' : '#FFFFFF' }]}>
           {/* <StatisticsCard /> */}
           <BalanceChart />
         </View>
@@ -706,16 +705,6 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
 
         <View style={{ height: 100 }}></View>
       </ScrollView>
-
-      <NewFABMenu
-        onIncomePress={handleQuickIncome}
-        onExpensePress={handleQuickExpense}
-        onTransferPress={handleQuickTransfer}
-        onDebtPress={handleQuickDebt}
-        onAddAccountPress={() => handleAddAccount('cards')}
-        onAddSavingsPress={handleAddGoal}
-        onAddCreditPress={() => handleAddAccount('credits')}
-      />
 
       <AccountTypeSelector
         visible={typeSelectorVisible}

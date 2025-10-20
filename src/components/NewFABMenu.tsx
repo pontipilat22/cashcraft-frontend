@@ -44,17 +44,9 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { reloadData } = useBudgetContext();
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleMenuPress = () => {
-    reloadData(); // Обновляем данные бюджета при открытии меню
-    setIsOpen(true);
-  };
-  const handleClose = () => setIsOpen(false);
 
   const handleItemPress = (action: () => void) => {
-    setIsOpen(false);
-    setTimeout(action, 150);
+    action();
   };
 
   const menuItems: MenuItem[] = [
@@ -192,20 +184,15 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
   });
 
   return (
-    <>
-      <TouchableOpacity style={styles.fab} onPress={handleMenuPress} activeOpacity={0.8}>
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
-
-      <Modal
-        visible={isOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={handleClose}
-      >
-        <View style={styles.modalOverlay}>
-          {/* Подложка: клик вне меню закрывает модалку */}
-          <Pressable style={RNStyleSheet.absoluteFill} onPress={handleClose} />
+    <Modal
+      visible={true}
+      transparent
+      animationType="slide"
+      onRequestClose={() => {}}
+    >
+      <View style={styles.modalOverlay}>
+        {/* Подложка: клик вне меню закрывает модалку */}
+        <Pressable style={RNStyleSheet.absoluteFill} onPress={() => {}} />
 
           {/* Контент меню */}
           <View style={styles.menuContainer}>
@@ -213,7 +200,7 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
               accessibilityRole="button"
               accessibilityLabel={t('common.close')}
               style={styles.closeButton}
-              onPress={handleClose}
+              onPress={() => {}}
               hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
             >
               <Ionicons name="close" size={18} color={colors.textSecondary} />
@@ -241,7 +228,6 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
             </View>
           </View>
         </View>
-      </Modal>
-    </>
+    </Modal>
   );
 };

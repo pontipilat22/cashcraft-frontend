@@ -5,6 +5,7 @@ import { ApiService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ExchangeRateService } from '../services/exchangeRate';
 import { AuthService } from '../services/auth';
+import { useLocalization } from './LocalizationContext';
 
 interface DataContextType {
   accounts: Account[];
@@ -64,6 +65,7 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode; userId?: string | null; defaultCurrency?: string }> = ({ children, userId, defaultCurrency = 'USD' }) => {
+  const { t } = useLocalization();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -99,9 +101,10 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       if (userId) {
         console.log('🗄️ [DataContext] Устанавливаем userId для базы данных:', userId);
         LocalDatabaseService.setUserId(userId);
-        
+
         console.log('🗄️ [DataContext] Инициализируем базу данных...');
-        await LocalDatabaseService.initDatabase(defaultCurrency);
+        const defaultAccountName = t('accounts.types.cash') || 'Cash';
+        await LocalDatabaseService.initDatabase(defaultCurrency, defaultAccountName);
         
         // Проверяем, что база данных действительно готова
         if (!LocalDatabaseService.isDatabaseReady()) {

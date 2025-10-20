@@ -23,7 +23,6 @@ import { TransactionItem } from '../components/TransactionItem';
 import { TransactionActionsModal } from '../components/TransactionActionsModal';
 import { EditTransactionModal } from '../components/EditTransactionModal';
 import { AddTransactionModal } from '../components/AddTransactionModal';
-import { NewFABMenu } from '../components/NewFABMenu';
 import { DebtOperationModal } from '../components/DebtOperationModal';
 import { DebtTypeSelector } from '../components/DebtTypeSelector';
 import { TransferModal } from '../components/TransferModal';
@@ -772,18 +771,6 @@ export const TransactionsScreen = () => {
         }), [])}
         onScrollToIndexFailed={useCallback(() => {}, [])}
       />
-
-      {!isSelectionMode && (
-        <NewFABMenu
-          onIncomePress={handleQuickIncome}
-          onExpensePress={handleQuickExpense}
-          onTransferPress={handleQuickTransfer}
-          onDebtPress={handleQuickDebt}
-          onAddAccountPress={() => handleAddAccount('card')}
-          onAddSavingsPress={handleAddGoal}
-          onAddCreditPress={() => handleAddAccount('credit')}
-        />
-      )}
 
       {showAddModal && (
         <AddTransactionModal

@@ -16,6 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useBudgetContext } from '../context/BudgetContext';
 import { Transaction } from '../types/index';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 import { CURRENCIES } from '../config/currencies';
@@ -37,6 +38,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const { accounts, categories, updateTransaction, transactions } = useData();
   const { t } = useLocalization();
   const { defaultCurrency } = useCurrency();
+  const { reloadData: reloadBudgetData } = useBudgetContext();
   
   const [isIncome, setIsIncome] = useState(false);
   const [amount, setAmount] = useState('');
@@ -137,46 +139,46 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   
   const handleSave = async () => {
     if (!amount || !selectedAccountId || !transaction) return;
-    
+
     try {
       if (isTransfer && transferToAccountId) {
         // Для переводов нужно обновить обе транзакции
         const cleanDesc = description.trim();
-        
+
         // Находим парную транзакцию
         const pairedTransaction = transactions.find(t => {
           if (t.id === transaction.id) return false;
-          
-          const isOtherTransfer = (t.categoryId === 'other_income' || t.categoryId === 'other_expense') 
+
+          const isOtherTransfer = (t.categoryId === 'other_income' || t.categoryId === 'other_expense')
             && t.description?.match(/[→←]/);
           if (!isOtherTransfer) return false;
-          
+
           const otherCleanDesc = getCleanTransferDescription(t.description || '');
           const thisCleanDesc = getCleanTransferDescription(transaction.description || '');
           if (otherCleanDesc !== thisCleanDesc) return false;
-          
+
           // Проверяем дату
           if (new Date(t.date).toDateString() !== new Date(transaction.date).toDateString()) return false;
-          
+
           return (transaction.type === 'expense' && t.type === 'income') ||
                  (transaction.type === 'income' && t.type === 'expense');
         });
-        
+
         if (pairedTransaction) {
           // Определяем счета и валюты
-          const fromAccount = transaction.type === 'expense' 
+          const fromAccount = transaction.type === 'expense'
             ? accounts.find(a => a.id === selectedAccountId)
             : accounts.find(a => a.id === transferToAccountId);
           const toAccount = transaction.type === 'expense'
             ? accounts.find(a => a.id === transferToAccountId)
             : accounts.find(a => a.id === selectedAccountId);
-            
+
           if (!fromAccount || !toAccount) return;
-          
+
           // Проверяем нужна ли конверсия валют
           let fromAmount = parseFloat(amount);
           let toAmount = fromAmount;
-          
+
           // При переносе между счетами конвертируем сумму
           if (fromAccount.currency !== toAccount.currency) {
             try {
@@ -185,7 +187,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                 fromAccount.currency || defaultCurrency,
                 toAccount.currency || defaultCurrency
               );
-              
+
               if (exchangeRate) {
                 toAmount = fromAmount * exchangeRate;
               } else {
@@ -197,11 +199,11 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               // Используем исходную сумму в случае ошибки
             }
           }
-          
+
           // Обновляем расходную транзакцию
           const expenseTransaction = transaction.type === 'expense' ? transaction : pairedTransaction;
           const incomeTransaction = transaction.type === 'income' ? transaction : pairedTransaction;
-          
+
           await updateTransaction(expenseTransaction.id, {
             amount: fromAmount,
             type: 'expense',
@@ -210,7 +212,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             description: cleanDesc ? `${cleanDesc} → ${toAccount.name}` : `→ ${toAccount.name}`,
             date: selectedDate.toISOString(),
           });
-          
+
           // Обновляем доходную транзакцию
           await updateTransaction(incomeTransaction.id, {
             amount: toAmount,
@@ -232,7 +234,11 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           date: selectedDate.toISOString(),
         });
       }
-      
+
+      // Обновляем данные бюджета после изменения транзакции
+      await reloadBudgetData();
+      console.log('🔄 [EditTransactionModal] Данные бюджета обновлены после редактирования');
+
       onClose();
     } catch (error) {
       console.error('Error updating transaction:', error);

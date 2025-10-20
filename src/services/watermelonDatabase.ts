@@ -43,15 +43,15 @@ export class WatermelonDatabaseService {
     return ready;
   }
 
-  static async initDatabase(defaultCurrency: string): Promise<void> {
+  static async initDatabase(defaultCurrency: string, defaultAccountName: string = 'Cash'): Promise<void> {
     if (this.isInitialized) {
       console.log('[WatermelonDB] Уже инициализировано');
       return;
     }
     try {
       console.log('[WatermelonDB] Инициализация базы данных...');
-      
-      // ─── Создаём дефолтный счёт "Наличные" только один раз ────────────────────────────
+
+      // ─── Создаём дефолтный счёт только один раз ────────────────────────────
       // Считаем, сколько сейчас записей в таблице accounts
       const accountsCount = await database.get<Account>('accounts').query().fetchCount()
 
@@ -60,11 +60,11 @@ export class WatermelonDatabaseService {
 
       // Если таблица пуста и дефолт ещё не создавали — создаём
       if (accountsCount === 0 && !hasInitDefault) {
-        console.log('[WatermelonDB] Создаем дефолтный счёт "Наличные"...');
+        console.log(`[WatermelonDB] Создаем дефолтный счёт "${defaultAccountName}"...`);
         await database.write(async () => {
           await database.get<Account>('accounts').create(acc => {
             acc._raw.id            = DEFAULT_CASH_ACCOUNT_ID // фиксированный ID
-            acc.name               = 'Наличные'
+            acc.name               = defaultAccountName
             acc.type               = 'cash'
             acc.balance            = 0
             acc.currency           = defaultCurrency

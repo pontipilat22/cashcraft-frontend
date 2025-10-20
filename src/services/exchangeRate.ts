@@ -445,29 +445,34 @@ export class ExchangeRateService {
   static async initializeRatesFromBackend(): Promise<boolean> {
     try {
       console.log('Initializing exchange rates from backend...');
-      
+
       // Проверяем подключение к интернету
       // const netInfo = await NetInfo.fetch();
       // if (!netInfo.isConnected) {
       //   console.log('No internet connection, skipping rate initialization');
       //   return false;
       // }
-      
-      // Получаем список всех используемых валют из локальной базы данных
-      const accounts = await LocalDatabaseService.getAccounts();
+
       const currencies = new Set<string>();
-      
+
       // Добавляем валюту по умолчанию
       const defaultCurrency = await AsyncStorage.getItem('defaultCurrency') || 'USD';
       currencies.add(defaultCurrency);
-      
-      // Добавляем валюты из счетов
-      accounts.forEach(account => {
-        if (account.currency) {
-          currencies.add(account.currency);
-        }
-      });
-      
+
+      // Получаем список всех используемых валют из локальной базы данных
+      // ТОЛЬКО если база данных уже инициализирована
+      if (LocalDatabaseService.isDatabaseReady()) {
+        const accounts = await LocalDatabaseService.getAccounts();
+        // Добавляем валюты из счетов
+        accounts.forEach(account => {
+          if (account.currency) {
+            currencies.add(account.currency);
+          }
+        });
+      } else {
+        console.log('Database not ready yet, initializing only default currency rates');
+      }
+
       // Если есть только одна валюта, не нужно загружать курсы
       if (currencies.size <= 1) {
         console.log('Only one currency in use, no rates needed');

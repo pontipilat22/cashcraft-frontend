@@ -24,6 +24,7 @@ export interface Account {
   creditRate?: number;
   creditPaymentType?: 'annuity' | 'differentiated';
   creditInitialAmount?: number;
+  creditPaidAmount?: number;
   // Поля для банковских счетов
   interestRate?: number;
   openDate?: string;

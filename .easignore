@@ -1,0 +1,14 @@
+# Git и локальные штуки
+.git
+.gitignore
+*.log
+.npmrc
+
+# Android кэши/артефакты
+android/.gradle
+android/build
+android/app/build
+
+# iOS артефакты
+ios/build
+
