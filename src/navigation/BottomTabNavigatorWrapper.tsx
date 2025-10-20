@@ -87,7 +87,13 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
   };
 
   const handleSaveAccount = async (accountData: any) => {
-    await createAccount(accountData);
+    // Добавляем type к данным счета
+    const accountWithType = {
+      ...accountData,
+      type: selectedAccountType,
+    };
+
+    await createAccount(accountWithType);
     await reloadBudgetData();
     setShowAddAccountModal(false);
 
