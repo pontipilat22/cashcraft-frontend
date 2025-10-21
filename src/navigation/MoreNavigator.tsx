@@ -10,7 +10,8 @@ import { HelpScreen } from '../screens/HelpScreen';
 import { ExportImportScreen } from '../screens/ExportImportScreen';
 import { SetPinScreen } from '../screens/SetPinScreen';
 import { CategorySettingsScreen } from '../screens/CategorySettingsScreen';
-import { AIAssistantScreen } from '../screens/AIAssistantScreen';
+// AI временно отключен
+// import { AIAssistantScreen } from '../screens/AIAssistantScreen';
 
 export type MoreStackParamList = {
   MoreMain: undefined;
@@ -23,7 +24,8 @@ export type MoreStackParamList = {
   Help: undefined;
   ExportImport: undefined;
   SetPin: { isChangingPin?: boolean } | undefined;
-  AIAssistant: undefined;
+  // AI временно отключен
+  // AIAssistant: undefined;
 };
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -87,7 +89,8 @@ export const MoreNavigator: React.FC = () => {
         component={SetPinScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
+      {/* AI временно отключен */}
+      {/* <Stack.Screen
         name="AIAssistant"
         component={AIAssistantScreen}
         options={{
@@ -104,7 +107,7 @@ export const MoreNavigator: React.FC = () => {
             if (parent) { parent.setOptions({ tabBarStyle: { display: 'flex' } }); }
           },
         })}
-      />
+      /> */}
     </Stack.Navigator>
   );
 };

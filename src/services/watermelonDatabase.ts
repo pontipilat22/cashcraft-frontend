@@ -598,22 +598,6 @@ export class WatermelonDatabaseService {
   }
 
   // Методы для поиска существующих записей (для предотвращения дублирования)
-  static async findAccountByName(name: string): Promise<any | null> {
-    const accounts = await database.get<Account>('accounts')
-      .query(Q.where('name', name))
-      .fetch();
-    
-    return accounts.length > 0 ? accounts[0] : null;
-  }
-
-  static async findCategoryByName(name: string): Promise<any | null> {
-    const categories = await database.get<Category>('categories')
-      .query(Q.where('name', name))
-      .fetch();
-    
-    return categories.length > 0 ? categories[0] : null;
-  }
-
   static async findTransactionByUniqueFields(transactionData: any): Promise<any | null> {
     const transactions = await database.get<Transaction>('transactions')
       .query(
@@ -623,16 +607,8 @@ export class WatermelonDatabaseService {
         Q.where('date', transactionData.date)
       )
       .fetch();
-    
-    return transactions.length > 0 ? transactions[0] : null;
-  }
 
-  static async findDebtByName(name: string): Promise<any | null> {
-    const debts = await database.get<Debt>('debts')
-      .query(Q.where('name', name))
-      .fetch();
-    
-    return debts.length > 0 ? debts[0] : null;
+    return transactions.length > 0 ? transactions[0] : null;
   }
 
   // Методы для синхронизации

@@ -33,7 +33,7 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
   const [selectedAccountType, setSelectedAccountType] = useState<AccountType>('card');
-  const [selectedDebtType, setSelectedDebtType] = useState<'owed_to_me' | 'owed_by_me'>('owed_to_me');
+  const [selectedDebtType, setSelectedDebtType] = useState<'give' | 'return' | 'borrow' | 'payback' | null>(null);
 
   // Handlers
   const handleQuickIncome = () => {
@@ -76,7 +76,7 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
     setShowAddAccountModal(true);
   };
 
-  const handleSelectDebtType = (type: 'owed_to_me' | 'owed_by_me') => {
+  const handleSelectDebtType = (type: 'give' | 'return' | 'borrow' | 'payback') => {
     setSelectedDebtType(type);
     setShowDebtTypeSelector(false);
     setShowDebtModal(true);
@@ -218,9 +218,8 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
       {showAddModal && (
         <AddTransactionModal
           visible={showAddModal}
-          type={transactionType}
-          onClose={() => setShowAddModal(false)}
-          onSave={async () => {
+          initialType={transactionType}
+          onClose={async () => {
             setShowAddModal(false);
             await reloadBudgetData();
           }}
@@ -230,8 +229,7 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
       {showTransferModal && (
         <TransferModal
           visible={showTransferModal}
-          onClose={() => setShowTransferModal(false)}
-          onSave={async () => {
+          onClose={async () => {
             setShowTransferModal(false);
             await reloadBudgetData();
           }}
@@ -241,10 +239,9 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
       {showDebtModal && (
         <DebtOperationModal
           visible={showDebtModal}
-          type={selectedDebtType}
+          operationType={selectedDebtType}
           onClose={() => setShowDebtModal(false)}
-          onSave={async () => {
-            setShowDebtModal(false);
+          onOperationComplete={async () => {
             await reloadBudgetData();
           }}
         />

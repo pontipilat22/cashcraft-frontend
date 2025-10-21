@@ -62,23 +62,18 @@ export const MoreScreen: React.FC = () => {
   };
 
   const menuItems = [
-    {
-      id: 'ai-assistant',
-      title: t('ai.title'),
-      icon: 'sparkles-outline',
-      onPress: () => navigation.navigate('AIAssistant'),
-    },
+    // AI временно отключен - будет добавлен в следующем обновлении
+    // {
+    //   id: 'ai-assistant',
+    //   title: t('ai.title'),
+    //   icon: 'sparkles-outline',
+    //   onPress: () => navigation.navigate('AIAssistant'),
+    // },
     {
       id: 'settings',
       title: t('settings.title'),
       icon: 'settings-outline',
       onPress: () => navigation.navigate('Settings'),
-    },
-    {
-      id: 'categories',
-      title: t('common.categories'),
-      icon: 'grid-outline',
-      onPress: () => setShowCategories(true),
     },
     {
       id: 'category-settings',

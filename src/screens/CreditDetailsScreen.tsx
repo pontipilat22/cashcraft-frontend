@@ -8,10 +8,31 @@ import { useTheme } from '../context/ThemeContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useData } from '../context/DataContext';
-import { Account, CreditPaymentSchedule as CreditPaymentScheduleType } from '../types';
+import { Account } from '../types';
 import { generatePaymentSchedule, calculateTotalPayment, calculateTotalInterest } from '../services/CreditCalculationService';
+import { markPaymentAsPaid, updateOverduePayments, makeEarlyRepayment } from '../services/CreditOperationsService';
+import { CreditPaymentModal } from '../components/CreditPaymentModal';
+import { CreditEarlyRepaymentModal } from '../components/CreditEarlyRepaymentModal';
 import database from '../database';
 import CreditPaymentSchedule from '../database/models/CreditPaymentSchedule';
+
+// Локальный интерфейс для графика платежей (обходим кэш TypeScript)
+interface CreditPaymentScheduleType {
+  id: string;
+  accountId: string;
+  paymentNumber: number;
+  paymentDate: string;
+  totalPayment: number;
+  principalPayment: number;
+  interestPayment: number;
+  remainingBalance: number;
+  status: 'pending' | 'paid' | 'partial' | 'overdue';
+  paidAmount?: number;
+  paidDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  syncedAt?: string;
+}
 
 type RouteParams = {
   CreditDetails: {
@@ -29,6 +50,9 @@ export const CreditDetailsScreen: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [paymentSchedule, setPaymentSchedule] = useState<CreditPaymentScheduleType[]>([]);
+  const [selectedPayment, setSelectedPayment] = useState<CreditPaymentScheduleType | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showEarlyRepaymentModal, setShowEarlyRepaymentModal] = useState(false);
 
   const accountId = route.params?.accountId;
   const account = accounts.find(acc => acc.id === accountId);
@@ -36,6 +60,13 @@ export const CreditDetailsScreen: React.FC = () => {
   // Загрузка графика платежей
   useEffect(() => {
     loadPaymentSchedule();
+  }, [accountId]);
+
+  // Проверка просрочек при загрузке
+  useEffect(() => {
+    if (accountId) {
+      updateOverduePayments(accountId);
+    }
   }, [accountId]);
 
   const loadPaymentSchedule = async () => {
@@ -62,7 +93,7 @@ export const CreditDetailsScreen: React.FC = () => {
           principalPayment: item.principalPayment,
           interestPayment: item.interestPayment,
           remainingBalance: item.remainingBalance,
-          status: item.status as any,
+          status: item.status as 'pending' | 'paid' | 'partial' | 'overdue',
           paidAmount: item.paidAmount,
           paidDate: item.paidDate,
           createdAt: item.createdAt.toISOString(),
@@ -124,6 +155,103 @@ export const CreditDetailsScreen: React.FC = () => {
     }
   };
 
+  // Обработчик подтверждения платежа
+  const handlePaymentConfirm = async (paidAmount: number, paidDate: Date, fromAccountId: string | null) => {
+    if (!selectedPayment || !account) return;
+
+    try {
+      // 1. Отмечаем платёж как оплаченный
+      await markPaymentAsPaid({
+        scheduleItemId: selectedPayment.id,
+        paidAmount,
+        paidDate,
+      });
+
+      // 2. Если указан счёт для списания - списываем деньги и создаём транзакцию расхода
+      if (fromAccountId) {
+        await database.write(async () => {
+          // Получаем счёт для списания
+          const accountsCollection = database.get<Account>('accounts');
+          const fromAccount = await accountsCollection.find(fromAccountId);
+
+          // Обновляем баланс счета (списываем деньги)
+          await fromAccount.update((acc: any) => {
+            acc.balance = acc.balance - paidAmount;
+          });
+
+          // Создаём транзакцию расхода
+          const transactionsCollection = database.get('transactions');
+          await transactionsCollection.create((transaction: any) => {
+            transaction.accountId = fromAccountId;
+            transaction.amount = paidAmount;
+            transaction.type = 'expense';
+            transaction.description = `Платёж по кредиту ${account.name} №${selectedPayment.paymentNumber}`;
+            transaction.date = paidDate.toISOString();
+          });
+        });
+      }
+
+      // 3. Перезагружаем график и данные аккаунта
+      await loadPaymentSchedule();
+      setShowPaymentModal(false);
+      setSelectedPayment(null);
+    } catch (error) {
+      console.error('Ошибка при отметке платежа:', error);
+      throw error;
+    }
+  };
+
+  // Открыть модальное окно для платежа
+  const handleOpenPaymentModal = (payment: CreditPaymentScheduleType) => {
+    setSelectedPayment(payment);
+    setShowPaymentModal(true);
+  };
+
+  // Обработчик досрочного погашения
+  const handleEarlyRepayment = async (amount: number, repaymentDate: Date, fromAccountId: string | null) => {
+    if (!account) return;
+
+    try {
+      // 1. Выполняем досрочное погашение
+      await makeEarlyRepayment({
+        accountId,
+        amount,
+        repaymentDate,
+      });
+
+      // 2. Если указан счёт для списания - списываем деньги и создаём транзакцию расхода
+      if (fromAccountId) {
+        await database.write(async () => {
+          // Получаем счёт для списания
+          const accountsCollection = database.get<Account>('accounts');
+          const fromAccount = await accountsCollection.find(fromAccountId);
+
+          // Обновляем баланс счета (списываем деньги)
+          await fromAccount.update((acc: any) => {
+            acc.balance = acc.balance - amount;
+          });
+
+          // Создаём транзакцию расхода
+          const transactionsCollection = database.get('transactions');
+          await transactionsCollection.create((transaction: any) => {
+            transaction.accountId = fromAccountId;
+            transaction.amount = amount;
+            transaction.type = 'expense';
+            transaction.description = `Досрочное погашение кредита ${account.name}`;
+            transaction.date = repaymentDate.toISOString();
+          });
+        });
+      }
+
+      // 3. Перезагружаем график и данные аккаунта
+      await loadPaymentSchedule();
+      setShowEarlyRepaymentModal(false);
+    } catch (error) {
+      console.error('Ошибка при досрочном погашении:', error);
+      throw error;
+    }
+  };
+
   // Вычисления для отображения
   const creditInfo = useMemo(() => {
     if (!account || !account.creditInitialAmount) {
@@ -134,8 +262,9 @@ export const CreditDetailsScreen: React.FC = () => {
       ? paymentSchedule.reduce((sum, p) => sum + p.totalPayment, 0)
       : account.creditInitialAmount;
 
+    // Учитываем как полностью оплаченные, так и частично оплаченные платежи
     const paidAmount = paymentSchedule
-      .filter(p => p.status === 'paid')
+      .filter(p => p.status === 'paid' || p.status === 'partial')
       .reduce((sum, p) => sum + (p.paidAmount || p.totalPayment), 0);
 
     const remainingBalance = account.balance < 0 ? Math.abs(account.balance) : 0;
@@ -240,6 +369,19 @@ export const CreditDetailsScreen: React.FC = () => {
             {Math.round(creditInfo.progressPercent)}% {t('credit.paidOff') || 'погашено'}
           </Text>
         </View>
+
+        {/* Кнопка досрочного погашения */}
+        {creditInfo.remainingBalance > 0 && (
+          <TouchableOpacity
+            style={[styles.earlyRepaymentButton, { borderColor: colors.primary }]}
+            onPress={() => setShowEarlyRepaymentModal(true)}
+          >
+            <Ionicons name="flash-outline" size={20} color={colors.primary} />
+            <Text style={[styles.earlyRepaymentButtonText, { color: colors.primary }]}>
+              {t('credit.earlyRepayment') || 'Досрочное погашение'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Ближайший платёж */}
@@ -274,7 +416,7 @@ export const CreditDetailsScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.markPaidButton, { backgroundColor: colors.primary }]}
-            onPress={() => {/* TODO: Открыть модальное окно оплаты */}}
+            onPress={() => creditInfo.nextPayment && handleOpenPaymentModal(creditInfo.nextPayment)}
           >
             <Text style={styles.markPaidButtonText}>
               {t('credit.markAsPaid') || 'Отметить как оплачено'}
@@ -363,6 +505,29 @@ export const CreditDetailsScreen: React.FC = () => {
           </View>
         ))}
       </View>
+
+      {/* Модальное окно для отметки платежа */}
+      <CreditPaymentModal
+        visible={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedPayment(null);
+        }}
+        payment={selectedPayment}
+        currency={account.currency}
+        creditAccountId={accountId}
+        onConfirm={handlePaymentConfirm}
+      />
+
+      {/* Модальное окно для досрочного погашения */}
+      <CreditEarlyRepaymentModal
+        visible={showEarlyRepaymentModal}
+        onClose={() => setShowEarlyRepaymentModal(false)}
+        currency={account.currency}
+        creditAccountId={accountId}
+        remainingBalance={creditInfo?.remainingBalance || 0}
+        onConfirm={handleEarlyRepayment}
+      />
     </ScrollView>
   );
 };
@@ -553,5 +718,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginLeft: 4,
+  },
+  earlyRepaymentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    marginTop: 16,
+    gap: 8,
+  },
+  earlyRepaymentButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

@@ -1,3 +1,5 @@
+
+
 export type AccountType = 'cash' | 'card' | 'bank' | 'savings' | 'debt' | 'credit';
 
 export interface Account {
@@ -21,6 +23,7 @@ export interface Account {
   creditInitialAmount?: number; // Начальная сумма кредита
   createdAt?: string;
   updatedAt?: string;
+  
 }
 
 export interface Transaction {
@@ -69,3 +72,21 @@ export interface Debt {
   createdAt: string;
   updatedAt: string;
 } 
+
+export interface CreditPaymentSchedule {
+  id: string;
+  accountId: string;
+  paymentNumber: number;
+  paymentDate: string;
+  totalPayment: number;
+  principalPayment: number;
+  interestPayment: number;
+  remainingBalance: number;
+  status: 'pending' | 'paid' | 'partial' | 'overdue';
+  paidAmount?: number;
+  paidDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  syncedAt?: string;
+}
+

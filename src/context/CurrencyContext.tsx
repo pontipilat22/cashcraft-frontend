@@ -31,9 +31,10 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
           setDefaultCurrencyState(savedCurrency);
         } else {
           // Определяем валюту по региону устройства
-          const region = Localization.region || 'US';
+          const locales = Localization.getLocales();
+          const region = locales[0]?.regionCode || 'US';
           const detectedCurrency = getCurrencyByCountry(region);
-          
+
           setDefaultCurrencyState(detectedCurrency);
           await AsyncStorage.setItem(CURRENCY_KEY, detectedCurrency);
         }
