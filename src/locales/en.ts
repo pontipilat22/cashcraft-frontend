@@ -831,5 +831,7 @@ export default {
     welcomeMessage: 'Hello! I\'m your AI financial assistant. How can I help you?',
     noMessages: 'Start a conversation with AI assistant',
     send: 'Send',
+    clearHistory: 'Clear History',
+    clearHistoryConfirm: 'Are you sure you want to delete all chat history?',
   },
 }; 

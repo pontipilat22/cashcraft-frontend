@@ -15,12 +15,11 @@ export interface ChatMessage {
 
 /**
  * Тип ответа, который мы теперь ожидаем от НАШЕГО backend'а.
- * Он может быть двух видов: обычный текст или вызов инструмента.
- * Именно это исправит все ваши ошибки TypeScript.
+ * Он может быть: обычный текст или вызов(ы) инструмента(ов).
  */
-export type AIResponse = 
+export type AIResponse =
   | { type: 'text'; content: string }
-  | { type: 'tool_call'; tool_name: string; arguments: any };
+  | { type: 'tool_calls'; calls: Array<{ tool_name: string; arguments: any }> };
 
 
 /**

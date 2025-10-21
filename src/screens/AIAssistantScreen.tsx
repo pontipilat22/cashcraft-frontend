@@ -13,16 +13,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useData } from '../context/DataContext';
 import { useNavigation } from '@react-navigation/native';
 import { AIService, ChatMessage } from '../services/aiService';
 
+const CHAT_HISTORY_KEY = '@ai_chat_history';
+
 export const AIAssistantScreen: React.FC = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { createAccount, createTransaction, accounts, categories } = useData();
+  const { createAccount, createTransaction, deleteAccount, accounts, categories } = useData();
   const navigation = useNavigation();
 
   // Принудительно скрываем tab bar при монтировании (ваш код, он правильный)
@@ -45,6 +48,62 @@ export const AIAssistantScreen: React.FC = () => {
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Загрузка истории чата при монтировании
+  useEffect(() => {
+    loadChatHistory();
+  }, []);
+
+  // Сохранение истории при изменении сообщений
+  useEffect(() => {
+    if (messages.length > 1) { // Сохраняем только если есть сообщения кроме приветствия
+      saveChatHistory();
+    }
+  }, [messages]);
+
+  const loadChatHistory = async () => {
+    try {
+      const savedHistory = await AsyncStorage.getItem(CHAT_HISTORY_KEY);
+      if (savedHistory) {
+        const parsed = JSON.parse(savedHistory);
+        setMessages(parsed);
+        console.log('✅ История чата загружена:', parsed.length, 'сообщений');
+      }
+    } catch (error) {
+      console.error('❌ Ошибка загрузки истории чата:', error);
+    }
+  };
+
+  const saveChatHistory = async () => {
+    try {
+      await AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
+    } catch (error) {
+      console.error('❌ Ошибка сохранения истории чата:', error);
+    }
+  };
+
+  const clearChatHistory = async () => {
+    Alert.alert(
+      t('ai.clearHistory') || 'Очистить историю',
+      t('ai.clearHistoryConfirm') || 'Вы уверены, что хотите удалить всю историю чата?',
+      [
+        { text: t('common.cancel') || 'Отмена', style: 'cancel' },
+        {
+          text: t('common.delete') || 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem(CHAT_HISTORY_KEY);
+              setMessages([AIService.getWelcomeMessage()]);
+              console.log('✅ История чата очищена');
+            } catch (error) {
+              console.error('❌ Ошибка очистки истории:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // 1. ОПРЕДЕЛЯЕМ ИНСТРУМЕНТЫ, КОТОРЫЕ AI МОЖЕТ ИСПОЛЬЗОВАТЬ
   const availableTools = [
@@ -89,8 +148,44 @@ export const AIAssistantScreen: React.FC = () => {
             type: 'string',
             description: 'Тип транзакции: "expense" для расхода или "income" для дохода.',
           },
+          date: {
+            type: 'string',
+            description: 'Дата транзакции в формате "YYYY-MM-DD". Например "2025-10-16". Если не указана, используется текущая дата.',
+          },
         },
         required: ['amount', 'category', 'type'],
+      },
+    },
+    {
+      name: 'deleteAccount',
+      description: 'Удаляет существующий счет по его названию.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'Название счета для удаления, например "Kaspi" или "Наличные".',
+          },
+        },
+        required: ['name'],
+      },
+    },
+    {
+      name: 'deleteTransaction',
+      description: 'Удаляет последнюю транзакцию по указанной категории или сумме.',
+      parameters: {
+        type: 'object',
+        properties: {
+          category: {
+            type: 'string',
+            description: 'Категория транзакции для удаления.',
+          },
+          amount: {
+            type: 'number',
+            description: 'Сумма транзакции для удаления (опционально).',
+          },
+        },
+        required: ['category'],
       },
     },
   ];
@@ -123,9 +218,29 @@ export const AIAssistantScreen: React.FC = () => {
       const aiResponse = await AIService.sendMessage(newMessages, availableTools);
 
       // Проверяем тип ответа от AI
-      if (aiResponse.type === 'tool_call') {
-        // AI хочет использовать инструмент
-        handleToolCall(aiResponse.tool_name, aiResponse.arguments);
+      if (aiResponse.type === 'tool_calls') {
+        // AI хочет использовать один или несколько инструментов
+        console.log(`📋 AI запросил ${aiResponse.calls.length} действий`);
+
+        const results: string[] = [];
+
+        // Выполняем все вызовы последовательно и собираем результаты
+        for (const call of aiResponse.calls) {
+          const result = await handleToolCall(call.tool_name, call.arguments);
+          if (result) results.push(result);
+          // Небольшая задержка между действиями для лучшего UX
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        // Показываем одно итоговое сообщение со всеми результатами
+        if (results.length > 0) {
+          const summaryMessage: ChatMessage = {
+            role: 'assistant',
+            content: results.join('\n'),
+            timestamp: Date.now(),
+          };
+          setMessages(prev => [...prev, summaryMessage]);
+        }
       } else {
         // AI просто ответил текстом
         const assistantMessage: ChatMessage = {
@@ -147,10 +262,7 @@ export const AIAssistantScreen: React.FC = () => {
   };
 
   // 3. ДОБАВЛЯЕМ ОБРАБОТЧИК КОМАНД ОТ AI (TOOL CALLS)
-  const handleToolCall = async (toolName: string, args: any) => {
-    let infoMessageText = '';
-
-    // Показываем пользователю, что начинаем выполнять команду
+  const handleToolCall = async (toolName: string, args: any): Promise<string> => {
     const accountTypeLabels: Record<string, string> = {
       cash: 'наличные',
       card: 'карту',
@@ -159,64 +271,45 @@ export const AIAssistantScreen: React.FC = () => {
       investment: 'инвестиции',
     };
 
-    switch (toolName) {
-      case 'createAccount':
-        const typeLabel = args.accountType ? (accountTypeLabels[args.accountType] || 'счет') : 'счет';
-        infoMessageText = `Создаю ${typeLabel} "${args.name || ''}" в валюте ${args.currency || ''}...`;
-        break;
-      case 'addTransaction':
-        infoMessageText = `Добавляю ${args.type === 'income' ? 'доход' : 'расход'} "${args.category || ''}" на сумму ${args.amount || 0}...`;
-        break;
-      default:
-        infoMessageText = 'Получена неизвестная команда от AI.';
-    }
-
-    const infoMessage: ChatMessage = {
-        role: 'assistant',
-        content: infoMessageText,
-        timestamp: Date.now(),
-    };
-    setMessages(prev => [...prev, infoMessage]);
-
-    // Выполняем действие напрямую
     try {
-      let successMessage = '';
-
       switch (toolName) {
         case 'createAccount':
-          // Создаем счет напрямую через DataContext
           const accountType = args.accountType || 'cash';
           await createAccount({
             name: args.name,
-            balance: 0, // Начальный баланс 0
+            balance: 0,
             currency: args.currency,
             type: accountType,
             isIncludedInTotal: true,
           });
           const createdTypeLabel = accountTypeLabels[accountType] || 'счет';
-          successMessage = `✅ ${createdTypeLabel.charAt(0).toUpperCase() + createdTypeLabel.slice(1)} "${args.name}" успешно создан!`;
-          break;
+          return `✅ ${createdTypeLabel.charAt(0).toUpperCase() + createdTypeLabel.slice(1)} "${args.name}" создан`;
 
         case 'addTransaction':
-          // Создаем транзакцию напрямую через DataContext
           if (!accounts || accounts.length === 0) {
-            throw new Error('Сначала создайте счет для добавления транзакций');
+            return '❌ Сначала создайте счет для добавления транзакций';
           }
 
-          // Находим первый доступный счет
           const defaultAccount = accounts.find(acc => acc.isIncludedInTotal) || accounts[0];
-
-          // Находим категорию
           const categoryName = args.category;
           let category = categories?.find(cat =>
             cat.name.toLowerCase() === categoryName.toLowerCase()
           );
 
           if (!category) {
-            // Если категория не найдена, используем "Разное" или "Other"
             category = categories?.find(cat =>
               cat.name === 'Разное' || cat.name === 'Other' || cat.name.toLowerCase() === 'other'
             );
+          }
+
+          // Обработка даты
+          let transactionDate: string;
+          if (args.date) {
+            // Если дата передана в формате YYYY-MM-DD, преобразуем в ISO
+            const parsedDate = new Date(args.date);
+            transactionDate = parsedDate.toISOString();
+          } else {
+            transactionDate = new Date().toISOString();
           }
 
           await createTransaction({
@@ -224,34 +317,43 @@ export const AIAssistantScreen: React.FC = () => {
             type: args.type || 'expense',
             categoryId: category?.id || '',
             accountId: defaultAccount.id,
-            date: new Date().toISOString(),
+            date: transactionDate,
             description: `Добавлено через AI помощника`,
           });
 
-          successMessage = `✅ ${args.type === 'income' ? 'Доход' : 'Расход'} на сумму ${args.amount} успешно добавлен!`;
-          break;
+          const dateStr = args.date ? ` за ${args.date}` : '';
+          return `✅ ${args.type === 'income' ? 'Доход' : 'Расход'} ${args.amount} (${args.category})${dateStr} добавлен`;
+
+        case 'deleteAccount':
+          const accountToDelete = accounts?.find(acc =>
+            acc.name.toLowerCase() === args.name.toLowerCase()
+          );
+          if (!accountToDelete) {
+            return `❌ Счет "${args.name}" не найден`;
+          }
+          await deleteAccount(accountToDelete.id);
+          return `✅ Счет "${args.name}" удален`;
+
+        case 'deleteTransaction':
+          // Находим последнюю транзакцию по категории
+          const targetCategory = categories?.find(cat =>
+            cat.name.toLowerCase() === args.category.toLowerCase()
+          );
+          if (!targetCategory) {
+            return `❌ Категория "${args.category}" не найдена`;
+          }
+
+          // Здесь нужно найти транзакцию через transactions из DataContext
+          // Упрощенная версия - просто возвращаем успех
+          // TODO: нужен доступ к transactions для поиска конкретной транзакции
+          return `⚠️ Удаление транзакций через AI пока в разработке`;
 
         default:
-          console.warn('AI вызвал неизвестный инструмент:', toolName);
-          throw new Error('Неизвестная команда');
+          return `❌ Неизвестная команда: ${toolName}`;
       }
-
-      // Показываем сообщение об успехе
-      const successMsg: ChatMessage = {
-        role: 'assistant',
-        content: successMessage,
-        timestamp: Date.now(),
-      };
-      setMessages(prev => [...prev, successMsg]);
-
     } catch (error: any) {
       console.error('❌ [AIAssistantScreen] Ошибка выполнения команды:', error);
-      const errorMsg: ChatMessage = {
-        role: 'assistant',
-        content: `❌ Ошибка: ${error?.message || 'Не удалось выполнить команду'}`,
-        timestamp: Date.now(),
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      return `❌ Ошибка: ${error?.message || 'Не удалось выполнить команду'}`;
     }
   };
 
@@ -316,7 +418,12 @@ export const AIAssistantScreen: React.FC = () => {
             {t('ai.subtitle')}
           </Text>
         </View>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={clearChatHistory}
+        >
+          <Ionicons name="trash-outline" size={22} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
