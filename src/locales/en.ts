@@ -836,6 +836,8 @@ export default {
     payFromAccount: 'Pay from account',
     selectAccount: 'Select account to debit',
     noAccountsForPayment: 'No available accounts for payment. Payment will be marked without debit.',
+    fullPaymentHint: 'Amount set automatically',
+    insufficientFunds: 'Insufficient funds in the account',
     // Early repayment
     earlyRepayment: 'Early repayment',
     earlyRepaymentDescription: 'The amount will be distributed across unpaid payments in order',

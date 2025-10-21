@@ -26,7 +26,8 @@
       "Bash(adb -s emulator-5554 shell pm list packages)",
       "Bash(findstr cashcraft)",
       "Bash(adb -s emulator-5554 shell \"df -h /data\")",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

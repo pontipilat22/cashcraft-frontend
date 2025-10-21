@@ -89,6 +89,18 @@ export const CreditEarlyRepaymentModal: React.FC<CreditEarlyRepaymentModalProps>
       return;
     }
 
+    // Проверка достаточности средств на выбранном счете
+    if (selectedAccountId) {
+      const selectedAccount = availableAccounts.find(acc => acc.id === selectedAccountId);
+      if (selectedAccount && selectedAccount.balance < repaymentAmount) {
+        Alert.alert(
+          t('credit.error') || 'Ошибка',
+          `${t('credit.insufficientFunds') || 'Недостаточно средств на счете'}. ${t('accounts.available') || 'Доступно'}: ${formatAmount(selectedAccount.balance, selectedAccount.currency)}`
+        );
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       await onConfirm(repaymentAmount, repaymentDate, selectedAccountId);

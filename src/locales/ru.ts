@@ -829,6 +829,8 @@ export default {
     payFromAccount: 'Списать со счёта',
     selectAccount: 'Выберите счёт для списания',
     noAccountsForPayment: 'Нет доступных счетов для оплаты. Платёж будет отмечен без списания.',
+    fullPaymentHint: 'Сумма установлена автоматически',
+    insufficientFunds: 'Недостаточно средств на счете',
     // Досрочное погашение
     earlyRepayment: 'Досрочное погашение',
     earlyRepaymentDescription: 'Внесённая сумма будет распределена по неоплаченным платежам в порядке очереди',

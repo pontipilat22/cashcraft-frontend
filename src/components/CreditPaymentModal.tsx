@@ -112,6 +112,18 @@ export const CreditPaymentModal: React.FC<CreditPaymentModalProps> = ({
       return;
     }
 
+    // Проверка достаточности средств на выбранном счете
+    if (selectedAccountId) {
+      const selectedAccount = availableAccounts.find(acc => acc.id === selectedAccountId);
+      if (selectedAccount && selectedAccount.balance < amount) {
+        Alert.alert(
+          t('credit.error') || 'Ошибка',
+          `${t('credit.insufficientFunds') || 'Недостаточно средств на счете'}. ${t('accounts.available') || 'Доступно'}: ${formatAmount(selectedAccount.balance, selectedAccount.currency)}`
+        );
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       await onConfirm(amount, paidDate, selectedAccountId);
@@ -225,28 +237,32 @@ export const CreditPaymentModal: React.FC<CreditPaymentModalProps> = ({
           </View>
 
           {/* Ввод суммы */}
-          {isPartialPayment && (
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text }]}>
-                {t('credit.paidAmount') || 'Сумма платежа'}
+          <View style={styles.inputContainer}>
+            <Text style={[styles.label, { color: colors.text }]}>
+              {t('credit.paidAmount') || 'Сумма платежа'}
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? '#2C2C2C' : '#F5F5F5',
+                  color: isPartialPayment ? colors.text : colors.textSecondary,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={paidAmount}
+              onChangeText={setPaidAmount}
+              keyboardType="numeric"
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+              editable={isPartialPayment}
+            />
+            {!isPartialPayment && (
+              <Text style={[styles.hint, { color: colors.textSecondary }]}>
+                {t('credit.fullPaymentHint') || 'Сумма установлена автоматически'}
               </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: isDark ? '#2C2C2C' : '#F5F5F5',
-                    color: colors.text,
-                    borderColor: colors.border,
-                  },
-                ]}
-                value={paidAmount}
-                onChangeText={setPaidAmount}
-                keyboardType="numeric"
-                placeholder="0.00"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          )}
+            )}
+          </View>
 
           {/* Выбор даты */}
           <View style={styles.inputContainer}>
@@ -496,5 +512,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
+  },
+  hint: {
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
