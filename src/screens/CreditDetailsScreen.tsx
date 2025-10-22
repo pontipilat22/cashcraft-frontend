@@ -8,12 +8,13 @@ import { useTheme } from '../context/ThemeContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useData } from '../context/DataContext';
-import { Account } from '../types';
+import { Account as AccountType } from '../types';
 import { generatePaymentSchedule, calculateTotalPayment, calculateTotalInterest } from '../services/CreditCalculationService';
 import { markPaymentAsPaid, updateOverduePayments, makeEarlyRepayment } from '../services/CreditOperationsService';
 import { CreditPaymentModal } from '../components/CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../components/CreditEarlyRepaymentModal';
 import database from '../database';
+import Account from '../database/models/Account';
 import CreditPaymentSchedule from '../database/models/CreditPaymentSchedule';
 
 // Локальный интерфейс для графика платежей (обходим кэш TypeScript)
@@ -177,14 +178,14 @@ export const CreditDetailsScreen: React.FC = () => {
         let amountToDebit = paidAmount;
         let descriptionSuffix = '';
 
-        if (fromAccount.currency !== account.currency) {
+        if (fromAccount.currency && account.currency && fromAccount.currency !== account.currency) {
           amountToDebit = await convertAmount(paidAmount, account.currency, fromAccount.currency);
           descriptionSuffix = ` (${formatAmount(paidAmount, account.currency)} → ${formatAmount(amountToDebit, fromAccount.currency)})`;
         }
 
         await database.write(async () => {
           // Обновляем баланс счета (списываем конвертированную сумму)
-          await fromAccount.update((acc: any) => {
+          await fromAccount.update((acc: Account) => {
             acc.balance = acc.balance - amountToDebit;
           });
 
@@ -238,14 +239,14 @@ export const CreditDetailsScreen: React.FC = () => {
         let amountToDebit = amount;
         let descriptionSuffix = '';
 
-        if (fromAccount.currency !== account.currency) {
+        if (fromAccount.currency && account.currency && fromAccount.currency !== account.currency) {
           amountToDebit = await convertAmount(amount, account.currency, fromAccount.currency);
           descriptionSuffix = ` (${formatAmount(amount, account.currency)} → ${formatAmount(amountToDebit, fromAccount.currency)})`;
         }
 
         await database.write(async () => {
           // Обновляем баланс счета (списываем конвертированную сумму)
-          await fromAccount.update((acc: any) => {
+          await fromAccount.update((acc: Account) => {
             acc.balance = acc.balance - amountToDebit;
           });
 
