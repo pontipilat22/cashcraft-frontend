@@ -44,7 +44,7 @@ export const CreditDetailsScreen: React.FC = () => {
   const route = useRoute<RouteProp<RouteParams, 'CreditDetails'>>();
   const navigation = useNavigation<StackNavigationProp<any>>();
   const { colors, isDark } = useTheme();
-  const { formatAmount } = useCurrency();
+  const { formatAmount, convertAmount } = useCurrency();
   const { t } = useLocalization();
   const { accounts } = useData();
 
@@ -169,23 +169,32 @@ export const CreditDetailsScreen: React.FC = () => {
 
       // 2. Если указан счёт для списания - списываем деньги и создаём транзакцию расхода
       if (fromAccountId) {
-        await database.write(async () => {
-          // Получаем счёт для списания
-          const accountsCollection = database.get<Account>('accounts');
-          const fromAccount = await accountsCollection.find(fromAccountId);
+        // Получаем счёт для списания
+        const accountsCollection = database.get<Account>('accounts');
+        const fromAccount = await accountsCollection.find(fromAccountId);
 
-          // Обновляем баланс счета (списываем деньги)
+        // Конвертируем сумму если валюты разные
+        let amountToDebit = paidAmount;
+        let descriptionSuffix = '';
+
+        if (fromAccount.currency !== account.currency) {
+          amountToDebit = await convertAmount(paidAmount, account.currency, fromAccount.currency);
+          descriptionSuffix = ` (${formatAmount(paidAmount, account.currency)} → ${formatAmount(amountToDebit, fromAccount.currency)})`;
+        }
+
+        await database.write(async () => {
+          // Обновляем баланс счета (списываем конвертированную сумму)
           await fromAccount.update((acc: any) => {
-            acc.balance = acc.balance - paidAmount;
+            acc.balance = acc.balance - amountToDebit;
           });
 
           // Создаём транзакцию расхода
           const transactionsCollection = database.get('transactions');
           await transactionsCollection.create((transaction: any) => {
             transaction.accountId = fromAccountId;
-            transaction.amount = paidAmount;
+            transaction.amount = amountToDebit;
             transaction.type = 'expense';
-            transaction.description = `Платёж по кредиту ${account.name} №${selectedPayment.paymentNumber}`;
+            transaction.description = `Платёж по кредиту ${account.name} №${selectedPayment.paymentNumber}${descriptionSuffix}`;
             transaction.date = paidDate.toISOString();
           });
         });
@@ -221,23 +230,32 @@ export const CreditDetailsScreen: React.FC = () => {
 
       // 2. Если указан счёт для списания - списываем деньги и создаём транзакцию расхода
       if (fromAccountId) {
-        await database.write(async () => {
-          // Получаем счёт для списания
-          const accountsCollection = database.get<Account>('accounts');
-          const fromAccount = await accountsCollection.find(fromAccountId);
+        // Получаем счёт для списания
+        const accountsCollection = database.get<Account>('accounts');
+        const fromAccount = await accountsCollection.find(fromAccountId);
 
-          // Обновляем баланс счета (списываем деньги)
+        // Конвертируем сумму если валюты разные
+        let amountToDebit = amount;
+        let descriptionSuffix = '';
+
+        if (fromAccount.currency !== account.currency) {
+          amountToDebit = await convertAmount(amount, account.currency, fromAccount.currency);
+          descriptionSuffix = ` (${formatAmount(amount, account.currency)} → ${formatAmount(amountToDebit, fromAccount.currency)})`;
+        }
+
+        await database.write(async () => {
+          // Обновляем баланс счета (списываем конвертированную сумму)
           await fromAccount.update((acc: any) => {
-            acc.balance = acc.balance - amount;
+            acc.balance = acc.balance - amountToDebit;
           });
 
           // Создаём транзакцию расхода
           const transactionsCollection = database.get('transactions');
           await transactionsCollection.create((transaction: any) => {
             transaction.accountId = fromAccountId;
-            transaction.amount = amount;
+            transaction.amount = amountToDebit;
             transaction.type = 'expense';
-            transaction.description = `Досрочное погашение кредита ${account.name}`;
+            transaction.description = `Досрочное погашение кредита ${account.name}${descriptionSuffix}`;
             transaction.date = repaymentDate.toISOString();
           });
         });

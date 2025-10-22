@@ -53,7 +53,7 @@ export const CreditPaymentModal: React.FC<CreditPaymentModalProps> = ({
   onConfirm,
 }) => {
   const { colors, isDark } = useTheme();
-  const { formatAmount } = useCurrency();
+  const { formatAmount, convertAmount } = useCurrency();
   const { t } = useLocalization();
   const { accounts } = useData();
 
@@ -63,6 +63,7 @@ export const CreditPaymentModal: React.FC<CreditPaymentModalProps> = ({
   const [isPartialPayment, setIsPartialPayment] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
 
   // Фильтруем счета - исключаем кредиты и цели
   const availableAccounts = React.useMemo(
@@ -78,10 +79,37 @@ export const CreditPaymentModal: React.FC<CreditPaymentModalProps> = ({
       setPaidAmount(payment.totalPayment.toString());
       setPaidDate(new Date());
       setIsPartialPayment(false);
+      setConvertedAmount(null);
       // Выбираем первый доступный счёт по умолчанию
       setSelectedAccountId(availableAccounts[0]?.id || null);
     }
   }, [visible, payment, availableAccounts]);
+
+  // Автоматический расчет конвертации при изменении счета или суммы
+  React.useEffect(() => {
+    const calculateConversion = async () => {
+      if (!selectedAccountId || !paidAmount) {
+        setConvertedAmount(null);
+        return;
+      }
+
+      const selectedAccount = availableAccounts.find(acc => acc.id === selectedAccountId);
+      if (!selectedAccount) return;
+
+      const amount = parseFloat(paidAmount);
+      if (isNaN(amount)) return;
+
+      // Если валюты разные, рассчитываем конвертацию
+      if (selectedAccount.currency !== currency) {
+        const converted = await convertAmount(amount, currency, selectedAccount.currency);
+        setConvertedAmount(converted);
+      } else {
+        setConvertedAmount(null);
+      }
+    };
+
+    calculateConversion();
+  }, [selectedAccountId, paidAmount, currency, availableAccounts, convertAmount]);
 
   const handleConfirm = async () => {
     if (!payment) return;
@@ -337,6 +365,21 @@ export const CreditPaymentModal: React.FC<CreditPaymentModalProps> = ({
             </View>
           )}
 
+          {/* Предупреждение о конвертации валют */}
+          {convertedAmount !== null && selectedAccountId && (
+            <View style={[styles.conversionBox, { backgroundColor: isDark ? '#1A3A5A' : '#E3F2FD' }]}>
+              <Ionicons name="swap-horizontal" size={20} color="#1976D2" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.conversionTitle, { color: '#1976D2' }]}>
+                  {t('credit.currencyConversion') || 'Конвертация валют'}
+                </Text>
+                <Text style={[styles.conversionText, { color: isDark ? '#90CAF9' : '#1565C0' }]}>
+                  {t('credit.willBeDebited') || 'Будет списано'}: {formatAmount(convertedAmount, availableAccounts.find(a => a.id === selectedAccountId)?.currency || currency)}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {availableAccounts.length === 0 && (
             <View style={[styles.warningBox, { backgroundColor: isDark ? '#4A3000' : '#FFF3CD' }]}>
               <Ionicons name="warning-outline" size={20} color="#856404" />
@@ -517,5 +560,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  conversionBox: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  conversionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  conversionText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

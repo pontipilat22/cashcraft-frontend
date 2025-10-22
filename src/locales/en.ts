@@ -838,6 +838,9 @@ export default {
     noAccountsForPayment: 'No available accounts for payment. Payment will be marked without debit.',
     fullPaymentHint: 'Amount set automatically',
     insufficientFunds: 'Insufficient funds in the account',
+    currencyConversion: 'Currency Conversion',
+    willBeDebited: 'Will be debited',
+    exchangeRate: 'Exchange rate',
     // Early repayment
     earlyRepayment: 'Early repayment',
     earlyRepaymentDescription: 'The amount will be distributed across unpaid payments in order',

@@ -34,7 +34,7 @@ export const CreditEarlyRepaymentModal: React.FC<CreditEarlyRepaymentModalProps>
   onConfirm,
 }) => {
   const { colors, isDark } = useTheme();
-  const { formatAmount } = useCurrency();
+  const { formatAmount, convertAmount } = useCurrency();
   const { t } = useLocalization();
   const { accounts } = useData();
 
@@ -43,6 +43,7 @@ export const CreditEarlyRepaymentModal: React.FC<CreditEarlyRepaymentModalProps>
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
 
   // Фильтруем счета - исключаем кредиты и цели
   const availableAccounts = React.useMemo(
@@ -57,10 +58,36 @@ export const CreditEarlyRepaymentModal: React.FC<CreditEarlyRepaymentModalProps>
     if (visible) {
       setAmount('');
       setRepaymentDate(new Date());
+      setConvertedAmount(null);
       // Выбираем первый доступный счёт по умолчанию
       setSelectedAccountId(availableAccounts[0]?.id || null);
     }
   }, [visible, availableAccounts]);
+
+  // Автоматический расчет конвертации
+  React.useEffect(() => {
+    const calculateConversion = async () => {
+      if (!selectedAccountId || !amount) {
+        setConvertedAmount(null);
+        return;
+      }
+
+      const selectedAccount = availableAccounts.find(acc => acc.id === selectedAccountId);
+      if (!selectedAccount) return;
+
+      const repaymentAmount = parseFloat(amount);
+      if (isNaN(repaymentAmount)) return;
+
+      if (selectedAccount.currency !== currency) {
+        const converted = await convertAmount(repaymentAmount, currency, selectedAccount.currency);
+        setConvertedAmount(converted);
+      } else {
+        setConvertedAmount(null);
+      }
+    };
+
+    calculateConversion();
+  }, [selectedAccountId, amount, currency, availableAccounts, convertAmount]);
 
   const handleConfirm = async () => {
     const repaymentAmount = parseFloat(amount);
@@ -252,6 +279,21 @@ export const CreditEarlyRepaymentModal: React.FC<CreditEarlyRepaymentModalProps>
             </View>
           )}
 
+          {/* Предупреждение о конвертации валют */}
+          {convertedAmount !== null && selectedAccountId && (
+            <View style={[styles.conversionBox, { backgroundColor: isDark ? '#1A3A5A' : '#E3F2FD' }]}>
+              <Ionicons name="swap-horizontal" size={20} color="#1976D2" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.conversionTitle, { color: '#1976D2' }]}>
+                  {t('credit.currencyConversion') || 'Конвертация валют'}
+                </Text>
+                <Text style={[styles.conversionText, { color: isDark ? '#90CAF9' : '#1565C0' }]}>
+                  {t('credit.willBeDebited') || 'Будет списано'}: {formatAmount(convertedAmount, availableAccounts.find(a => a.id === selectedAccountId)?.currency || currency)}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {availableAccounts.length === 0 && (
             <View style={[styles.warningBox, { backgroundColor: isDark ? '#4A3000' : '#FFF3CD' }]}>
               <Ionicons name="warning-outline" size={20} color="#856404" />
@@ -391,6 +433,23 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
+  },
+  conversionBox: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  conversionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  conversionText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   actions: {
     flexDirection: 'row',
