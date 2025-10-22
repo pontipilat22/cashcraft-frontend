@@ -272,8 +272,16 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       });
 
       // Если это кредит и указан счёт для зачисления - создаём транзакцию
+      console.log('Credit creation data:', {
+        selectedAccountType,
+        creditDepositAccountId: data.creditDepositAccountId,
+        creditDepositAmount: data.creditDepositAmount,
+        creditInitialAmount: data.creditInitialAmount
+      });
+
       if (selectedAccountType === 'credit' && data.creditDepositAccountId && data.creditDepositAmount) {
         const depositAccount = accounts.find(acc => acc.id === data.creditDepositAccountId);
+        console.log('Deposit account found:', depositAccount?.name, 'Amount to deposit:', data.creditDepositAmount);
         if (depositAccount && data.creditDepositAmount > 0) {
           // Обновляем баланс счёта зачисления
           await updateAccount(data.creditDepositAccountId, {

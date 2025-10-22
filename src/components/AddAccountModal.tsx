@@ -274,6 +274,13 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       accountData.creditInitialAmount = parseFloat(balance) || 0;
       accountData.creditDepositAccountId = creditDepositAccountId || null; // Счёт для зачисления
       accountData.creditDepositAmount = parseFloat(creditDepositAmount) || parseFloat(balance) || 0; // Сумма зачисления (по умолчанию = сумме кредита)
+
+      console.log('AddAccountModal - Credit data being sent:', {
+        creditDepositAccountId: accountData.creditDepositAccountId,
+        creditDepositAmount: accountData.creditDepositAmount,
+        creditDepositAmountInput: creditDepositAmount,
+        balance
+      });
     }
 
     onSave(accountData);
@@ -626,237 +633,261 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
               </>
             )}
 
-            {/* Поля для кредитов - оптимизированная форма */}
+            {/* Поля для кредитов - улучшенная форма */}
             {accountType === 'credit' && (
               <>
-                {/* Сумма кредита */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>
-                    {t('accounts.creditAmount') || 'Сумма кредита'} 💰
+                {/* Шаг 1: Основная информация */}
+                <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1C1C1C' : '#F9FAFB', borderRadius: 12, padding: 16, marginBottom: 16 }]}>
+                  <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 }]}>
+                    📋 Основная информация
                   </Text>
-                  <TextInput
-                    style={[styles.input, {
-                      backgroundColor: colors.background,
-                      color: colors.text,
-                      borderColor: showErrors && errors.balance ? '#FF4444' : colors.border,
-                    }]}
-                    value={balance}
-                    onChangeText={setBalance}
-                    placeholder="500000"
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="numeric"
-                    autoFocus
-                  />
-                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                    Какую сумму взяли в кредит
-                  </Text>
-                </View>
 
-                {/* Срок и ставка в одной строке */}
-                <View style={styles.rowContainer}>
-                  <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>
-                      {t('accounts.creditTerm') || 'Срок'} 📅
+                  {/* Сумма кредита */}
+                  <View style={[styles.inputContainer, { marginBottom: 12 }]}>
+                    <Text style={[styles.label, { color: colors.textSecondary, fontSize: 13 }]}>
+                      Сумма кредита
                     </Text>
                     <TextInput
                       style={[styles.input, {
                         backgroundColor: colors.background,
                         color: colors.text,
-                        borderColor: showErrors && errors.creditTerm ? '#FF4444' : colors.border,
+                        borderColor: showErrors && errors.balance ? '#FF4444' : colors.border,
+                        fontSize: 18,
+                        fontWeight: '600',
                       }]}
-                      value={creditTerm}
-                      onChangeText={(text) => {
-                        setCreditTerm(text);
-                        if (showErrors && errors.creditTerm && text && parseInt(text) > 0) {
-                          setErrors(prev => ({ ...prev, creditTerm: false }));
-                        }
-                      }}
-                      placeholder="12"
+                      value={balance}
+                      onChangeText={setBalance}
+                      placeholder="100 000"
                       placeholderTextColor={colors.textSecondary}
                       keyboardType="numeric"
+                      autoFocus
                     />
-                    <Text style={[styles.hint, { color: colors.textSecondary }]}>месяцев</Text>
                   </View>
 
-                  <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>
-                      {t('accounts.creditRate') || 'Ставка'} %
+                  {/* Дата начала */}
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.label, { color: colors.textSecondary, fontSize: 13 }]}>
+                      Когда взяли кредит
                     </Text>
-                    <TextInput
-                      style={[styles.input, {
-                        backgroundColor: colors.background,
-                        color: colors.text,
-                        borderColor: showErrors && errors.creditRate ? '#FF4444' : colors.border,
-                      }]}
-                      value={creditRate}
-                      onChangeText={(text) => {
-                        setCreditRate(text);
-                        if (showErrors && errors.creditRate && text && parseFloat(text) >= 0) {
-                          setErrors(prev => ({ ...prev, creditRate: false }));
-                        }
-                      }}
-                      placeholder="15.5"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="numeric"
-                    />
-                    <Text style={[styles.hint, { color: colors.textSecondary }]}>годовых</Text>
-                  </View>
-                </View>
-
-                {/* Тип платежей - компактный */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>
-                    {t('accounts.paymentType') || 'Тип платежей'}
-                  </Text>
-                  <View style={styles.paymentTypeContainer}>
                     <TouchableOpacity
-                      style={[
-                        styles.paymentTypeButtonCompact,
-                        {
-                          backgroundColor: creditPaymentType === 'annuity' ? colors.primary : colors.background,
-                          borderColor: colors.border,
-                        }
-                      ]}
-                      onPress={() => setCreditPaymentType('annuity')}
-                    >
-                      <Text style={[
-                        styles.paymentTypeTextCompact,
-                        { color: creditPaymentType === 'annuity' ? '#fff' : colors.text }
-                      ]}>
-                        {t('accounts.annuity') || 'Аннуитет'}
-                      </Text>
-                      <Text style={[
-                        styles.paymentTypeHint,
-                        { color: creditPaymentType === 'annuity' ? 'rgba(255,255,255,0.7)' : colors.textSecondary }
-                      ]}>
-                        Равные платежи
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.paymentTypeButtonCompact,
-                        {
-                          backgroundColor: creditPaymentType === 'differentiated' ? colors.primary : colors.background,
-                          borderColor: colors.border,
-                        }
-                      ]}
-                      onPress={() => setCreditPaymentType('differentiated')}
-                    >
-                      <Text style={[
-                        styles.paymentTypeTextCompact,
-                        { color: creditPaymentType === 'differentiated' ? '#fff' : colors.text }
-                      ]}>
-                        {t('accounts.differentiated') || 'Дифференц.'}
-                      </Text>
-                      <Text style={[
-                        styles.paymentTypeHint,
-                        { color: creditPaymentType === 'differentiated' ? 'rgba(255,255,255,0.7)' : colors.textSecondary }
-                      ]}>
-                        Убывающие
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Дата начала кредита */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>
-                    {t('accounts.creditStartDate') || 'Дата начала кредита'} 📅
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.selector, {
-                      backgroundColor: colors.background,
-                      borderColor: colors.border,
-                    }]}
-                    onPress={creditDatePicker.openDatePicker}
-                  >
-                    <Text style={{ fontSize: 16, color: colors.text }}>
-                      {creditDatePicker.selectedDate.toLocaleDateString('ru-RU', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
-                    </Text>
-                    <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                    Когда был получен кредит
-                  </Text>
-                </View>
-
-                {/* Выбор счёта для зачисления кредита */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>
-                    {t('accounts.creditDepositAccount') || 'Зачислить деньги на счёт'} 💳
-                  </Text>
-                  {accounts.filter(acc => acc.type !== 'savings' && acc.type !== 'credit' && acc.type !== 'debt').length > 0 ? (
-                    <View style={styles.accountSelector}>
-                      {accounts
-                        .filter(acc => acc.type !== 'savings' && acc.type !== 'credit' && acc.type !== 'debt')
-                        .map((acc) => (
-                          <TouchableOpacity
-                            key={acc.id}
-                            style={[
-                              styles.accountButton,
-                              {
-                                backgroundColor: creditDepositAccountId === acc.id ? colors.primary : (isDark ? '#2C2C2C' : '#F5F5F5'),
-                                borderColor: creditDepositAccountId === acc.id ? colors.primary : colors.border,
-                              },
-                            ]}
-                            onPress={() => setCreditDepositAccountId(acc.id)}
-                          >
-                            <Text
-                              style={[
-                                styles.accountButtonText,
-                                { color: creditDepositAccountId === acc.id ? '#FFFFFF' : colors.text },
-                              ]}
-                            >
-                              {acc.name}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.accountBalance,
-                                { color: creditDepositAccountId === acc.id ? '#FFFFFF' : colors.textSecondary },
-                              ]}
-                            >
-                              {formatAmount(acc.balance, acc.currency || defaultCurrency)}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                    </View>
-                  ) : (
-                    <Text style={[styles.hint, { color: colors.textSecondary, fontStyle: 'italic' }]}>
-                      Нет доступных счетов. Создайте обычный счёт сначала.
-                    </Text>
-                  )}
-                  <Text style={[styles.hint, { color: colors.textSecondary, marginTop: 8 }]}>
-                    На этот счёт будут зачислены деньги кредита
-                  </Text>
-                </View>
-
-                {/* Сумма зачисления на счёт */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>
-                    {t('accounts.creditDepositAmount') || 'Сумма зачисления'} 💰
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
+                      style={[styles.selector, {
                         backgroundColor: colors.background,
-                        color: colors.text,
                         borderColor: colors.border,
-                      },
-                    ]}
-                    value={creditDepositAmount}
-                    onChangeText={setCreditDepositAmount}
-                    keyboardType="numeric"
-                    placeholder={balance || "0"}
-                    placeholderTextColor={colors.textSecondary}
-                  />
-                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                    Сколько фактически зачислить на счёт (0 если деньги уже потрачены)
+                      }]}
+                      onPress={creditDatePicker.openDatePicker}
+                    >
+                      <Text style={{ fontSize: 16, color: colors.text }}>
+                        {creditDatePicker.selectedDate.toLocaleDateString('ru-RU', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Шаг 2: Условия кредита */}
+                <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1C1C1C' : '#F9FAFB', borderRadius: 12, padding: 16, marginBottom: 16 }]}>
+                  <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 }]}>
+                    📊 Условия кредита
                   </Text>
+
+                  {/* Срок и ставка в одной строке */}
+                  <View style={[styles.rowContainer, { marginBottom: 12 }]}>
+                    <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
+                      <Text style={[styles.label, { color: colors.textSecondary, fontSize: 13 }]}>
+                        Срок
+                      </Text>
+                      <TextInput
+                        style={[styles.input, {
+                          backgroundColor: colors.background,
+                          color: colors.text,
+                          borderColor: showErrors && errors.creditTerm ? '#FF4444' : colors.border,
+                        }]}
+                        value={creditTerm}
+                        onChangeText={(text) => {
+                          setCreditTerm(text);
+                          if (showErrors && errors.creditTerm && text && parseInt(text) > 0) {
+                            setErrors(prev => ({ ...prev, creditTerm: false }));
+                          }
+                        }}
+                        placeholder="12"
+                        placeholderTextColor={colors.textSecondary}
+                        keyboardType="numeric"
+                      />
+                      <Text style={[styles.hint, { color: colors.textSecondary, fontSize: 11 }]}>месяцев</Text>
+                    </View>
+
+                    <View style={[styles.inputContainer, { flex: 1 }]}>
+                      <Text style={[styles.label, { color: colors.textSecondary, fontSize: 13 }]}>
+                        Ставка
+                      </Text>
+                      <TextInput
+                        style={[styles.input, {
+                          backgroundColor: colors.background,
+                          color: colors.text,
+                          borderColor: showErrors && errors.creditRate ? '#FF4444' : colors.border,
+                        }]}
+                        value={creditRate}
+                        onChangeText={(text) => {
+                          setCreditRate(text);
+                          if (showErrors && errors.creditRate && text && parseFloat(text) >= 0) {
+                            setErrors(prev => ({ ...prev, creditRate: false }));
+                          }
+                        }}
+                        placeholder="15.5"
+                        placeholderTextColor={colors.textSecondary}
+                        keyboardType="numeric"
+                      />
+                      <Text style={[styles.hint, { color: colors.textSecondary, fontSize: 11 }]}>% годовых</Text>
+                    </View>
+                  </View>
+
+                  {/* Тип платежей */}
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.label, { color: colors.textSecondary, fontSize: 13, marginBottom: 8 }]}>
+                      Тип платежей
+                    </Text>
+                    <View style={styles.paymentTypeContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.paymentTypeButtonCompact,
+                          {
+                            backgroundColor: creditPaymentType === 'annuity' ? colors.primary : colors.background,
+                            borderColor: creditPaymentType === 'annuity' ? colors.primary : colors.border,
+                            borderWidth: 1.5,
+                          }
+                        ]}
+                        onPress={() => setCreditPaymentType('annuity')}
+                      >
+                        <Text style={[
+                          styles.paymentTypeTextCompact,
+                          { color: creditPaymentType === 'annuity' ? '#fff' : colors.text, fontWeight: '600' }
+                        ]}>
+                          Аннуитет
+                        </Text>
+                        <Text style={[
+                          styles.paymentTypeHint,
+                          { color: creditPaymentType === 'annuity' ? 'rgba(255,255,255,0.7)' : colors.textSecondary, fontSize: 11 }
+                        ]}>
+                          Равные платежи
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.paymentTypeButtonCompact,
+                          {
+                            backgroundColor: creditPaymentType === 'differentiated' ? colors.primary : colors.background,
+                            borderColor: creditPaymentType === 'differentiated' ? colors.primary : colors.border,
+                            borderWidth: 1.5,
+                          }
+                        ]}
+                        onPress={() => setCreditPaymentType('differentiated')}
+                      >
+                        <Text style={[
+                          styles.paymentTypeTextCompact,
+                          { color: creditPaymentType === 'differentiated' ? '#fff' : colors.text, fontWeight: '600' }
+                        ]}>
+                          Дифференцированный
+                        </Text>
+                        <Text style={[
+                          styles.paymentTypeHint,
+                          { color: creditPaymentType === 'differentiated' ? 'rgba(255,255,255,0.7)' : colors.textSecondary, fontSize: 11 }
+                        ]}>
+                          Убывающие платежи
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Шаг 3: Зачисление денег (опционально) */}
+                <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1C1C1C' : '#F9FAFB', borderRadius: 12, padding: 16 }]}>
+                  <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 }]}>
+                    💳 Зачисление денег
+                  </Text>
+                  <Text style={[styles.hint, { color: colors.textSecondary, fontSize: 12, marginBottom: 12 }]}>
+                    Если деньги уже потрачены, оставьте сумму 0
+                  </Text>
+
+                  {/* Выбор счёта */}
+                  {accounts.filter(acc => acc.type !== 'savings' && acc.type !== 'credit' && acc.type !== 'debt').length > 0 ? (
+                    <>
+                      <View style={[styles.inputContainer, { marginBottom: 12 }]}>
+                        <Text style={[styles.label, { color: colors.textSecondary, fontSize: 13, marginBottom: 8 }]}>
+                          Выберите счёт
+                        </Text>
+                        <View style={styles.accountSelector}>
+                          {accounts
+                            .filter(acc => acc.type !== 'savings' && acc.type !== 'credit' && acc.type !== 'debt')
+                            .map((acc) => (
+                              <TouchableOpacity
+                                key={acc.id}
+                                style={[
+                                  styles.accountButton,
+                                  {
+                                    backgroundColor: creditDepositAccountId === acc.id ? colors.primary : colors.background,
+                                    borderColor: creditDepositAccountId === acc.id ? colors.primary : colors.border,
+                                    borderWidth: 1.5,
+                                  },
+                                ]}
+                                onPress={() => setCreditDepositAccountId(acc.id)}
+                              >
+                                <Text
+                                  style={[
+                                    styles.accountButtonText,
+                                    { color: creditDepositAccountId === acc.id ? '#FFFFFF' : colors.text, fontWeight: '500' },
+                                  ]}
+                                >
+                                  {acc.name}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.accountBalance,
+                                    { color: creditDepositAccountId === acc.id ? 'rgba(255,255,255,0.8)' : colors.textSecondary, fontSize: 12 },
+                                  ]}
+                                >
+                                  {formatAmount(acc.balance, acc.currency || defaultCurrency)}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                        </View>
+                      </View>
+
+                      {/* Сумма зачисления */}
+                      <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: colors.textSecondary, fontSize: 13 }]}>
+                          Сумма для зачисления
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            {
+                              backgroundColor: colors.background,
+                              color: colors.text,
+                              borderColor: colors.border,
+                            },
+                          ]}
+                          value={creditDepositAmount}
+                          onChangeText={setCreditDepositAmount}
+                          keyboardType="numeric"
+                          placeholder={balance || "0"}
+                          placeholderTextColor={colors.textSecondary}
+                        />
+                        <Text style={[styles.hint, { color: colors.textSecondary, fontSize: 11 }]}>
+                          По умолчанию = сумме кредита. Укажите 0 если деньги уже потрачены
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={[{ backgroundColor: isDark ? '#2C2C2C' : '#FEF3C7', borderRadius: 8, padding: 12 }]}>
+                      <Text style={[{ color: isDark ? colors.textSecondary : '#92400E', fontSize: 13 }]}>
+                        ⚠️ Нет доступных счетов. Сначала создайте обычный счёт для зачисления денег.
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </>
             )}
