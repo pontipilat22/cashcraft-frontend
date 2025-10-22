@@ -195,6 +195,7 @@ export default {
     openDate: 'Opening date',
     interestDay: 'Interest accrual day',
     creditDate: 'Credit date',
+    creditStartDate: 'Credit start date',
     creditAmount: 'Credit amount',
     creditTerm: 'Term (months)',
     creditRate: 'Interest rate (%)',

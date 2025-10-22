@@ -158,6 +158,7 @@ export default {
     openDate: 'Дата открытия',
     interestDay: 'Число начисления процентов',
     creditDate: 'Дата получения',
+    creditStartDate: 'Дата начала кредита',
     creditAmount: 'Сумма кредита',
     creditTerm: 'Срок (месяцев)',
     creditRate: 'Процентная ставка (%)',

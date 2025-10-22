@@ -241,7 +241,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       exchangeRate: selectedCurrency !== defaultCurrency ? parseFloat(exchangeRate) || 1 : undefined,
       cardNumber: cardNumber.trim() ? cardNumber.trim() : undefined,
       isDefault: (accountType !== 'savings' && accountType !== 'credit' && accountType !== 'debt') ? isDefault : false,
-      isIncludedInTotal: accountType === 'savings' ? false : isIncludedInTotal,
+      isIncludedInTotal: (accountType === 'savings' || accountType === 'credit') ? false : isIncludedInTotal,
     };
 
     if (accountType === 'savings') {
@@ -750,6 +750,32 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                       </Text>
                     </TouchableOpacity>
                   </View>
+                </View>
+
+                {/* Дата начала кредита */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>
+                    {t('accounts.creditStartDate') || 'Дата начала кредита'} 📅
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.selector, {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    }]}
+                    onPress={creditDatePicker.openDatePicker}
+                  >
+                    <Text style={{ fontSize: 16, color: colors.text }}>
+                      {creditDatePicker.selectedDate.toLocaleDateString('ru-RU', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
+                    Когда был получен кредит
+                  </Text>
                 </View>
               </>
             )}
