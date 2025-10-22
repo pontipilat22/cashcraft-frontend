@@ -7,6 +7,11 @@ import database from '../database';
 import CreditPaymentSchedule from '../database/models/CreditPaymentSchedule';
 import Account from '../database/models/Account';
 import { Q } from '@nozbe/watermelondb';
+import {
+  recalculateScheduleAfterEarlyPayment,
+  CreditParams,
+  PaymentScheduleItem,
+} from './CreditCalculationService';
 
 export interface MarkPaymentParams {
   scheduleItemId: string;
@@ -117,45 +122,88 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
       .query(Q.where('account_id', accountId), Q.sortBy('payment_number', Q.asc))
       .fetch();
 
-    // Находим первый неоплаченный платёж после даты досрочного погашения
-    const pendingPayments = allPayments.filter(
-      p => p.status === 'pending' && new Date(p.paymentDate) >= actualDate
-    );
-
-    if (pendingPayments.length === 0) {
-      throw new Error('Нет неоплаченных платежей для досрочного погашения');
+    if (allPayments.length === 0) {
+      throw new Error('График платежей не найден');
     }
 
-    // Рассчитываем текущий остаток долга
-    let currentBalance = allPayments[allPayments.length - 1]?.remainingBalance ?? 0;
+    // Находим последний оплаченный платёж
+    const paidPayments = allPayments.filter(p => p.status === 'paid');
+    const lastPaidPaymentNumber = paidPayments.length > 0
+      ? paidPayments[paidPayments.length - 1].paymentNumber
+      : 0;
+
+    // Номер месяца для досрочного погашения (следующий после последнего оплаченного)
+    const earlyPaymentMonth = lastPaidPaymentNumber + 1;
+
+    // Находим остаток на момент досрочного погашения
+    const paymentBeforeEarly = allPayments.find(p => p.paymentNumber === earlyPaymentMonth - 1);
+    const currentBalance = paymentBeforeEarly
+      ? paymentBeforeEarly.remainingBalance
+      : (account.creditInitialAmount || 0);
 
     if (amount > currentBalance) {
       throw new Error('Сумма досрочного погашения превышает остаток долга');
     }
 
-    // Простая логика: помечаем первые N платежей как оплаченные
-    let remainingAmount = amount;
-
-    for (const payment of pendingPayments) {
-      if (remainingAmount <= 0) break;
-
-      if (remainingAmount >= payment.totalPayment) {
-        // Полностью оплачиваем этот платёж
-        await payment.update((record: any) => {
-          record.paidAmount = payment.totalPayment;
-          record.paidDate = actualDate.toISOString();
-          record.status = 'paid';
-        });
-        remainingAmount -= payment.totalPayment;
-      } else {
-        // Частично оплачиваем
-        await payment.update((record: any) => {
-          record.paidAmount = remainingAmount;
-          record.paidDate = actualDate.toISOString();
-          record.status = 'partial';
-        });
-        remainingAmount = 0;
+    // Если досрочное погашение полностью покрывает остаток
+    if (amount >= currentBalance) {
+      // Удаляем все неоплаченные платежи
+      const pendingPayments = allPayments.filter(p => p.status === 'pending');
+      for (const payment of pendingPayments) {
+        await payment.markAsDeleted();
       }
+
+      // Обновляем остаток долга в аккаунте
+      await updateAccountBalance(accountId);
+      return;
+    }
+
+    // Готовим параметры для пересчёта
+    const creditParams: CreditParams = {
+      principal: account.creditInitialAmount || 0,
+      interestRate: account.creditRate || 0,
+      termMonths: account.creditTerm || 0,
+      paymentType: (account.creditPaymentType as 'annuity' | 'differentiated') || 'annuity',
+      startDate: new Date(account.creditStartDate || new Date()),
+    };
+
+    // Конвертируем текущий график в формат PaymentScheduleItem
+    const originalSchedule: PaymentScheduleItem[] = allPayments.map(p => ({
+      paymentNumber: p.paymentNumber,
+      paymentDate: new Date(p.paymentDate),
+      principalPayment: p.principalPayment,
+      interestPayment: p.interestPayment,
+      totalPayment: p.totalPayment,
+      remainingBalance: p.remainingBalance,
+    }));
+
+    // Пересчитываем график
+    const newSchedule = recalculateScheduleAfterEarlyPayment(
+      originalSchedule,
+      amount,
+      earlyPaymentMonth,
+      creditParams
+    );
+
+    // Удаляем все неоплаченные платежи из БД
+    const pendingPayments = allPayments.filter(p => p.status === 'pending');
+    for (const payment of pendingPayments) {
+      await payment.markAsDeleted();
+    }
+
+    // Создаём новые платежи на основе пересчитанного графика
+    for (const item of newSchedule) {
+      await scheduleCollection.create((record: any) => {
+        record.accountId = accountId;
+        record.paymentNumber = item.paymentNumber;
+        record.paymentDate = item.paymentDate.toISOString();
+        record.principalPayment = item.principalPayment;
+        record.interestPayment = item.interestPayment;
+        record.totalPayment = item.totalPayment;
+        record.remainingBalance = item.remainingBalance;
+        record.paidAmount = 0;
+        record.status = 'pending';
+      });
     }
 
     // Обновляем остаток долга в аккаунте
