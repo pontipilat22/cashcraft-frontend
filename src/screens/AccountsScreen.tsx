@@ -272,18 +272,18 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       });
 
       // Если это кредит и указан счёт для зачисления - создаём транзакцию
-      if (selectedAccountType === 'credit' && data.creditDepositAccountId && data.creditInitialAmount) {
+      if (selectedAccountType === 'credit' && data.creditDepositAccountId && data.creditDepositAmount) {
         const depositAccount = accounts.find(acc => acc.id === data.creditDepositAccountId);
-        if (depositAccount) {
+        if (depositAccount && data.creditDepositAmount > 0) {
           // Обновляем баланс счёта зачисления
           await updateAccount(data.creditDepositAccountId, {
-            balance: depositAccount.balance + data.creditInitialAmount
+            balance: depositAccount.balance + data.creditDepositAmount
           });
 
           // Создаём транзакцию зачисления
           await createTransaction({
             accountId: data.creditDepositAccountId,
-            amount: data.creditInitialAmount,
+            amount: data.creditDepositAmount,
             type: 'income',
             description: `Получение кредита ${data.name}`,
             date: new Date(data.creditStartDate || new Date()),

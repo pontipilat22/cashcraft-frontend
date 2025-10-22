@@ -110,6 +110,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const [creditPaymentType, setCreditPaymentType] = useState<'annuity' | 'differentiated'>('annuity');
   const [suggestedRate, setSuggestedRate] = useState<number | null>(null);
   const [creditDepositAccountId, setCreditDepositAccountId] = useState<string>(''); // Счёт для зачисления кредита
+  const [creditDepositAmount, setCreditDepositAmount] = useState<string>(''); // Сумма зачисления на счёт
 
   // Для накоплений - связанный счет
   const [linkedAccountId, setLinkedAccountId] = useState<string>('');
@@ -272,6 +273,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       accountData.creditPaymentType = creditPaymentType;
       accountData.creditInitialAmount = parseFloat(balance) || 0;
       accountData.creditDepositAccountId = creditDepositAccountId || null; // Счёт для зачисления
+      accountData.creditDepositAmount = parseFloat(creditDepositAmount) || parseFloat(balance) || 0; // Сумма зачисления (по умолчанию = сумме кредита)
     }
 
     onSave(accountData);
@@ -296,6 +298,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     setCreditRate('');
     setCreditPaymentType('annuity');
     setCreditDepositAccountId('');
+    setCreditDepositAmount('');
     setErrors({});
     setShowErrors(false);
   };
@@ -828,6 +831,31 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                   )}
                   <Text style={[styles.hint, { color: colors.textSecondary, marginTop: 8 }]}>
                     На этот счёт будут зачислены деньги кредита
+                  </Text>
+                </View>
+
+                {/* Сумма зачисления на счёт */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>
+                    {t('accounts.creditDepositAmount') || 'Сумма зачисления'} 💰
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    value={creditDepositAmount}
+                    onChangeText={setCreditDepositAmount}
+                    keyboardType="numeric"
+                    placeholder={balance || "0"}
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
+                    Сколько фактически зачислить на счёт (0 если деньги уже потрачены)
                   </Text>
                 </View>
               </>

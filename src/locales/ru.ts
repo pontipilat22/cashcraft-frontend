@@ -160,6 +160,7 @@ export default {
     creditDate: 'Дата получения',
     creditStartDate: 'Дата начала кредита',
     creditDepositAccount: 'Зачислить деньги на счёт',
+    creditDepositAmount: 'Сумма зачисления',
     creditAmount: 'Сумма кредита',
     creditTerm: 'Срок (месяцев)',
     creditRate: 'Процентная ставка (%)',

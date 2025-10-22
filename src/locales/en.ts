@@ -197,6 +197,7 @@ export default {
     creditDate: 'Credit date',
     creditStartDate: 'Credit start date',
     creditDepositAccount: 'Deposit money to account',
+    creditDepositAmount: 'Deposit amount',
     creditAmount: 'Credit amount',
     creditTerm: 'Term (months)',
     creditRate: 'Interest rate (%)',
