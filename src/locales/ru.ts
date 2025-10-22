@@ -159,6 +159,7 @@ export default {
     interestDay: 'Число начисления процентов',
     creditDate: 'Дата получения',
     creditStartDate: 'Дата начала кредита',
+    creditDepositAccount: 'Зачислить деньги на счёт',
     creditAmount: 'Сумма кредита',
     creditTerm: 'Срок (месяцев)',
     creditRate: 'Процентная ставка (%)',

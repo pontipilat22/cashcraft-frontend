@@ -109,7 +109,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const [creditRate, setCreditRate] = useState('');
   const [creditPaymentType, setCreditPaymentType] = useState<'annuity' | 'differentiated'>('annuity');
   const [suggestedRate, setSuggestedRate] = useState<number | null>(null);
-  
+  const [creditDepositAccountId, setCreditDepositAccountId] = useState<string>(''); // Счёт для зачисления кредита
+
   // Для накоплений - связанный счет
   const [linkedAccountId, setLinkedAccountId] = useState<string>('');
   const [showAccountPicker, setShowAccountPicker] = useState(false);
@@ -270,6 +271,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       accountData.creditRate = parseFloat(creditRate) || 0;
       accountData.creditPaymentType = creditPaymentType;
       accountData.creditInitialAmount = parseFloat(balance) || 0;
+      accountData.creditDepositAccountId = creditDepositAccountId || null; // Счёт для зачисления
     }
 
     onSave(accountData);
@@ -293,6 +295,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     setCreditTerm('');
     setCreditRate('');
     setCreditPaymentType('annuity');
+    setCreditDepositAccountId('');
     setErrors({});
     setShowErrors(false);
   };
@@ -775,6 +778,56 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                   </TouchableOpacity>
                   <Text style={[styles.hint, { color: colors.textSecondary }]}>
                     Когда был получен кредит
+                  </Text>
+                </View>
+
+                {/* Выбор счёта для зачисления кредита */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>
+                    {t('accounts.creditDepositAccount') || 'Зачислить деньги на счёт'} 💳
+                  </Text>
+                  {accounts.filter(acc => acc.type !== 'savings' && acc.type !== 'credit' && acc.type !== 'debt').length > 0 ? (
+                    <View style={styles.accountSelector}>
+                      {accounts
+                        .filter(acc => acc.type !== 'savings' && acc.type !== 'credit' && acc.type !== 'debt')
+                        .map((acc) => (
+                          <TouchableOpacity
+                            key={acc.id}
+                            style={[
+                              styles.accountButton,
+                              {
+                                backgroundColor: creditDepositAccountId === acc.id ? colors.primary : (isDark ? '#2C2C2C' : '#F5F5F5'),
+                                borderColor: creditDepositAccountId === acc.id ? colors.primary : colors.border,
+                              },
+                            ]}
+                            onPress={() => setCreditDepositAccountId(acc.id)}
+                          >
+                            <Text
+                              style={[
+                                styles.accountButtonText,
+                                { color: creditDepositAccountId === acc.id ? '#FFFFFF' : colors.text },
+                              ]}
+                            >
+                              {acc.name}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.accountBalance,
+                                { color: creditDepositAccountId === acc.id ? '#FFFFFF' : colors.textSecondary },
+                              ]}
+                            >
+                              {formatAmount(acc.balance, acc.currency || defaultCurrency)}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                    </View>
+                  ) : (
+                    <Text style={[styles.hint, { color: colors.textSecondary, fontStyle: 'italic' }]}>
+                      Нет доступных счетов. Создайте обычный счёт сначала.
+                    </Text>
+                  )}
+                  <Text style={[styles.hint, { color: colors.textSecondary, marginTop: 8 }]}>
+                    На этот счёт будут зачислены деньги кредита
                   </Text>
                 </View>
               </>

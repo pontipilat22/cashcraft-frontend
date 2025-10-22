@@ -196,6 +196,7 @@ export default {
     interestDay: 'Interest accrual day',
     creditDate: 'Credit date',
     creditStartDate: 'Credit start date',
+    creditDepositAccount: 'Deposit money to account',
     creditAmount: 'Credit amount',
     creditTerm: 'Term (months)',
     creditRate: 'Interest rate (%)',

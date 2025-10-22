@@ -40,7 +40,7 @@ interface AccountsScreenProps {
 
 export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
-  const { accounts, goals, isLoading, createAccount, updateAccount, deleteAccount, createGoal, updateGoal, deleteGoal, refreshData } = useData();
+  const { accounts, goals, isLoading, createAccount, updateAccount, deleteAccount, createGoal, updateGoal, deleteGoal, refreshData, createTransaction } = useData();
   const { checkIfPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
@@ -236,9 +236,9 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     setModalVisible(true);
   };
 
-  const handleSaveAccount = async (data: { 
-    name: string; 
-    balance: number; 
+  const handleSaveAccount = async (data: {
+    name: string;
+    balance: number;
     cardNumber?: string;
     isDefault?: boolean;
     isIncludedInTotal?: boolean;
@@ -249,6 +249,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     creditRate?: number;
     creditPaymentType?: 'annuity' | 'differentiated';
     creditInitialAmount?: number;
+    creditDepositAccountId?: string | null;
     [key: string]: any; // Для остальных полей
   }) => {
     try {
@@ -262,12 +263,34 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
           });
         }
       }
-      
-      await createAccount({
+
+      // Создаём кредитный счёт
+      const newAccount = await createAccount({
         ...data,
         type: selectedAccountType,
         currency: defaultCurrency
       });
+
+      // Если это кредит и указан счёт для зачисления - создаём транзакцию
+      if (selectedAccountType === 'credit' && data.creditDepositAccountId && data.creditInitialAmount) {
+        const depositAccount = accounts.find(acc => acc.id === data.creditDepositAccountId);
+        if (depositAccount) {
+          // Обновляем баланс счёта зачисления
+          await updateAccount(data.creditDepositAccountId, {
+            balance: depositAccount.balance + data.creditInitialAmount
+          });
+
+          // Создаём транзакцию зачисления
+          await createTransaction({
+            accountId: data.creditDepositAccountId,
+            amount: data.creditInitialAmount,
+            type: 'income',
+            description: `Получение кредита ${data.name}`,
+            date: new Date(data.creditStartDate || new Date()),
+          });
+        }
+      }
+
       setModalVisible(false);
     } catch (error) {
       console.error('Error creating account:', error);
