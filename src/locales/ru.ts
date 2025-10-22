@@ -175,6 +175,7 @@ export default {
     interestAmount: 'Проценты',
     totalPayment: 'Всего к оплате',
     remainingDebt: 'Остаток долга',
+    paidOff: 'Выплачено',
     isPaid: 'Оплачен',
     markAsPaid: 'Отметить как оплаченный',
     overpayment: 'Переплата',

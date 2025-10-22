@@ -212,6 +212,7 @@ export default {
     interestAmount: 'Interest',
     totalPayment: 'Total payment',
     remainingDebt: 'Remaining debt',
+    paidOff: 'Paid off',
     isPaid: 'Paid',
     markAsPaid: 'Mark as paid',
     overpayment: 'Overpayment',

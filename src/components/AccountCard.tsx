@@ -403,6 +403,26 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                       <Text style={[styles.creditPayment, { color: colors.primary }]}>
                         {formatBalance(calculateMonthlyPayment())}{t('accounts.perMonth')}
                       </Text>
+                      {/* Прогресс выплаты кредита */}
+                      {account.creditInitialAmount && account.creditInitialAmount > 0 && (
+                        <View style={{ marginTop: 8 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                              {t('accounts.paidOff')}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
+                              {Math.round(((account.creditInitialAmount - Math.abs(account.balance)) / account.creditInitialAmount) * 100)}%
+                            </Text>
+                          </View>
+                          <View style={{ height: 4, backgroundColor: isDark ? '#2C2C2C' : '#E5E7EB', borderRadius: 2, overflow: 'hidden' }}>
+                            <View style={{
+                              height: '100%',
+                              width: `${Math.min(100, ((account.creditInitialAmount - Math.abs(account.balance)) / account.creditInitialAmount) * 100)}%`,
+                              backgroundColor: isDark ? '#FF6B6B' : '#EF4444',
+                            }} />
+                          </View>
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>

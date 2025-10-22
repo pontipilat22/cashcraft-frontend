@@ -241,7 +241,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       exchangeRate: selectedCurrency !== defaultCurrency ? parseFloat(exchangeRate) || 1 : undefined,
       cardNumber: cardNumber.trim() ? cardNumber.trim() : undefined,
       isDefault: (accountType !== 'savings' && accountType !== 'credit' && accountType !== 'debt') ? isDefault : false,
-      isIncludedInTotal: (accountType === 'savings' || accountType === 'credit') ? false : isIncludedInTotal,
+      isIncludedInTotal: accountType === 'savings' ? false : isIncludedInTotal,
     };
 
     if (accountType === 'savings') {
