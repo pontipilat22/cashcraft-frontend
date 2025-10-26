@@ -14,14 +14,16 @@ import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { getLocalizedCategory } from '../utils/categoryUtils';
+import { AddCategoryModal } from '../components/AddCategoryModal';
 
 export const CategorySettingsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
-  const { categories, updateCategory } = useData();
+  const { categories, updateCategory, deleteCategory } = useData();
   const { t } = useLocalization();
 
   const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     // Filter only expense categories
@@ -73,6 +75,41 @@ export const CategorySettingsScreen: React.FC = () => {
     }
   };
 
+  const handleDeleteCategory = (category: any) => {
+    // Проверяем, что это не базовая категория "Другое"
+    if (category.id === 'other_income' || category.id === 'other_expense') {
+      Alert.alert(
+        t('common.error'),
+        t('categories.cannotDeleteDefault') || 'Базовую категорию "Другое" нельзя удалить'
+      );
+      return;
+    }
+
+    const localizedCategory = getLocalizedCategory(category, t);
+    Alert.alert(
+      t('categories.deleteCategory') || 'Удалить категорию?',
+      t('categories.deleteCategoryMessage', { name: localizedCategory.name }) || `Все транзакции категории "${localizedCategory.name}" будут перемещены в "Другое"`,
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCategory(category.id);
+            } catch (error) {
+              console.error('Error deleting category:', error);
+              Alert.alert(t('common.error'), t('categories.deleteError') || 'Не удалось удалить категорию');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -92,9 +129,20 @@ export const CategorySettingsScreen: React.FC = () => {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {t('categories.budgetSettingsDescription')}
+            Управляйте категориями расходов и назначайте им типы для системы бюджетирования
           </Text>
         </View>
+
+        {/* Кнопка добавления категории */}
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: colors.primary }]}
+          onPress={() => setShowAddModal(true)}
+        >
+          <Ionicons name="add" size={20} color="#fff" />
+          <Text style={styles.addButtonText}>
+            Добавить категорию
+          </Text>
+        </TouchableOpacity>
 
         <View style={styles.categoriesList}>
           {expenseCategories.map(category => {
@@ -121,6 +169,16 @@ export const CategorySettingsScreen: React.FC = () => {
                       {getBudgetCategoryLabel(category.budgetCategory)}
                     </Text>
                   </View>
+
+                  {/* Кнопка удаления */}
+                  {category.id !== 'other_income' && category.id !== 'other_expense' && (
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteCategory(category)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 <View style={styles.budgetTypeButtons}>
@@ -173,6 +231,13 @@ export const CategorySettingsScreen: React.FC = () => {
           })}
         </View>
       </ScrollView>
+
+      {/* Модалка добавления категории */}
+      <AddCategoryModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        initialType="expense"
+      />
     </SafeAreaView>
   );
 };
@@ -263,5 +328,23 @@ const styles = StyleSheet.create({
   budgetTypeButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 8,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8,
   },
 });
