@@ -76,11 +76,18 @@ export const MoreScreen: React.FC = () => {
       onPress: () => navigation.navigate('Settings'),
     },
     {
-      id: 'category-settings',
-      title: t('categories.budgetSettings'),
-      icon: 'options-outline',
-      onPress: () => navigation.navigate('CategorySettings'),
+      id: 'categories',
+      title: t('categories.title') || 'Категории',
+      icon: 'pricetags-outline',
+      onPress: () => setShowCategories(true),
     },
+    // Настройка бюджетных категорий перенесена на экран Планы
+    // {
+    //   id: 'category-settings',
+    //   title: t('categories.budgetSettings'),
+    //   icon: 'options-outline',
+    //   onPress: () => navigation.navigate('CategorySettings'),
+    // },
     {
       id: 'export-import',
       title: t('export.title') || 'Экспорт и импорт',
