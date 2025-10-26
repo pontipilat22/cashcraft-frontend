@@ -11,7 +11,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
-import { useBudgetContext } from '../context/BudgetContext';
 
 
 interface NewFABMenuProps {
@@ -43,7 +42,6 @@ export const NewFABMenu: React.FC<NewFABMenuProps> = ({
 }) => {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { reloadData } = useBudgetContext();
 
   const handleItemPress = (action: () => void) => {
     action();
