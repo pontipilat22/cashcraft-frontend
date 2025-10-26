@@ -103,6 +103,10 @@ export async function makePartialPayment(params: PartialPaymentParams): Promise<
 export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<void> {
   const { accountId, amount, repaymentDate } = params;
 
+  console.log('💳 [CreditOperations] Начало досрочного погашения:');
+  console.log('  - Сумма:', amount);
+  console.log('  - ID кредита:', accountId);
+
   if (amount <= 0) {
     throw new Error('Сумма досрочного погашения должна быть больше нуля');
   }
@@ -115,6 +119,8 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
     }
 
     const actualDate = repaymentDate ?? new Date();
+    console.log('  - Название кредита:', account.name);
+    console.log('  - Текущий баланс (долг):', account.balance);
 
     // Получаем все платежи
     const scheduleCollection = database.get<CreditPaymentSchedule>('credit_payment_schedules');
@@ -132,8 +138,13 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
       ? paidPayments[paidPayments.length - 1].paymentNumber
       : 0;
 
+    console.log('  - Всего платежей в графике:', allPayments.length);
+    console.log('  - Оплаченных платежей:', paidPayments.length);
+    console.log('  - Последний оплаченный:', lastPaidPaymentNumber);
+
     // Номер месяца для досрочного погашения (следующий после последнего оплаченного)
     const earlyPaymentMonth = lastPaidPaymentNumber + 1;
+    console.log('  - Досрочное погашение применяется к месяцу:', earlyPaymentMonth);
 
     // Находим остаток на момент досрочного погашения
     const paymentBeforeEarly = allPayments.find(p => p.paymentNumber === earlyPaymentMonth - 1);
@@ -147,21 +158,24 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
 
     // Если досрочное погашение полностью покрывает остаток
     if (amount >= currentBalance) {
+      console.log('✅ Досрочное погашение покрывает весь остаток долга!');
       // Удаляем все неоплаченные платежи
       const pendingPayments = allPayments.filter(p => p.status === 'pending');
+      console.log('  - Удаляем', pendingPayments.length, 'неоплаченных платежей');
       for (const payment of pendingPayments) {
         await payment.markAsDeleted();
       }
 
       // Обновляем остаток долга в аккаунте
       await updateAccountBalance(accountId);
+      console.log('🎉 Кредит полностью погашен!');
       return;
     }
 
     // Готовим параметры для пересчёта
     const creditParams: CreditParams = {
       principal: account.creditInitialAmount || 0,
-      interestRate: account.creditRate || 0,
+      annualRate: account.creditRate || 0,
       termMonths: account.creditTerm || 0,
       paymentType: (account.creditPaymentType as 'annuity' | 'differentiated') || 'annuity',
       startDate: new Date(account.creditStartDate || new Date()),
@@ -178,6 +192,7 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
     }));
 
     // Пересчитываем график
+    console.log('🔄 Вызываем функцию пересчета графика...');
     const newSchedule = recalculateScheduleAfterEarlyPayment(
       originalSchedule,
       amount,
@@ -187,11 +202,13 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
 
     // Удаляем все неоплаченные платежи из БД
     const pendingPayments = allPayments.filter(p => p.status === 'pending');
+    console.log('🗑️ Удаляем старые неоплаченные платежи:', pendingPayments.length, 'шт.');
     for (const payment of pendingPayments) {
       await payment.markAsDeleted();
     }
 
     // Создаём новые платежи на основе пересчитанного графика
+    console.log('➕ Создаем новые платежи:', newSchedule.length, 'шт.');
     for (const item of newSchedule) {
       await scheduleCollection.create((record: any) => {
         record.accountId = accountId;
@@ -207,7 +224,9 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
     }
 
     // Обновляем остаток долга в аккаунте
+    console.log('💾 Обновляем остаток долга в аккаунте...');
     await updateAccountBalance(accountId);
+    console.log('✅ [CreditOperations] Досрочное погашение завершено успешно!');
   });
 }
 

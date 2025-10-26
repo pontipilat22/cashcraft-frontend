@@ -208,20 +208,43 @@ export function recalculateScheduleAfterEarlyPayment(
     return [];
   }
 
+  console.log('📊 [CreditCalculation] Пересчет графика после досрочного погашения:');
+  console.log('  - Исходный срок кредита:', params.termMonths, 'мес.');
+  console.log('  - Номер месяца досрочного погашения:', earlyPaymentMonth);
+  console.log('  - Оплачено платежей:', earlyPaymentMonth - 1);
+  console.log('  - Остаток основного долга до досрочки:', paymentBeforeEarly.remainingBalance);
+  console.log('  - Сумма досрочного погашения:', earlyPaymentAmount);
+  console.log('  - Новый остаток основного долга:', newPrincipal);
+
   // Рассчитываем новый график для оставшихся месяцев
-  const remainingMonths = params.termMonths - earlyPaymentMonth;
+  // ИСПРАВЛЕНО: количество оплаченных месяцев = earlyPaymentMonth - 1
+  const remainingMonths = params.termMonths - (earlyPaymentMonth - 1);
+  console.log('  - Оставшихся месяцев:', remainingMonths);
+
+  const nextPaymentItem = originalSchedule.find(p => p.paymentNumber === earlyPaymentMonth);
+  if (!nextPaymentItem) {
+    throw new Error('Не найден следующий платеж для расчета даты');
+  }
+
   const newParams: CreditParams = {
     ...params,
     principal: newPrincipal,
     termMonths: remainingMonths,
-    startDate: originalSchedule[earlyPaymentMonth].paymentDate,
+    startDate: nextPaymentItem.paymentDate,
   };
 
   const newSchedule = generatePaymentSchedule(newParams);
 
+  console.log('  - Новый график создан:', newSchedule.length, 'платежей');
+
   // Корректируем номера платежей
-  return newSchedule.map(item => ({
+  const correctedSchedule = newSchedule.map((item, index) => ({
     ...item,
-    paymentNumber: item.paymentNumber + earlyPaymentMonth,
+    paymentNumber: item.paymentNumber + earlyPaymentMonth - 1,
   }));
+
+  console.log('  - Номера платежей скорректированы: с', correctedSchedule[0]?.paymentNumber, 'по', correctedSchedule[correctedSchedule.length - 1]?.paymentNumber);
+  console.log('✅ [CreditCalculation] Пересчет завершен успешно');
+
+  return correctedSchedule;
 }

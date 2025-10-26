@@ -109,8 +109,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const [creditRate, setCreditRate] = useState('');
   const [creditPaymentType, setCreditPaymentType] = useState<'annuity' | 'differentiated'>('annuity');
   const [suggestedRate, setSuggestedRate] = useState<number | null>(null);
-  const [creditDepositAccountId, setCreditDepositAccountId] = useState<string>(''); // Счёт для зачисления кредита
-  const [creditDepositAmount, setCreditDepositAmount] = useState<string>(''); // Сумма зачисления на счёт
+  const [creditDepositAccountId, setCreditDepositAccountId] = useState<string>('');
+  const [creditDepositAmount, setCreditDepositAmount] = useState<string>('');
 
   // Для накоплений - связанный счет
   const [linkedAccountId, setLinkedAccountId] = useState<string>('');
@@ -146,6 +146,22 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       }
     }
   }, [visible, accountType, accounts, defaultCurrency]);
+
+  // Устанавливаем счет по умолчанию при открытии модального окна для кредитов
+  useEffect(() => {
+    if (visible && accountType === 'credit') {
+      // Находим доступные счета (не кредиты, не накопления, не долги)
+      const availableAccounts = accounts.filter(acc => acc.type !== 'savings' && acc.type !== 'credit' && acc.type !== 'debt');
+
+      if (availableAccounts.length > 0) {
+        // Если ещё не выбран счёт, выбираем первый по умолчанию или просто первый доступный
+        if (!creditDepositAccountId) {
+          const defaultAccount = availableAccounts.find(acc => acc.isDefault);
+          setCreditDepositAccountId(defaultAccount?.id || availableAccounts[0].id);
+        }
+      }
+    }
+  }, [visible, accountType, accounts, creditDepositAccountId]);
 
   // Обновляем валюту при изменении привязанного счета
   useEffect(() => {
@@ -272,14 +288,27 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       accountData.creditRate = parseFloat(creditRate) || 0;
       accountData.creditPaymentType = creditPaymentType;
       accountData.creditInitialAmount = parseFloat(balance) || 0;
-      accountData.creditDepositAccountId = creditDepositAccountId || null; // Счёт для зачисления
-      accountData.creditDepositAmount = parseFloat(creditDepositAmount) || parseFloat(balance) || 0; // Сумма зачисления (по умолчанию = сумме кредита)
+
+      // Обрабатываем счёт для зачисления
+      accountData.creditDepositAccountId = creditDepositAccountId;
+
+      // Обрабатываем сумму зачисления
+      // Если поле пустое или не указано, используем сумму кредита по умолчанию
+      const enteredAmount = creditDepositAmount.trim();
+      if (enteredAmount === '') {
+        // Поле пустое - используем сумму кредита
+        accountData.creditDepositAmount = parseFloat(balance) || 0;
+      } else {
+        // Поле заполнено - используем введенную сумму
+        accountData.creditDepositAmount = parseFloat(enteredAmount) || 0;
+      }
 
       console.log('AddAccountModal - Credit data being sent:', {
         creditDepositAccountId: accountData.creditDepositAccountId,
         creditDepositAmount: accountData.creditDepositAmount,
         creditDepositAmountInput: creditDepositAmount,
-        balance
+        balance,
+        enteredAmount
       });
     }
 
@@ -400,11 +429,11 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
               )}
             </View>
 
-            {accountType !== 'savings' && (
+            {accountType !== 'savings' && accountType !== 'credit' && (
               <View style={styles.inputContainer}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>{t('accounts.initialBalance')}</Text>
                 <TextInput
-                  style={[styles.input, { 
+                  style={[styles.input, {
                     backgroundColor: colors.background,
                     color: colors.text,
                     borderColor: showErrors && errors.balance ? '#FF4444' : colors.border,
@@ -577,24 +606,26 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
             )}
 
             {accountType !== 'savings' && accountType !== 'credit' && accountType !== 'debt' && (
-              <View style={styles.switchContainer}>
-                <Text style={[styles.switchLabel, { color: colors.text }]}>{t('accounts.defaultAccount')}</Text>
-                <Switch
-                  value={isDefault}
-                  onValueChange={setIsDefault}
-                  trackColor={{ false: '#767577', true: colors.primary }}
-                />
-              </View>
-            )}
+              <>
+                <View style={styles.switchContainer}>
+                  <Text style={[styles.switchLabel, { color: colors.text }]}>{t('accounts.defaultAccount')}</Text>
+                  <Switch
+                    value={isDefault}
+                    onValueChange={setIsDefault}
+                    trackColor={{ false: '#767577', true: colors.primary }}
+                  />
+                </View>
 
-            <View style={styles.switchContainer}>
-              <Text style={[styles.switchLabel, { color: colors.text }]}>{t('accounts.includeInBalance')}</Text>
-              <Switch
-                value={isIncludedInTotal}
-                onValueChange={setIsIncludedInTotal}
-                trackColor={{ false: '#767577', true: colors.primary }}
-              />
-            </View>
+                <View style={styles.switchContainer}>
+                  <Text style={[styles.switchLabel, { color: colors.text }]}>{t('accounts.includeInBalance')}</Text>
+                  <Switch
+                    value={isIncludedInTotal}
+                    onValueChange={setIsIncludedInTotal}
+                    trackColor={{ false: '#767577', true: colors.primary }}
+                  />
+                </View>
+              </>
+            )}
 
             {accountType === 'bank' && (
               <>
@@ -639,7 +670,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 {/* Шаг 1: Основная информация */}
                 <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1C1C1C' : '#F9FAFB', borderRadius: 12, padding: 16, marginBottom: 16 }]}>
                   <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 }]}>
-                    📋 Основная информация
+                    Основная информация
                   </Text>
 
                   {/* Сумма кредита */}
@@ -660,7 +691,6 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                       placeholder="100 000"
                       placeholderTextColor={colors.textSecondary}
                       keyboardType="numeric"
-                      autoFocus
                     />
                   </View>
 
@@ -691,7 +721,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 {/* Шаг 2: Условия кредита */}
                 <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1C1C1C' : '#F9FAFB', borderRadius: 12, padding: 16, marginBottom: 16 }]}>
                   <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 }]}>
-                    📊 Условия кредита
+                    Условия кредита
                   </Text>
 
                   {/* Срок и ставка в одной строке */}
@@ -806,7 +836,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 {/* Шаг 3: Зачисление денег (опционально) */}
                 <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1C1C1C' : '#F9FAFB', borderRadius: 12, padding: 16 }]}>
                   <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 }]}>
-                    💳 Зачисление денег
+                    Зачисление денег
                   </Text>
                   <Text style={[styles.hint, { color: colors.textSecondary, fontSize: 12, marginBottom: 12 }]}>
                     Если деньги уже потрачены, оставьте сумму 0
@@ -1375,5 +1405,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     marginTop: 2,
+  },
+  sectionContainer: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  accountSelector: {
+    gap: 8,
+  },
+  accountButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  accountButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  accountBalance: {
+    fontSize: 13,
   },
 }); 

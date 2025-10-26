@@ -20,7 +20,7 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
   const { isFABMenuOpen, closeFABMenu, setTargetTab } = useFAB();
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { createAccount, createGoal } = useData();
+  const { createAccount, createGoal, accounts, updateAccount, createTransaction } = useData();
   const { reloadData: reloadBudgetData } = useBudgetContext();
 
   // Modals state
@@ -87,19 +87,93 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
   };
 
   const handleSaveAccount = async (accountData: any) => {
-    // Добавляем type к данным счета
-    const accountWithType = {
-      ...accountData,
-      type: selectedAccountType,
-    };
+    try {
+      console.log('🚀 [BottomTabNavigatorWrapper] handleSaveAccount ВЫЗВАН');
+      console.log('📦 [BottomTabNavigatorWrapper] Полученные данные:', JSON.stringify(accountData, null, 2));
+      console.log('🏷️ [BottomTabNavigatorWrapper] Тип счета (selectedAccountType):', selectedAccountType);
 
-    await createAccount(accountWithType);
-    await reloadBudgetData();
-    setShowAddAccountModal(false);
+      // Добавляем type к данным счета
+      const accountWithType = {
+        ...accountData,
+        type: selectedAccountType,
+      };
 
-    // Если создали кредит, переключаем на вкладку кредитов
-    if (selectedAccountType === 'credit') {
-      setTargetTab('credits');
+      // Если это кредит и указан счёт для зачисления - подготавливаем данные ДО создания счёта
+      console.log('=== 🏦 НАЧАЛО СОЗДАНИЯ КРЕДИТА ===');
+      console.log('💰 Данные кредита:', {
+        типСчета: selectedAccountType,
+        счетДляЗачисления: accountData.creditDepositAccountId,
+        суммаЗачисления: accountData.creditDepositAmount,
+        суммаКредита: accountData.creditInitialAmount
+      });
+
+      let shouldCreateDepositTransaction = false;
+      let depositAccountData = null;
+
+      console.log('🔍 Проверяем условия для транзакции зачисления:');
+      console.log('  ✓ Это кредит?', selectedAccountType === 'credit');
+      console.log('  ✓ ID счета для зачисления:', accountData.creditDepositAccountId);
+      console.log('  ✓ Сумма зачисления:', accountData.creditDepositAmount);
+      console.log('  ✓ Сумма определена?', accountData.creditDepositAmount !== undefined);
+
+      // Проверяем, нужно ли создавать транзакцию зачисления
+      // Условия: это кредит, указан счет для зачисления, и сумма > 0
+      if (selectedAccountType === 'credit' && accountData.creditDepositAccountId && typeof accountData.creditDepositAmount === 'number' && accountData.creditDepositAmount > 0) {
+        const depositAccount = accounts.find(acc => acc.id === accountData.creditDepositAccountId);
+        console.log('✅ Счет для зачисления найден:', depositAccount?.name, '| Сумма для зачисления:', accountData.creditDepositAmount);
+        if (depositAccount) {
+          shouldCreateDepositTransaction = true;
+          depositAccountData = {
+            id: depositAccount.id,
+            currentBalance: depositAccount.balance,
+            depositAmount: accountData.creditDepositAmount,
+            creditName: accountData.name,
+            creditStartDate: accountData.creditStartDate
+          };
+          console.log('✅ БУДЕТ СОЗДАНА транзакция зачисления после создания кредитного счета');
+        } else {
+          console.log('❌ Зачисление пропущено: счет не найден в списке счетов');
+        }
+      } else {
+        console.log('❌ Транзакция зачисления НЕ БУДЕТ СОЗДАНА. Причины:');
+        console.log('   - Это кредит?', selectedAccountType === 'credit');
+        console.log('   - Есть ID счета для зачисления?', !!accountData.creditDepositAccountId, '(значение:', accountData.creditDepositAccountId, ')');
+        console.log('   - Сумма является числом?', typeof accountData.creditDepositAmount === 'number', '(тип:', typeof accountData.creditDepositAmount, ')');
+        console.log('   - Сумма больше 0?', accountData.creditDepositAmount > 0, '(значение:', accountData.creditDepositAmount, ')');
+      }
+
+      // Создаём кредитный счёт
+      await createAccount(accountWithType);
+
+      // ПОСЛЕ создания кредита создаём транзакцию зачисления
+      if (shouldCreateDepositTransaction && depositAccountData) {
+        console.log('💳 Создаю транзакцию зачисления кредита...');
+
+        // Создаём транзакцию зачисления (она автоматически обновит баланс счета)
+        await createTransaction({
+          accountId: depositAccountData.id,
+          amount: depositAccountData.depositAmount,
+          type: 'income',
+          categoryId: '', // Без категории для кредитных транзакций
+          description: `Получение кредита "${depositAccountData.creditName}"`,
+          date: depositAccountData.creditStartDate || new Date().toISOString(),
+        });
+        console.log('💵 Баланс счета автоматически обновлен транзакцией:', depositAccountData.currentBalance, '+', depositAccountData.depositAmount, '=', depositAccountData.currentBalance + depositAccountData.depositAmount);
+        console.log('✅ ТРАНЗАКЦИЯ ЗАЧИСЛЕНИЯ СОЗДАНА УСПЕШНО!');
+        console.log('=== 🎉 КРЕДИТ СОЗДАН И ЗАЧИСЛЕН ===');
+      } else {
+        console.log('⚠️ Транзакция зачисления НЕ создана (shouldCreate:', shouldCreateDepositTransaction, ', hasData:', !!depositAccountData, ')');
+      }
+
+      await reloadBudgetData();
+      setShowAddAccountModal(false);
+
+      // Если создали кредит, переключаем на вкладку кредитов
+      if (selectedAccountType === 'credit') {
+        setTargetTab('credits');
+      }
+    } catch (error) {
+      console.error('❌ [BottomTabNavigatorWrapper] Error creating account:', error);
     }
   };
 

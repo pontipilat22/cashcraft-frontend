@@ -6,7 +6,7 @@ import { useSubscription } from '../context/SubscriptionContext';
 import { useAuth } from '../context/AuthContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { useBudgetContext } from '../context/BudgetContext';
+import { useBudgetContext } from '../context/BudgetContext'; // Импорт хука BudgetContext
 import { useFAB } from '../context/FABContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
@@ -253,6 +253,9 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     [key: string]: any; // Для остальных полей
   }) => {
     try {
+      console.log('🚀 [AccountsScreen] handleSaveAccount ВЫЗВАН');
+      console.log('📦 [AccountsScreen] Полученные данные:', JSON.stringify(data, null, 2));
+      console.log('🏷️ [AccountsScreen] Тип счета (selectedAccountType):', selectedAccountType);
 
       // Если новый счет должен быть по умолчанию, снимаем флаг с предыдущего
       if (data.isDefault) {
@@ -264,6 +267,52 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         }
       }
 
+      // Если это кредит и указан счёт для зачисления - подготавливаем данные ДО создания счёта
+      console.log('=== 🏦 НАЧАЛО СОЗДАНИЯ КРЕДИТА ===');
+      console.log('📝 Тип счета:', selectedAccountType);
+      console.log('📊 Все данные:', JSON.stringify(data, null, 2));
+      console.log('💰 Данные кредита:', {
+        типСчета: selectedAccountType,
+        счетДляЗачисления: data.creditDepositAccountId,
+        суммаЗачисления: data.creditDepositAmount,
+        суммаКредита: data.creditInitialAmount
+      });
+
+      let shouldCreateDepositTransaction = false;
+      let depositAccountData = null;
+
+      console.log('🔍 Проверяем условия для транзакции зачисления:');
+      console.log('  ✓ Это кредит?', selectedAccountType === 'credit');
+      console.log('  ✓ ID счета для зачисления:', data.creditDepositAccountId);
+      console.log('  ✓ Сумма зачисления:', data.creditDepositAmount);
+      console.log('  ✓ Сумма определена?', data.creditDepositAmount !== undefined);
+
+      // Проверяем, нужно ли создавать транзакцию зачисления
+      // Условия: это кредит, указан счет для зачисления, и сумма > 0
+      if (selectedAccountType === 'credit' && data.creditDepositAccountId && typeof data.creditDepositAmount === 'number' && data.creditDepositAmount > 0) {
+        const depositAccount = accounts.find(acc => acc.id === data.creditDepositAccountId);
+        console.log('✅ Счет для зачисления найден:', depositAccount?.name, '| Сумма для зачисления:', data.creditDepositAmount);
+        if (depositAccount) {
+          shouldCreateDepositTransaction = true;
+          depositAccountData = {
+            id: depositAccount.id,
+            currentBalance: depositAccount.balance,
+            depositAmount: data.creditDepositAmount,
+            creditName: data.name,
+            creditStartDate: data.creditStartDate
+          };
+          console.log('✅ БУДЕТ СОЗДАНА транзакция зачисления после создания кредитного счета');
+        } else {
+          console.log('❌ Зачисление пропущено: счет не найден в списке счетов');
+        }
+      } else {
+        console.log('❌ Транзакция зачисления НЕ БУДЕТ СОЗДАНА. Причины:');
+        console.log('   - Это кредит?', selectedAccountType === 'credit');
+        console.log('   - Есть ID счета для зачисления?', !!data.creditDepositAccountId, '(значение:', data.creditDepositAccountId, ')');
+        console.log('   - Сумма является числом?', typeof data.creditDepositAmount === 'number', '(тип:', typeof data.creditDepositAmount, ')');
+        console.log('   - Сумма больше 0?', data.creditDepositAmount > 0, '(значение:', data.creditDepositAmount, ')');
+      }
+
       // Создаём кредитный счёт
       const newAccount = await createAccount({
         ...data,
@@ -271,32 +320,24 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         currency: defaultCurrency
       });
 
-      // Если это кредит и указан счёт для зачисления - создаём транзакцию
-      console.log('Credit creation data:', {
-        selectedAccountType,
-        creditDepositAccountId: data.creditDepositAccountId,
-        creditDepositAmount: data.creditDepositAmount,
-        creditInitialAmount: data.creditInitialAmount
-      });
+      // ПОСЛЕ создания кредита создаём транзакцию зачисления
+      if (shouldCreateDepositTransaction && depositAccountData) {
+        console.log('💳 Создаю транзакцию зачисления кредита...');
 
-      if (selectedAccountType === 'credit' && data.creditDepositAccountId && data.creditDepositAmount) {
-        const depositAccount = accounts.find(acc => acc.id === data.creditDepositAccountId);
-        console.log('Deposit account found:', depositAccount?.name, 'Amount to deposit:', data.creditDepositAmount);
-        if (depositAccount && data.creditDepositAmount > 0) {
-          // Обновляем баланс счёта зачисления
-          await updateAccount(data.creditDepositAccountId, {
-            balance: depositAccount.balance + data.creditDepositAmount
-          });
-
-          // Создаём транзакцию зачисления
-          await createTransaction({
-            accountId: data.creditDepositAccountId,
-            amount: data.creditDepositAmount,
-            type: 'income',
-            description: `Получение кредита ${data.name}`,
-            date: new Date(data.creditStartDate || new Date()),
-          });
-        }
+        // Создаём транзакцию зачисления (она автоматически обновит баланс счета)
+        await createTransaction({
+          accountId: depositAccountData.id,
+          amount: depositAccountData.depositAmount,
+          type: 'income',
+          categoryId: '', // Без категории для кредитных транзакций
+          description: `Получение кредита "${depositAccountData.creditName}"`,
+          date: depositAccountData.creditStartDate || new Date().toISOString(),
+        });
+        console.log('💵 Баланс счета автоматически обновлен транзакцией:', depositAccountData.currentBalance, '+', depositAccountData.depositAmount, '=', depositAccountData.currentBalance + depositAccountData.depositAmount);
+        console.log('✅ ТРАНЗАКЦИЯ ЗАЧИСЛЕНИЯ СОЗДАНА УСПЕШНО!');
+        console.log('=== 🎉 КРЕДИТ СОЗДАН И ЗАЧИСЛЕН ===');
+      } else {
+        console.log('⚠️ Транзакция зачисления НЕ создана (shouldCreate:', shouldCreateDepositTransaction, ', hasData:', !!depositAccountData, ')');
       }
 
       setModalVisible(false);
