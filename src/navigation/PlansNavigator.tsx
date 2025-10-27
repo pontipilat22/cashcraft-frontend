@@ -2,12 +2,14 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { PlansScreen } from '../screens/PlansScreen';
 import { BudgetSystemSettings } from '../screens/BudgetSystemSettings';
+import { CategorySettingsScreen } from '../screens/CategorySettingsScreen';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 
 export type PlansStackParamList = {
   PlansMain: undefined;
   BudgetSystemSettings: undefined;
+  CategorySettings: undefined;
 };
 
 const Stack = createStackNavigator<PlansStackParamList>();
@@ -41,6 +43,13 @@ export const PlansNavigator: React.FC = () => {
           headerShown: true,
           title: t('plans.budgetSystemSettings'),
           headerBackTitle: t('common.back'),
+        }}
+      />
+      <Stack.Screen
+        name="CategorySettings"
+        component={CategorySettingsScreen}
+        options={{
+          headerShown: false,
         }}
       />
     </Stack.Navigator>
