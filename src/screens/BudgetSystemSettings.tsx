@@ -343,6 +343,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
+    paddingBottom: 90, // Увеличен отступ чтобы кнопка была видна над нижней навигацией
     borderTopWidth: 1,
   },
   saveButton: {
