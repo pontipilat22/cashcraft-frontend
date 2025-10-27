@@ -94,25 +94,23 @@ export const PlansScreen: React.FC = () => {
         </TouchableOpacity>
 
         {/* Category Management Card */}
-        {budgetSettings.enabled && (
-          <TouchableOpacity
-            style={[styles.card, styles.regularCard, { backgroundColor: colors.card }]}
-            onPress={() => navigation.navigate('CategorySettings')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleInfo}>
-                <Text style={[styles.toggleTitle, { color: colors.text }]}>
-                  Управление категориями
-                </Text>
-                <Text style={[styles.toggleSubtitle, { color: colors.textSecondary }]}>
-                  Создавайте и настраивайте категории
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+        <TouchableOpacity
+          style={[styles.card, styles.regularCard, { backgroundColor: colors.card }]}
+          onPress={() => navigation.navigate('CategorySettings')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <Text style={[styles.toggleTitle, { color: colors.text }]}>
+                Управление категориями
+              </Text>
+              <Text style={[styles.toggleSubtitle, { color: colors.textSecondary }]}>
+                Создавайте и настраивайте категории
+              </Text>
             </View>
-          </TouchableOpacity>
-        )}
+            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
 
         {budgetSettings.enabled && (
           <>
