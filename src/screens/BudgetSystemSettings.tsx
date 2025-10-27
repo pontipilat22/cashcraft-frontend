@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: 24,
-    marginBottom: 100, // Отступ снизу чтобы была видна над навигацией
+    marginBottom: 130, // Увеличенный отступ снизу для комфортного нажатия
   },
   saveButtonText: {
     color: '#fff',
