@@ -72,8 +72,8 @@ export const BudgetSystemSettings: React.FC = () => {
     }
 
     const dayValue = parseInt(periodStartDay);
-    if (isNaN(dayValue) || dayValue < 1 || dayValue > 28) {
-      Alert.alert('Ошибка', 'День начала периода должен быть от 1 до 28');
+    if (isNaN(dayValue) || dayValue < 1 || dayValue > 31) {
+      Alert.alert('Ошибка', 'День начала периода должен быть от 1 до 31');
       return;
     }
 
@@ -196,7 +196,7 @@ export const BudgetSystemSettings: React.FC = () => {
                 День начала периода
               </Text>
               <Text style={[styles.infoText, { color: colors.textSecondary, marginBottom: 16 }]}>
-                Выберите день месяца когда вы получаете зарплату (1-28)
+                Выберите день месяца когда вы получаете зарплату (1-31)
               </Text>
 
               <View style={styles.inputRow}>
@@ -209,12 +209,14 @@ export const BudgetSystemSettings: React.FC = () => {
                   onChangeText={setPeriodStartDay}
                   keyboardType="numeric"
                   maxLength={2}
-                  placeholder="1-28"
+                  placeholder="1-31"
                 />
               </View>
 
               <Text style={[styles.infoText, { color: colors.textSecondary, marginTop: 12, fontSize: 12 }]}>
-                Пример: если зарплата 15 числа, укажите "15". Бюджетный период будет с 15 числа по 14 число следующего месяца.
+                💡 Пример: зарплата 15 числа → период с 15 по 14 следующего месяца.
+                {'\n'}
+                ℹ️ Если указано 31, а в месяце 30 дней — период начнется 30-го числа.
               </Text>
             </View>
 

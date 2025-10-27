@@ -9,7 +9,7 @@ export interface BudgetSettings {
   essentialPercentage: number;
   nonEssentialPercentage: number;
   savingsPercentage: number;
-  periodStartDay: number; // День начала бюджетного периода (1-28)
+  periodStartDay: number; // День начала бюджетного периода (1-31, автоматически подстраивается под месяц)
 }
 
 export interface BudgetTrackingData {
@@ -28,7 +28,7 @@ const DEFAULT_BUDGET: BudgetSettings = {
   essentialPercentage: 50,
   nonEssentialPercentage: 30,
   savingsPercentage: 20,
-  periodStartDay: 1, // По умолчанию 1 число месяца
+  periodStartDay: 1, // По умолчанию 1 число (можно 1-31, автоматически подстраивается под месяц)
 };
 
 // Helper: validate that percentages sum to 100 (allow small float error)
@@ -57,18 +57,30 @@ export const useBudget = () => {
   }, []);
 
   // Helper function to calculate daily budget
+  // Helper: получить реальный день с учетом количества дней в месяце
+  const getActualDayInMonth = (year: number, month: number, desiredDay: number): number => {
+    // Получаем последний день месяца
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    // Возвращаем минимум из желаемого дня и последнего дня месяца
+    return Math.min(desiredDay, lastDay);
+  };
+
   // Helper: получить дату ТЕКУЩЕГО начала периода
   const getCurrentPeriodStartDate = (periodStartDay: number): Date => {
     const now = new Date();
     const currentDay = now.getDate();
 
-    // Если сегодня >= periodStartDay - период начался в этом месяце
-    if (currentDay >= periodStartDay) {
-      return new Date(now.getFullYear(), now.getMonth(), periodStartDay, 0, 0, 0, 0);
+    // Получаем реальный день в текущем месяце (может быть меньше если месяц короткий)
+    const actualDayThisMonth = getActualDayInMonth(now.getFullYear(), now.getMonth(), periodStartDay);
+
+    // Если сегодня >= actualDayThisMonth - период начался в этом месяце
+    if (currentDay >= actualDayThisMonth) {
+      return new Date(now.getFullYear(), now.getMonth(), actualDayThisMonth, 0, 0, 0, 0);
     }
 
     // Иначе период начался в прошлом месяце
-    return new Date(now.getFullYear(), now.getMonth() - 1, periodStartDay, 0, 0, 0, 0);
+    const actualDayLastMonth = getActualDayInMonth(now.getFullYear(), now.getMonth() - 1, periodStartDay);
+    return new Date(now.getFullYear(), now.getMonth() - 1, actualDayLastMonth, 0, 0, 0, 0);
   };
 
   // Helper: проверить нужен ли сброс периода
@@ -83,13 +95,17 @@ export const useBudget = () => {
     const now = new Date();
     const currentDay = now.getDate();
 
+    // Получаем реальный день в текущем месяце
+    const actualDayThisMonth = getActualDayInMonth(now.getFullYear(), now.getMonth(), periodStartDay);
+
     // Если сегодня до начала периода - следующий период в этом месяце
-    if (currentDay < periodStartDay) {
-      return new Date(now.getFullYear(), now.getMonth(), periodStartDay);
+    if (currentDay < actualDayThisMonth) {
+      return new Date(now.getFullYear(), now.getMonth(), actualDayThisMonth);
     }
 
     // Иначе - следующий период в следующем месяце
-    return new Date(now.getFullYear(), now.getMonth() + 1, periodStartDay);
+    const actualDayNextMonth = getActualDayInMonth(now.getFullYear(), now.getMonth() + 1, periodStartDay);
+    return new Date(now.getFullYear(), now.getMonth() + 1, actualDayNextMonth);
   };
 
   // Helper: получить количество дней до следующего периода
