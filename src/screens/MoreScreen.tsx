@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, Modal, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Modal, Alert, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
@@ -115,8 +115,10 @@ export const MoreScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 10 }}>
+    <>
+      <StatusBar backgroundColor={colors.background} barStyle={colors.text === '#FFFFFF' ? 'light-content' : 'dark-content'} />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 10 }}>
         {user && !user.isGuest && (
           <View style={[styles.userCard, { backgroundColor: colors.card }]}>
             <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
@@ -261,7 +263,8 @@ export const MoreScreen: React.FC = () => {
           checkIfPremium();
         }} />
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 };
 

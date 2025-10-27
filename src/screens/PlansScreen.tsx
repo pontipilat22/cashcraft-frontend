@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -131,8 +132,10 @@ export const PlansScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <>
+      <StatusBar backgroundColor={colors.background} barStyle={colors.text === '#FFFFFF' ? 'light-content' : 'dark-content'} />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Budget System Card - Clickable */}
         <TouchableOpacity
           style={[styles.card, styles.firstCard, { backgroundColor: colors.card }]}
@@ -253,7 +256,8 @@ export const PlansScreen: React.FC = () => {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 };
 
