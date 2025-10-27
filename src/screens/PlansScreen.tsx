@@ -50,23 +50,85 @@ export const PlansScreen: React.FC = () => {
     title: string,
     percentage: number,
     color: string,
-    icon: keyof typeof Ionicons.glyphMap
-  ) => (
-    <View style={[styles.budgetCard, { backgroundColor: colors.card }]}>
-      <View style={styles.budgetHeader}>
-        <View style={[styles.budgetIcon, { backgroundColor: color }]}>
-          <Ionicons name={icon} size={24} color="#fff" />
+    icon: keyof typeof Ionicons.glyphMap,
+    type: 'essential' | 'nonEssential' | 'savings'
+  ) => {
+    const allocated = calculateAmount(percentage);
+    let spent = 0;
+
+    if (type === 'essential') {
+      spent = trackingData.essentialSpent || 0;
+    } else if (type === 'nonEssential') {
+      spent = trackingData.nonEssentialSpent || 0;
+    } else if (type === 'savings') {
+      spent = trackingData.savingsAllocated || 0;
+    }
+
+    const remaining = allocated - spent;
+    const progress = allocated > 0 ? (spent / allocated) * 100 : 0;
+    const isOverspent = spent > allocated;
+
+    return (
+      <View style={[styles.budgetCard, { backgroundColor: colors.card }]}>
+        <View style={styles.budgetHeader}>
+          <View style={[styles.budgetIcon, { backgroundColor: color + '20' }]}>
+            <Ionicons name={icon} size={24} color={color} />
+          </View>
+          <Text style={[styles.budgetTitle, { color: colors.text }]}>{title}</Text>
         </View>
-        <Text style={[styles.budgetTitle, { color: colors.text }]}>{title}</Text>
+
+        <View style={styles.budgetDetails}>
+          <View style={styles.budgetRow}>
+            <Text style={[styles.budgetLabel, { color: colors.textSecondary }]}>
+              {t('plans.allocated')}:
+            </Text>
+            <Text style={[styles.budgetValue, { color: colors.text }]}>
+              {formatAmount(allocated)}
+            </Text>
+          </View>
+
+          <View style={styles.budgetRow}>
+            <Text style={[styles.budgetLabel, { color: colors.textSecondary }]}>
+              {type === 'savings' ? t('plans.saved') : t('plans.spent')}:
+            </Text>
+            <Text style={[styles.budgetValue, { color: isOverspent ? '#F44336' : color }]}>
+              {formatAmount(spent)}
+            </Text>
+          </View>
+
+          <View style={styles.budgetRow}>
+            <Text style={[styles.budgetLabel, { color: colors.textSecondary }]}>
+              {t('plans.remaining')}:
+            </Text>
+            <Text style={[styles.budgetValue, {
+              color: remaining >= 0 ? '#4CAF50' : '#F44336',
+              fontWeight: '600'
+            }]}>
+              {formatAmount(remaining)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={[styles.progressBarBackground, { backgroundColor: colors.border }]}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  backgroundColor: isOverspent ? '#F44336' : color,
+                  width: `${Math.min(progress, 100)}%`
+                }
+              ]}
+            />
+          </View>
+          <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+            {progress.toFixed(0)}%
+          </Text>
+        </View>
       </View>
-      <Text style={[styles.budgetPercentage, { color: color }]}>{percentage}%</Text>
-      {trackingData.totalIncomeThisMonth > 0 && (
-        <Text style={[styles.budgetAmount, { color: colors.textSecondary }]}>
-          {formatAmount(calculateAmount(percentage))}
-        </Text>
-      )}
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -169,19 +231,22 @@ export const PlansScreen: React.FC = () => {
                   t('plans.essentialExpenses'),
                   budgetSettings.essentialPercentage,
                   '#FF6B6B',
-                  'home-outline'
+                  'home-outline',
+                  'essential'
                 )}
                 {renderBudgetCard(
                   t('plans.nonEssentialExpenses'),
                   budgetSettings.nonEssentialPercentage,
                   '#4ECDC4',
-                  'gift-outline'
+                  'gift-outline',
+                  'nonEssential'
                 )}
                 {renderBudgetCard(
                   t('plans.savings'),
                   budgetSettings.savingsPercentage,
                   '#45B7D1',
-                  'wallet-outline'
+                  'wallet-outline',
+                  'savings'
                 )}
               </View>
             )}
@@ -258,12 +323,12 @@ const styles = StyleSheet.create({
   budgetCard: {
     borderRadius: 16,
     padding: 20,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   budgetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   budgetIcon: {
     width: 40,
@@ -278,13 +343,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
-  budgetPercentage: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
+  budgetDetails: {
+    marginBottom: 16,
   },
-  budgetAmount: {
-    fontSize: 18,
+  budgetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  budgetLabel: {
+    fontSize: 14,
+  },
+  budgetValue: {
+    fontSize: 16,
     fontWeight: '500',
+  },
+  progressBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  progressBarBackground: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: '600',
+    width: 40,
+    textAlign: 'right',
   },
 });
