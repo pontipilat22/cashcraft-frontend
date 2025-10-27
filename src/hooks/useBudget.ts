@@ -9,6 +9,7 @@ export interface BudgetSettings {
   essentialPercentage: number;
   nonEssentialPercentage: number;
   savingsPercentage: number;
+  periodStartDay: number; // День начала бюджетного периода (1-28)
 }
 
 export interface BudgetTrackingData {
@@ -27,6 +28,7 @@ const DEFAULT_BUDGET: BudgetSettings = {
   essentialPercentage: 50,
   nonEssentialPercentage: 30,
   savingsPercentage: 20,
+  periodStartDay: 1, // По умолчанию 1 число месяца
 };
 
 // Helper: validate that percentages sum to 100 (allow small float error)
@@ -55,6 +57,55 @@ export const useBudget = () => {
   }, []);
 
   // Helper function to calculate daily budget
+  // Helper: получить дату ТЕКУЩЕГО начала периода
+  const getCurrentPeriodStartDate = (periodStartDay: number): Date => {
+    const now = new Date();
+    const currentDay = now.getDate();
+
+    // Если сегодня >= periodStartDay - период начался в этом месяце
+    if (currentDay >= periodStartDay) {
+      return new Date(now.getFullYear(), now.getMonth(), periodStartDay, 0, 0, 0, 0);
+    }
+
+    // Иначе период начался в прошлом месяце
+    return new Date(now.getFullYear(), now.getMonth() - 1, periodStartDay, 0, 0, 0, 0);
+  };
+
+  // Helper: проверить нужен ли сброс периода
+  const needsPeriodReset = (lastResetDate: Date, periodStartDay: number): boolean => {
+    const currentPeriodStart = getCurrentPeriodStartDate(periodStartDay);
+    // Если последний сброс был до начала текущего периода - нужен сброс
+    return lastResetDate < currentPeriodStart;
+  };
+
+  // Helper: получить дату следующего начала периода
+  const getNextPeriodStartDate = (periodStartDay: number): Date => {
+    const now = new Date();
+    const currentDay = now.getDate();
+
+    // Если сегодня до начала периода - следующий период в этом месяце
+    if (currentDay < periodStartDay) {
+      return new Date(now.getFullYear(), now.getMonth(), periodStartDay);
+    }
+
+    // Иначе - следующий период в следующем месяце
+    return new Date(now.getFullYear(), now.getMonth() + 1, periodStartDay);
+  };
+
+  // Helper: получить количество дней до следующего периода
+  const getDaysUntilNextPeriod = (periodStartDay: number): number => {
+    const now = new Date();
+    const nextPeriodStart = getNextPeriodStartDate(periodStartDay);
+
+    // Разница в миллисекундах
+    const diffMs = nextPeriodStart.getTime() - now.getTime();
+
+    // Конвертируем в дни и округляем вверх
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    return Math.max(1, diffDays); // Минимум 1 день
+  };
+
   const calculateDailyBudget = (tracking: BudgetTrackingData, settings: BudgetSettings) => {
     const essential = (tracking.totalIncomeThisMonth * settings.essentialPercentage) / 100;
     const nonEssential = (tracking.totalIncomeThisMonth * settings.nonEssentialPercentage) / 100;
@@ -63,10 +114,8 @@ export const useBudget = () => {
     const remainingNonEssential = Math.max(0, nonEssential - tracking.nonEssentialSpent);
     const totalRemaining = remainingEssential + remainingNonEssential;
 
-    // Get days remaining in current month
-    const now = new Date();
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const daysRemaining = lastDayOfMonth - now.getDate() + 1;
+    // Получаем количество дней до следующего периода
+    const daysRemaining = getDaysUntilNextPeriod(settings.periodStartDay);
 
     console.log('📊 [calculateDailyBudget] Calculation:', {
       totalIncome: tracking.totalIncomeThisMonth,
@@ -114,18 +163,17 @@ export const useBudget = () => {
       if (trackingDataRaw) {
         const tracking = JSON.parse(trackingDataRaw);
 
-        // Check if we need to reset monthly data
+        // Check if we need to reset period data
         const lastResetDate = new Date(tracking.lastResetDate);
         const currentDate = new Date();
-        const needsMonthlyReset = lastResetDate.getMonth() !== currentDate.getMonth() ||
-                                 lastResetDate.getFullYear() !== currentDate.getFullYear();
+        const periodReset = needsPeriodReset(lastResetDate, settings.periodStartDay);
 
         // Check if we need to reset daily data
         const lastDailyResetDate = new Date(tracking.lastDailyResetDate || tracking.lastResetDate);
         const needsDailyReset = lastDailyResetDate.toDateString() !== currentDate.toDateString();
 
-        if (needsMonthlyReset) {
-          console.log('🔄 [useBudget] Resetting monthly budget data');
+        if (periodReset) {
+          console.log('🔄 [useBudget] Resetting period budget data (day:', settings.periodStartDay, ')');
           const resetData = {
             ...DEFAULT_TRACKING,
             lastResetDate: currentDate.toISOString(),
@@ -364,11 +412,11 @@ export const useBudget = () => {
       const lastResetDate = new Date(tracking.lastResetDate);
       const lastDailyResetDate = new Date(tracking.lastDailyResetDate || tracking.lastResetDate);
 
-      const needsMonthlyReset = lastResetDate.getMonth() !== currentDate.getMonth() || lastResetDate.getFullYear() !== currentDate.getFullYear();
+      const periodReset = needsPeriodReset(lastResetDate, budgetSettings.periodStartDay);
       const needsDailyReset = lastDailyResetDate.toDateString() !== currentDate.toDateString();
 
-      if (needsMonthlyReset) {
-        console.log('🔄 [useBudget.scheduler] Monthly reset triggered by scheduler');
+      if (periodReset) {
+        console.log('🔄 [useBudget.scheduler] Period reset triggered by scheduler (day:', budgetSettings.periodStartDay, ')');
         const resetData = {
           ...DEFAULT_TRACKING,
           lastResetDate: currentDate.toISOString(),

@@ -28,6 +28,7 @@ export const BudgetSystemSettings: React.FC = () => {
     nonEssential: budgetSettings.nonEssentialPercentage.toString(),
     savings: budgetSettings.savingsPercentage.toString(),
   });
+  const [periodStartDay, setPeriodStartDay] = useState(budgetSettings.periodStartDay?.toString() || '1');
 
   // Update state when budget settings change
   useEffect(() => {
@@ -37,6 +38,7 @@ export const BudgetSystemSettings: React.FC = () => {
       nonEssential: budgetSettings.nonEssentialPercentage.toString(),
       savings: budgetSettings.savingsPercentage.toString(),
     });
+    setPeriodStartDay(budgetSettings.periodStartDay?.toString() || '1');
   }, [budgetSettings]);
 
   const getCurrentTotal = () => {
@@ -69,12 +71,19 @@ export const BudgetSystemSettings: React.FC = () => {
       return;
     }
 
+    const dayValue = parseInt(periodStartDay);
+    if (isNaN(dayValue) || dayValue < 1 || dayValue > 28) {
+      Alert.alert('Ошибка', 'День начала периода должен быть от 1 до 28');
+      return;
+    }
+
     const newSettings = {
       ...budgetSettings,
       enabled: isEnabled,
       essentialPercentage: parseFloat(tempPercentages.essential),
       nonEssentialPercentage: parseFloat(tempPercentages.nonEssential),
       savingsPercentage: parseFloat(tempPercentages.savings),
+      periodStartDay: dayValue,
     };
 
     await saveBudgetSettings(newSettings);
@@ -179,6 +188,34 @@ export const BudgetSystemSettings: React.FC = () => {
                   {t('common.reset')}
                 </Text>
               </TouchableOpacity>
+            </View>
+
+            {/* Period Start Day Card */}
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>
+                День начала периода
+              </Text>
+              <Text style={[styles.infoText, { color: colors.textSecondary, marginBottom: 16 }]}>
+                Выберите день месяца когда вы получаете зарплату (1-28)
+              </Text>
+
+              <View style={styles.inputRow}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                  День месяца:
+                </Text>
+                <TextInput
+                  style={[styles.percentageInput, { backgroundColor: colors.background, color: colors.text }]}
+                  value={periodStartDay}
+                  onChangeText={setPeriodStartDay}
+                  keyboardType="numeric"
+                  maxLength={2}
+                  placeholder="1-28"
+                />
+              </View>
+
+              <Text style={[styles.infoText, { color: colors.textSecondary, marginTop: 12, fontSize: 12 }]}>
+                Пример: если зарплата 15 числа, укажите "15". Бюджетный период будет с 15 числа по 14 число следующего месяца.
+              </Text>
             </View>
 
             {/* Information Card */}
