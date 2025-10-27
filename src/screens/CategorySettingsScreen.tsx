@@ -111,7 +111,7 @@ export const CategorySettingsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.navigationHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <TouchableOpacity
@@ -126,7 +126,11 @@ export const CategorySettingsScreen: React.FC = () => {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Управляйте категориями расходов и назначайте им типы для системы бюджетирования
@@ -268,7 +272,10 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
     padding: 16,
+    paddingBottom: 100,
   },
   header: {
     marginBottom: 24,
