@@ -231,17 +231,15 @@ export const BudgetSystemSettings: React.FC = () => {
             </View>
           </>
         )}
-      </ScrollView>
 
-      {/* Save Button */}
-      <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+        {/* Save Button */}
         <TouchableOpacity
           style={[styles.saveButton, { backgroundColor: colors.primary }]}
           onPress={saveSettings}
         >
           <Text style={styles.saveButtonText}>{t('common.save')}</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -341,15 +339,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  footer: {
-    padding: 16,
-    paddingBottom: 90, // Увеличен отступ чтобы кнопка была видна над нижней навигацией
-    borderTopWidth: 1,
-  },
   saveButton: {
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 100, // Отступ снизу чтобы была видна над навигацией
   },
   saveButtonText: {
     color: '#fff',
