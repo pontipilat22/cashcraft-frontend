@@ -21,7 +21,7 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { createAccount, createGoal, accounts, updateAccount, createTransaction } = useData();
-  const { reloadData: reloadBudgetData } = useBudgetContext();
+  const { reloadData: reloadBudgetData, isEnabled: isBudgetEnabled } = useBudgetContext();
 
   // Modals state
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('income');
@@ -293,6 +293,7 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
         <AddTransactionModal
           visible={showAddModal}
           initialType={transactionType}
+          isBudgetEnabled={isBudgetEnabled}
           onClose={async () => {
             setShowAddModal(false);
             await reloadBudgetData();
