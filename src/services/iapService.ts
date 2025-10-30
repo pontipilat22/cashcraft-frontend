@@ -1,14 +1,18 @@
-import { 
-  initConnection, 
-  endConnection, 
-  getSubscriptions, 
+import {
+  initConnection,
+  endConnection,
+  fetchProducts,
   requestPurchase,
-  requestSubscription,
   getAvailablePurchases,
   finishTransaction,
-  type SubscriptionProduct,
-  type Purchase 
-} from 'expo-iap';
+  purchaseUpdatedListener,
+  purchaseErrorListener,
+  type Product,
+  type ProductSubscription,
+  type Purchase,
+  type PurchaseError,
+  type AndroidSubscriptionOfferInput,
+} from 'react-native-iap';
 import { Platform } from 'react-native';
 
 // Константы для подписок
@@ -26,16 +30,18 @@ export interface PurchaseResult {
   transactionId: string;
   transactionDate: number;
   transactionReceipt: string;
-  orderId?: string;
-  isAcknowledged?: boolean;
+  orderId?: string | null;
+  isAcknowledged?: boolean | null;
 }
 
 /**
- * Сервис для работы с покупками в приложении через expo-iap
+ * Сервис для работы с покупками в приложении через react-native-iap
  */
 class IAPService {
   private isInitialized = false;
   private isConnected = false;
+  private purchaseUpdateSubscription: any = null;
+  private purchaseErrorSubscription: any = null;
 
   /**
    * Инициализация сервиса покупок
@@ -43,18 +49,21 @@ class IAPService {
   async initialize(): Promise<boolean> {
     try {
       console.log('🔄 [IAPService] Initializing...');
-      
+
       // Инициализируем подключение к store
       const result = await initConnection();
       this.isConnected = result;
-      
+
       if (this.isConnected) {
         console.log('✅ [IAPService] Connected to store');
-        
+
+        // Настраиваем слушатели событий покупок
+        this.setupPurchaseListeners();
+
         // Получаем список доступных товаров
         const products = await this.getProducts();
         console.log('📦 [IAPService] Available products:', products.length);
-        
+
         this.isInitialized = true;
         return true;
       } else {
@@ -70,9 +79,33 @@ class IAPService {
   }
 
   /**
+   * Настройка слушателей событий покупок
+   */
+  private setupPurchaseListeners(): void {
+    // Слушатель успешных покупок
+    this.purchaseUpdateSubscription = purchaseUpdatedListener(
+      async (purchase: Purchase) => {
+        console.log('✅ [IAPService] Purchase successful:', purchase);
+
+        // Для Android подтверждаем покупку
+        if (Platform.OS === 'android') {
+          await this.acknowledgePurchase(purchase);
+        }
+      }
+    );
+
+    // Слушатель ошибок покупок
+    this.purchaseErrorSubscription = purchaseErrorListener(
+      (error: PurchaseError) => {
+        console.error('❌ [IAPService] Purchase error:', error);
+      }
+    );
+  }
+
+  /**
    * Получение списка доступных товаров (подписок)
    */
-  async getProducts(): Promise<SubscriptionProduct[]> {
+  async getProducts(): Promise<ProductSubscription[]> {
     try {
       if (!this.isConnected) {
         throw new Error('IAPService не инициализирован');
@@ -81,38 +114,45 @@ class IAPService {
       const skus = Object.values(SUBSCRIPTION_SKUS);
       console.log('🔍 [IAPService] Getting products for SKUs:', skus);
 
-      const products = await getSubscriptions(skus);
+      const products = await fetchProducts({ skus, type: 'subs' });
+
+      if (!products) {
+        console.log('📦 [IAPService] No products found');
+        return [];
+      }
+
       console.log('📦 [IAPService] Retrieved products count:', products.length);
 
       // Детальное логирование каждого продукта
-      products.forEach((product, index) => {
+      products.forEach((product: Product | ProductSubscription, index: number) => {
         console.log(`📋 [IAPService] Product ${index + 1}:`, {
           id: product.id,
           title: product.title,
           description: product.description,
           price: product.price,
           displayPrice: product.displayPrice,
-          hasOfferDetails: 'subscriptionOfferDetails' in product,
-          offerDetailsCount: (product as any).subscriptionOfferDetails?.length || 0,
         });
 
         // Логируем детали предложений для Android
-        if ('subscriptionOfferDetails' in product) {
-          const offerDetails = (product as any).subscriptionOfferDetails;
-          if (offerDetails && Array.isArray(offerDetails)) {
-            offerDetails.forEach((offer: any, offerIndex: number) => {
-              console.log(`  🎫 [IAPService] Offer ${offerIndex + 1}:`, {
-                offerToken: offer.offerToken,
-                basePlanId: offer.basePlanId,
-                offerId: offer.offerId,
-                pricingPhases: offer.pricingPhases?.length || 0,
+        if (Platform.OS === 'android') {
+          const androidProduct = product as any;
+          if (androidProduct.subscriptionOfferDetailsAndroid) {
+            const offerDetails = androidProduct.subscriptionOfferDetailsAndroid;
+            if (offerDetails && Array.isArray(offerDetails)) {
+              offerDetails.forEach((offer: any, offerIndex: number) => {
+                console.log(`  🎫 [IAPService] Offer ${offerIndex + 1}:`, {
+                  offerToken: offer.offerToken,
+                  basePlanId: offer.basePlanId,
+                  offerId: offer.offerId,
+                  pricingPhases: offer.pricingPhases?.pricingPhaseList?.length || 0,
+                });
               });
-            });
+            }
           }
         }
       });
 
-      return products;
+      return products as ProductSubscription[];
     } catch (error) {
       console.error('❌ [IAPService] Failed to get products:', error);
       throw error;
@@ -129,30 +169,35 @@ class IAPService {
       }
 
       console.log('💳 [IAPService] Purchasing subscription:', productId);
-      
-      // Получаем реальный offerToken из продукта
-      let offerToken = '';
-      
+
+      // Получаем информацию о продукте и offerToken для Android
+      let subscriptionOffers: AndroidSubscriptionOfferInput[] | undefined;
+
       if (Platform.OS === 'android') {
         try {
           const products = await this.getProducts();
-          const product = products.find(p => p.id === productId);
-          
+          const product = products.find(p => p.id === productId) as any;
+
           console.log('🔍 [IAPService] Found product:', product);
-          
-          if (product && 'subscriptionOfferDetails' in product) {
-            const subscriptionOfferDetails = (product as any).subscriptionOfferDetails;
+
+          if (product?.subscriptionOfferDetailsAndroid) {
+            const subscriptionOfferDetails = product.subscriptionOfferDetailsAndroid;
             console.log('📋 [IAPService] SubscriptionOfferDetails:', subscriptionOfferDetails);
-            
+
             if (subscriptionOfferDetails && subscriptionOfferDetails.length > 0) {
-              offerToken = subscriptionOfferDetails[0].offerToken;
+              const offerToken = subscriptionOfferDetails[0].offerToken;
               console.log('🔑 [IAPService] Found offerToken:', offerToken);
+
+              subscriptionOffers = [{
+                sku: productId,
+                offerToken: offerToken,
+              }];
             }
           }
-          
-          if (!offerToken) {
+
+          if (!subscriptionOffers) {
             console.warn('⚠️ [IAPService] No offerToken found for product:', productId);
-            throw new Error('Подписка еще не активирована в Google Play Console. Попробуйте позже.');
+            throw new Error('Подписка еще не активирована в Google Play Console. Убедитесь, что базовый план активен.');
           }
         } catch (error) {
           console.error('❌ [IAPService] Error getting offerToken:', error);
@@ -160,37 +205,38 @@ class IAPService {
         }
       }
 
-      // Используем deprecated метод requestSubscription с реальным offerToken
-      const result = await requestSubscription({
-        ios: { sku: productId },
-        android: { 
-          skus: [productId],
-          subscriptionOffers: [{
-            sku: productId,
-            offerToken: offerToken || 'default' // Используем реальный токен или fallback
-          }]
-        }
+      // Запрашиваем покупку подписки
+      const result = await requestPurchase({
+        type: 'subs',
+        request: Platform.OS === 'android'
+          ? {
+              android: {
+                skus: [productId],
+                subscriptionOffers: subscriptionOffers,
+              }
+            }
+          : {
+              ios: {
+                sku: productId,
+              }
+            }
       });
-      
+
       console.log('✅ [IAPService] Purchase result:', result);
 
-      // result может быть Purchase, Purchase[] или void
+      // result может быть Purchase, Purchase[] или null
       const purchase = Array.isArray(result) ? result[0] : result;
-      
+
       if (purchase && purchase.transactionId) {
         const purchaseResult: PurchaseResult = {
           purchaseId: purchase.transactionId,
           productId: productId,
           transactionId: purchase.transactionId,
-          transactionDate: Date.now(),
-          transactionReceipt: purchase.transactionReceipt || '',
-          // orderId и isAcknowledged могут отсутствовать в новом API
+          transactionDate: purchase.transactionDate || Date.now(),
+          transactionReceipt: purchase.purchaseToken || '',
+          orderId: 'dataAndroid' in purchase ? purchase.dataAndroid : undefined,
+          isAcknowledged: 'isAcknowledgedAndroid' in purchase ? purchase.isAcknowledgedAndroid : undefined,
         };
-
-        // Для Android подтверждаем покупку
-        if (Platform.OS === 'android') {
-          await this.acknowledgePurchase(purchase);
-        }
 
         return purchaseResult;
       }
@@ -212,16 +258,22 @@ class IAPService {
       }
 
       console.log('🔄 [IAPService] Restoring purchases...');
-      
+
       const purchases = await getAvailablePurchases();
       console.log('📜 [IAPService] Available purchases:', purchases);
 
+      if (!purchases) {
+        return [];
+      }
+
       return purchases.map(purchase => ({
-        purchaseId: purchase.transactionId || '',
+        purchaseId: purchase.transactionId || purchase.id,
         productId: purchase.productId,
-        transactionId: purchase.transactionId || '',
+        transactionId: purchase.transactionId || purchase.id,
         transactionDate: purchase.transactionDate || Date.now(),
-        transactionReceipt: purchase.transactionReceipt || '',
+        transactionReceipt: purchase.purchaseToken || '',
+        orderId: 'dataAndroid' in purchase ? purchase.dataAndroid : undefined,
+        isAcknowledged: 'isAcknowledgedAndroid' in purchase ? purchase.isAcknowledgedAndroid : undefined,
       }));
     } catch (error) {
       console.error('❌ [IAPService] Failed to restore purchases:', error);
@@ -239,21 +291,27 @@ class IAPService {
       }
 
       console.log('🔍 [IAPService] Getting active subscriptions...');
-      
+
       const subscriptions = await getAvailablePurchases();
       console.log('📋 [IAPService] Available subscriptions:', subscriptions);
 
+      if (!subscriptions) {
+        return [];
+      }
+
       // Фильтруем только наши подписки
-      const ourSubscriptions = subscriptions.filter(sub => 
+      const ourSubscriptions = subscriptions.filter(sub =>
         Object.values(SUBSCRIPTION_SKUS).includes(sub.productId as SubscriptionSKU)
       );
 
       return ourSubscriptions.map(subscription => ({
-        purchaseId: subscription.transactionId || '',
+        purchaseId: subscription.transactionId || subscription.id,
         productId: subscription.productId,
-        transactionId: subscription.transactionId || '',
+        transactionId: subscription.transactionId || subscription.id,
         transactionDate: subscription.transactionDate || Date.now(),
-        transactionReceipt: subscription.transactionReceipt || '',
+        transactionReceipt: subscription.purchaseToken || '',
+        orderId: 'dataAndroid' in subscription ? subscription.dataAndroid : undefined,
+        isAcknowledged: 'isAcknowledgedAndroid' in subscription ? subscription.isAcknowledgedAndroid : undefined,
       }));
     } catch (error) {
       console.error('❌ [IAPService] Failed to get active subscriptions:', error);
@@ -268,12 +326,12 @@ class IAPService {
     try {
       if (Platform.OS === 'android') {
         console.log('✅ [IAPService] Acknowledging purchase:', purchase.transactionId);
-        
-        await finishTransaction({ 
-          purchase: purchase, 
-          isConsumable: false 
+
+        await finishTransaction({
+          purchase: purchase,
+          isConsumable: false
         });
-        
+
         console.log('✅ [IAPService] Purchase acknowledged');
       }
     } catch (error) {
@@ -287,8 +345,6 @@ class IAPService {
    */
   async isAvailable(): Promise<boolean> {
     try {
-      // В новой версии expo-iap нет метода isAvailable
-      // Возвращаем статус подключения
       return this.isConnected;
     } catch (error) {
       console.error('❌ [IAPService] Failed to check availability:', error);
@@ -301,6 +357,17 @@ class IAPService {
    */
   async disconnect(): Promise<void> {
     try {
+      // Отписываемся от слушателей
+      if (this.purchaseUpdateSubscription) {
+        this.purchaseUpdateSubscription.remove();
+        this.purchaseUpdateSubscription = null;
+      }
+
+      if (this.purchaseErrorSubscription) {
+        this.purchaseErrorSubscription.remove();
+        this.purchaseErrorSubscription = null;
+      }
+
       if (this.isConnected) {
         await endConnection();
         this.isConnected = false;

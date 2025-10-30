@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { iapService, PurchaseResult, SubscriptionSKU, SUBSCRIPTION_SKUS, IAPHelpers } from '../services/iapService';
-import { type SubscriptionProduct } from 'expo-iap';
+import { type ProductSubscription } from 'react-native-iap';
 
 interface Subscription {
   planId: string;
@@ -17,7 +17,7 @@ interface SubscriptionContextType {
   subscription: Subscription | null;
   isPremium: boolean;
   isLoading: boolean;
-  availableProducts: SubscriptionProduct[];
+  availableProducts: ProductSubscription[];
   checkIfPremium: () => Promise<boolean>;
   activateSubscription: (planId: string, planName: string, price: string, days: number) => Promise<void>;
   purchaseSubscription: (productId: SubscriptionSKU) => Promise<boolean>;
@@ -62,7 +62,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [availableProducts, setAvailableProducts] = useState<SubscriptionProduct[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<ProductSubscription[]>([]);
 
   // Простая функция проверки подписки
   const checkIfPremium = async (): Promise<boolean> => {
@@ -213,7 +213,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
         // Получаем информацию о продукте
         const product = availableProducts.find(p => p.id === productId);
         const productName = product?.title || IAPHelpers.getSubscriptionName(productId);
-        const price = String(product?.price || 'N/A');
+        const price = product?.displayPrice || String(product?.price || 'N/A');
         const days = IAPHelpers.getSubscriptionDuration(productId);
         
         // Активируем подписку локально
@@ -257,7 +257,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
           
           const product = availableProducts.find(p => p.id === latestPurchase.productId);
           const productName = product?.title || IAPHelpers.getSubscriptionName(latestPurchase.productId as SubscriptionSKU);
-          const price = String(product?.price || 'N/A');
+          const price = product?.displayPrice || String(product?.price || 'N/A');
           const days = IAPHelpers.getSubscriptionDuration(latestPurchase.productId as SubscriptionSKU);
           
           await activateSubscription(latestPurchase.productId, productName, price, days);
