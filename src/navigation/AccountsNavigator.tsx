@@ -23,11 +23,14 @@ export const AccountsNavigator: React.FC = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: isDark ? '#232323' : '#FFFFFF',
+          backgroundColor: colors.card,
           shadowColor: 'transparent',
           elevation: 0,
         },
         headerTintColor: colors.text,
+        cardStyle: {
+          backgroundColor: colors.background,
+        },
       }}
     >
       <Stack.Screen
@@ -44,7 +47,7 @@ export const AccountsNavigator: React.FC = () => {
           ),
           headerTitleAlign: 'left',
           headerStyle: {
-            backgroundColor: isDark ? '#232323' : '#FFFFFF',
+            backgroundColor: colors.card,
             shadowColor: 'transparent',
             elevation: 0,
           },
@@ -64,7 +67,7 @@ export const AccountsNavigator: React.FC = () => {
           ),
           headerTitleAlign: 'left',
           headerStyle: {
-            backgroundColor: isDark ? '#232323' : '#FFFFFF',
+            backgroundColor: colors.card,
             shadowColor: 'transparent',
             elevation: 0,
           },
@@ -77,7 +80,7 @@ export const AccountsNavigator: React.FC = () => {
           headerShown: true,
           title: 'Детали кредита',
           headerStyle: {
-            backgroundColor: isDark ? '#232323' : '#FFFFFF',
+            backgroundColor: colors.card,
             shadowColor: 'transparent',
             elevation: 0,
           },

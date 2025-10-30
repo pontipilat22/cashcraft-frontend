@@ -15,6 +15,7 @@ import { useBudgetContext } from '../context/BudgetContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useTheme } from '../context/ThemeContext';
 import { AccountType } from '../types';
+import { useInterstitialAd } from '../hooks/useInterstitialAd';
 
 export const BottomTabNavigatorWrapper: React.FC = () => {
   const { isFABMenuOpen, closeFABMenu, setTargetTab } = useFAB();
@@ -22,6 +23,7 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
   const { t } = useLocalization();
   const { createAccount, createGoal, accounts, updateAccount, createTransaction } = useData();
   const { reloadData: reloadBudgetData, isEnabled: isBudgetEnabled } = useBudgetContext();
+  const { trackAccountCreation } = useInterstitialAd();
 
   // Modals state
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('income');
@@ -144,6 +146,9 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
 
       // Создаём кредитный счёт
       await createAccount(accountWithType);
+
+      // Отслеживаем создание счета для показа рекламы (каждый 3-й счет)
+      await trackAccountCreation();
 
       // ПОСЛЕ создания кредита создаём транзакцию зачисления
       if (shouldCreateDepositTransaction && depositAccountData) {

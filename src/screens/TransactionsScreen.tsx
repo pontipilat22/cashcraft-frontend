@@ -11,6 +11,7 @@ import {
   Alert,
   InteractionManager,
   ScrollView,
+  StatusBar,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
@@ -692,11 +693,15 @@ export const TransactionsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={colors.card}
+      />
       {/* Поиск и кнопка удаления в одной строке */}
       <View style={[
         styles.searchWrapper,
         {
-          backgroundColor: isDark ? '#232323' : '#FFFFFF',
+          backgroundColor: colors.card,
           borderBottomLeftRadius: 20,
           borderBottomRightRadius: 20,
         }

@@ -76,6 +76,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const savedUserStr = await AsyncStorage.getItem('currentUser');
       if (!savedUserStr) {
+        // Автоматически создаем локального пользователя
+        const localUserId = `local_${Date.now()}`;
+        const localUser: AuthUser = {
+          id: localUserId,
+          email: `${localUserId}@local.app`,
+          displayName: 'Локальный пользователь',
+          isGuest: false,
+          isPremium: false
+        };
+        await setupUserSession(localUser);
         return;
       }
       const savedUser: AuthUser = JSON.parse(savedUserStr);

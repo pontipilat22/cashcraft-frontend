@@ -7,13 +7,15 @@ import { DataService } from './data';
 // Копируем логику получения URL из api.ts
 const getApiBaseUrl = () => {
   if (__DEV__) {
+    // Режим разработки - локальный backend
     if (Platform.OS === 'android') {
-      return 'http://192.168.2.101:3000/api/v1';
+      return 'http://10.0.2.2:3000/api/v1';
     } else {
-      return 'http://192.168.2.101:3000/api/v1';
+      return 'http://localhost:3000/api/v1';
     }
   } else {
-    return 'https://your-production-api.com/api/v1';
+    // Production - Railway backend
+    return 'https://cashcraft-backend-production.up.railway.app/api/v1';
   }
 };
 

@@ -82,132 +82,213 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
     return () => clearInterval(interval);
   }, []);
 
-  // Баланс-таймсерия
+  // Баланс по транзакциям (точечный график)
   const realBalanceData = useMemo(() => {
     if (!transactions || transactions.length === 0) {
-      const now = Date.now();
-      let points = 7; let interval = 24 * 60 * 60 * 1000;
-      switch (selectedPeriod) {
-        case '24h': points = 24; interval = 60 * 60 * 1000; break;
-        case '1W': points = 7; interval = 24 * 60 * 60 * 1000; break;
-        case '1M': points = 30; interval = 24 * 60 * 60 * 1000; break;
-        case '3M': points = 90; interval = 24 * 60 * 60 * 1000; break;
-        case '1Y': points = 12; interval = 30 * 24 * 60 * 60 * 1000; break;
-        case 'ALL': points = 7; interval = 24 * 60 * 60 * 1000; break;
-      }
-      const startDate = now - points * interval;
-      const zeroData: DataPoint[] = [];
-      for (let i = 0; i <= points; i++) zeroData.push({ date: startDate + i * interval, value: 0 });
-      return zeroData;
+      // Если нет транзакций, показываем нулевой баланс
+      return [
+        { date: Date.now() - 1000, value: 0 },
+        { date: Date.now(), value: 0 }
+      ];
     }
 
     const now = Date.now();
-    let startDate: number = now; let points = 7; let interval = 24 * 60 * 60 * 1000;
+    let startDate: number = now;
+
+    // Определяем начальную дату периода
     switch (selectedPeriod) {
-      case '24h': points = 24; interval = 60 * 60 * 1000; startDate = now - points * interval; break;
-      case '1W': points = 7; interval = 24 * 60 * 60 * 1000; startDate = now - points * interval; break;
-      case '1M': points = 30; interval = 24 * 60 * 60 * 1000; startDate = now - points * interval; break;
-      case '3M': points = 90; interval = 24 * 60 * 60 * 1000; startDate = now - points * interval; break;
-      case '1Y': points = 12; interval = 30 * 24 * 60 * 60 * 1000; startDate = now - points * interval; break;
+      case '24h': startDate = now - 24 * 60 * 60 * 1000; break;
+      case '1W': startDate = now - 7 * 24 * 60 * 60 * 1000; break;
+      case '1M': startDate = now - 30 * 24 * 60 * 60 * 1000; break;
+      case '3M': startDate = now - 90 * 24 * 60 * 60 * 1000; break;
+      case '1Y': startDate = now - 365 * 24 * 60 * 60 * 1000; break;
       case 'ALL': {
         const oldest = transactions.reduce((oldest, t) => {
           const d = typeof t.date === 'string' ? new Date(t.date).getTime() : t.date;
           return d < oldest ? d : oldest;
         }, now);
-        startDate = oldest;
-        const totalDays = Math.ceil((now - startDate) / (24 * 60 * 60 * 1000));
-        points = Math.min(Math.max(totalDays, 7), 30);
-        interval = totalDays > 0 ? (now - startDate) / points : 24 * 60 * 60 * 1000;
+        startDate = oldest - 60 * 60 * 1000; // начинаем за час до первой транзакции
         break;
       }
     }
 
-    // Сортируем транзакции по дате (преобразуем строки в timestamp)
-    const sortedTransactions = [...transactions].sort((a, b) => {
+    // Сортируем ВСЕ транзакции по дате
+    const allSortedTransactions = [...transactions].sort((a, b) => {
       const dateA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date;
       const dateB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date;
       return dateA - dateB;
     });
 
-    // Создаем набор точек: базовые точки периода + точки транзакций
-    const timePoints = new Set<number>();
+    // Вычисляем начальный баланс
+    let currentBalance = 0;
 
-    // Для периода ALL добавляем точку ПЕРЕД первой транзакцией, чтобы график начинался с 0
-    if (selectedPeriod === 'ALL' && sortedTransactions.length > 0) {
-      const firstTransactionTime = typeof sortedTransactions[0].date === 'string'
-        ? new Date(sortedTransactions[0].date).getTime()
-        : sortedTransactions[0].date;
+    // 1. Добавляем начальные балансы счетов, созданных ДО начала периода
+    if (accounts) {
+      for (const account of accounts) {
+        const accountCreatedAt = typeof account.createdAt === 'string'
+          ? new Date(account.createdAt).getTime()
+          : account.createdAt;
 
-      // Добавляем точку за 1 час до первой транзакции
-      timePoints.add(firstTransactionTime - 60 * 60 * 1000);
-    }
+        // Если счет создан до начала периода и включен в общий баланс
+        if (accountCreatedAt < startDate && account.isIncludedInTotal !== false) {
+          // Вычисляем начальный баланс счета = текущий баланс - все транзакции по этому счету
+          let accountInitialBalance = account.balance;
 
-    // Добавляем базовые точки периода
-    for (let i = 0; i <= points; i++) {
-      const pointDate = i === points ? now : startDate + i * interval;
-      timePoints.add(pointDate);
-    }
+          for (const transaction of allSortedTransactions) {
+            if (transaction.accountId === account.id) {
+              if (transaction.type === 'income') {
+                accountInitialBalance -= transaction.amount;
+              } else if (transaction.type === 'expense') {
+                accountInitialBalance += transaction.amount;
+              }
+            }
+          }
 
-    // Добавляем точки для каждой транзакции
-    for (const transaction of sortedTransactions) {
-      const transactionTimestamp = typeof transaction.date === 'string'
-        ? new Date(transaction.date).getTime()
-        : transaction.date;
-
-      // Добавляем точку транзакции только если она в диапазоне
-      if (transactionTimestamp >= startDate && transactionTimestamp <= now) {
-        timePoints.add(transactionTimestamp);
+          currentBalance += accountInitialBalance;
+        }
       }
     }
 
-    // Сортируем все точки времени
-    const sortedTimePoints = Array.from(timePoints).sort((a, b) => a - b);
+    // 2. Добавляем транзакции ДО начала периода
+    for (const transaction of allSortedTransactions) {
+      const tDate = typeof transaction.date === 'string' ? new Date(transaction.date).getTime() : transaction.date;
+      if (tDate < startDate) {
+        if (transaction.type === 'income') {
+          currentBalance += transaction.amount;
+        } else if (transaction.type === 'expense') {
+          currentBalance -= transaction.amount;
+        }
+      }
+    }
 
-    // Вычисляем баланс для каждой точки времени
+    // Фильтруем только транзакции в выбранном периоде
+    const periodTransactions = allSortedTransactions.filter(t => {
+      const tDate = typeof t.date === 'string' ? new Date(t.date).getTime() : t.date;
+      return tDate >= startDate && tDate <= now;
+    });
+
+    // Получаем счета, созданные В периоде
+    const periodAccounts = accounts ? accounts.filter(account => {
+      const accountCreatedAt = typeof account.createdAt === 'string'
+        ? new Date(account.createdAt).getTime()
+        : account.createdAt;
+      return accountCreatedAt >= startDate && accountCreatedAt <= now && account.isIncludedInTotal !== false;
+    }) : [];
+
+    // Объединяем транзакции и создания счетов, сортируем по времени
+    type TimelineEvent =
+      | { type: 'transaction'; data: typeof periodTransactions[0]; timestamp: number }
+      | { type: 'account'; data: typeof periodAccounts[0]; timestamp: number };
+
+    const timelineEvents: TimelineEvent[] = [
+      ...periodTransactions.map(t => ({
+        type: 'transaction' as const,
+        data: t,
+        timestamp: typeof t.date === 'string' ? new Date(t.date).getTime() : t.date
+      })),
+      ...periodAccounts.map(a => ({
+        type: 'account' as const,
+        data: a,
+        timestamp: typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : a.createdAt
+      }))
+    ].sort((a, b) => a.timestamp - b.timestamp);
+
+    // Создаем точки для графика
     const balanceData: DataPoint[] = [];
 
-    for (const pointDate of sortedTimePoints) {
-      // Накопительный баланс: считаем все транзакции до этой точки
-      let balanceAtPoint = 0;
+    // Добавляем начальную точку с балансом на начало периода
+    balanceData.push({
+      date: startDate,
+      value: Math.max(0, currentBalance)
+    });
 
-      for (const transaction of sortedTransactions) {
+    // Обрабатываем все события (транзакции и создания счетов)
+    timelineEvents.forEach((event, index) => {
+      if (event.type === 'transaction') {
+        const transaction = event.data;
         const transactionTimestamp = typeof transaction.date === 'string'
           ? new Date(transaction.date).getTime()
           : transaction.date;
 
-        if (transactionTimestamp <= pointDate) {
-          if (transaction.type === 'income') {
-            balanceAtPoint += transaction.amount;
-          } else if (transaction.type === 'expense') {
-            balanceAtPoint -= transaction.amount;
+        // Точка ПЕРЕД транзакцией (держим предыдущий баланс)
+        if (index > 0 || currentBalance !== 0) {
+          balanceData.push({
+            date: transactionTimestamp - 1,
+            value: Math.max(0, currentBalance)
+          });
+        }
+
+        // Обновляем баланс
+        if (transaction.type === 'income') {
+          currentBalance += transaction.amount;
+        } else if (transaction.type === 'expense') {
+          currentBalance -= transaction.amount;
+        }
+
+        // Точка ПОСЛЕ транзакции (новый баланс)
+        balanceData.push({
+          date: transactionTimestamp,
+          value: Math.max(0, currentBalance)
+        });
+      } else if (event.type === 'account') {
+        const account = event.data;
+        const accountTimestamp = typeof account.createdAt === 'string'
+          ? new Date(account.createdAt).getTime()
+          : account.createdAt;
+
+        // Точка ПЕРЕД созданием счета
+        if (index > 0 || currentBalance !== 0) {
+          balanceData.push({
+            date: accountTimestamp - 1,
+            value: Math.max(0, currentBalance)
+          });
+        }
+
+        // Вычисляем начальный баланс счета = текущий баланс - все транзакции по этому счету
+        let accountInitialBalance = account.balance;
+
+        for (const transaction of allSortedTransactions) {
+          if (transaction.accountId === account.id) {
+            if (transaction.type === 'income') {
+              accountInitialBalance -= transaction.amount;
+            } else if (transaction.type === 'expense') {
+              accountInitialBalance += transaction.amount;
+            }
           }
         }
-      }
 
+        // Добавляем начальный баланс счета
+        currentBalance += accountInitialBalance;
+
+        // Точка ПОСЛЕ создания счета (с его начальным балансом)
+        balanceData.push({
+          date: accountTimestamp,
+          value: Math.max(0, currentBalance)
+        });
+      }
+    });
+
+    // Добавляем финальную точку на текущий момент (держим последний баланс)
+    if (timelineEvents.length > 0) {
       balanceData.push({
-        date: pointDate,
-        value: Math.max(0, balanceAtPoint),
+        date: now,
+        value: Math.max(0, currentBalance)
       });
     }
 
     // Логирование для отладки
-    console.log('📊 [BalanceChart] Данные графика:', {
+    console.log('📊 [BalanceChart] Данные графика (точечный):', {
       период: selectedPeriod,
       точек: balanceData.length,
-      транзакций: transactions.length,
-      счетов: accounts?.length || 0,
-      первоеЗначение: balanceData[0]?.value,
-      последнееЗначение: balanceData[balanceData.length - 1]?.value,
-    });
-
-    // Показываем все точки с балансом
-    console.log('📊 [BalanceChart] Все точки баланса:');
-    balanceData.forEach((pt, i) => {
-      console.log(`  ${i + 1}. ${new Date(pt.date).toLocaleString()} -> ${pt.value}`);
+      транзакцийВПериоде: periodTransactions.length,
+      счетовВПериоде: periodAccounts.length,
+      всегоСобытий: timelineEvents.length,
+      начальныйБаланс: balanceData[0]?.value,
+      конечныйБаланс: balanceData[balanceData.length - 1]?.value,
     });
 
     return balanceData.length > 0 ? balanceData : [];
-  }, [transactions, accounts, selectedPeriod, defaultCurrency]);
+  }, [transactions, accounts, selectedPeriod]);
 
   const rawData = useMemo(() => (externalData ? externalData : realBalanceData || []), [externalData, realBalanceData]);
 
@@ -217,9 +298,10 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data: externalData }
   const bottomYSV = useSharedValue(CHART_HEIGHT - CHART_MARGIN);
   const morphProgress = useSharedValue(1); // 0..1
 
-  // Display → fixed samples
+  // Display → используем исходные точки транзакций без пересэмплирования
   const displaySeries = useMemo(() => (rawData && rawData.length ? rawData : []), [rawData]);
-  const sampledSeries = useMemo(() => resampleToFixed(displaySeries, SAMPLES), [displaySeries]);
+  // Отключаем пересэмплирование для точечного графика, чтобы сохранить точные значения
+  const sampledSeries = useMemo(() => displaySeries, [displaySeries]);
 
   // Scaling + points (JS)
   const { pointsNow, scaleX, scaleY, bottomY } = useMemo(() => {

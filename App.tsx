@@ -4,6 +4,7 @@
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { setGenerator } from '@nozbe/watermelondb/utils/common/randomId';
+
 setGenerator(() => uuidv4());
 
 
@@ -24,11 +25,12 @@ import { CurrencyProvider, useCurrency } from './src/context/CurrencyContext';
 import { BudgetProvider } from './src/context/BudgetContext';
 import { FABProvider } from './src/context/FABContext';
 
-import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { SplashScreen } from './src/components/SplashScreen';
 import { LocalDatabaseService } from './src/services/localDatabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import mobileAds from 'react-native-google-mobile-ads';
+import { AdService } from './src/services/AdService';
 
 // Предотвращаем автоматическое скрытие нативного splash screen
 SplashScreenExpo.preventAutoHideAsync();
@@ -100,6 +102,9 @@ const errorStyles = StyleSheet.create({
 });
 
 /* ─────────────── AppContent ─────────────── */
+// Авторизация отключена - приложение работает полностью локально
+// Каждое устройство автоматически получает локального пользователя
+// Подписки покупаются напрямую через IAP без авторизации
 function AppContent() {
   console.log('🎬 [AppContent] Component mounting...');
 
@@ -218,25 +223,45 @@ function AppContent() {
 
   console.log('📱 [AppContent] Rendering main app, user:', !!user);
 
+  // Кастомные темы навигации с нашими цветами
+  const customLightTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: '#F5F5F5', // Серый фон
+      card: '#FFFFFF', // Белые карточки
+    },
+  };
+
+  const customDarkTheme = {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      background: '#1a1a1a', // Темно-серый фон (из ThemeContext)
+      card: '#1c1c1e', // Темные карточки (из ThemeContext)
+    },
+  };
+
   return (
-    <SafeAreaProvider>
-      {!user ? (
-        <AuthNavigator />
-      ) : (
-        <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
-          <BudgetProvider>
-            <SubscriptionProvider userId={user.id} isGuest={user.isGuest}>
-              <DataProvider
-                key={dataProviderKey}
-                userId={user.id}
-                defaultCurrency={defaultCurrency}
-              >
-                <BottomTabNavigatorWrapper />
-              </DataProvider>
-            </SubscriptionProvider>
-          </BudgetProvider>
-        </NavigationContainer>
-      )}
+    <SafeAreaProvider style={{ flex: 1, backgroundColor: isDark ? '#1a1a1a' : '#F5F5F5' }}>
+      <NavigationContainer
+        theme={isDark ? customDarkTheme : customLightTheme}
+        documentTitle={{
+          enabled: false
+        }}
+      >
+        <BudgetProvider>
+          <SubscriptionProvider userId={user?.id || ''} isGuest={false}>
+            <DataProvider
+              key={dataProviderKey}
+              userId={user?.id || ''}
+              defaultCurrency={defaultCurrency}
+            >
+              <BottomTabNavigatorWrapper />
+            </DataProvider>
+          </SubscriptionProvider>
+        </BudgetProvider>
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }
@@ -244,6 +269,24 @@ function AppContent() {
 /* ─────────────── Корневой компонент ─────────────── */
 export default function App() {
   console.log('🚀 [App] Starting application...');
+
+  // Инициализация AdMob
+  useEffect(() => {
+    console.log('📱 [App] Initializing AdMob...');
+
+    mobileAds()
+      .initialize()
+      .then(adapterStatuses => {
+        console.log('✅ [App] AdMob initialized:', adapterStatuses);
+      })
+      .catch(error => {
+        console.error('❌ [App] AdMob initialization error:', error);
+      });
+
+    // Инициализация сервиса рекламы
+    AdService.init();
+    console.log('✅ [App] AdService initialized');
+  }, []);
 
   return (
     <ErrorBoundary>

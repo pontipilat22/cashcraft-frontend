@@ -249,6 +249,8 @@ export default {
   },
   goals: {
     createGoal: 'Create Goal',
+    addGoal: 'Add Goal',
+    goal: 'Goal',
     goalName: 'Goal Name',
     goalNamePlaceholder: 'e.g., Trip to Italy',
     targetAmount: 'Target Amount',
@@ -295,6 +297,12 @@ export default {
     essential: 'Essential',
     nonEssential: 'Non-Essential',
     notSet: 'Not Set',
+    allocated: 'Allocated',
+    spent: 'Spent',
+    saved: 'Saved',
+    remaining: 'Remaining',
+    categoryManagement: 'Category Management',
+    categoryManagementDescription: 'Create and customize categories',
   },
   transactions: {
     title: 'Transactions',

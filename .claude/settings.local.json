@@ -27,7 +27,9 @@
       "Bash(findstr cashcraft)",
       "Bash(adb -s emulator-5554 shell \"df -h /data\")",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

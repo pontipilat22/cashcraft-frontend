@@ -133,12 +133,15 @@ export const PlansScreen: React.FC = () => {
 
   return (
     <>
-      <StatusBar backgroundColor={colors.background} barStyle={colors.text === '#FFFFFF' ? 'light-content' : 'dark-content'} />
+      <StatusBar backgroundColor={colors.card} barStyle={colors.text === '#FFFFFF' ? 'light-content' : 'dark-content'} />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Верхний блок с закругленным низом - пустой, только для декора */}
+        <View style={[styles.topCard, { backgroundColor: colors.card }]} />
+
         {/* Budget System Card - Clickable */}
         <TouchableOpacity
-          style={[styles.card, styles.firstCard, { backgroundColor: colors.card }]}
+          style={[styles.card, styles.firstCard, { backgroundColor: colors.card, marginHorizontal: 16 }]}
           onPress={() => navigation.navigate('BudgetSystemSettings')}
           activeOpacity={0.7}
         >
@@ -160,17 +163,17 @@ export const PlansScreen: React.FC = () => {
 
         {/* Category Management Card */}
         <TouchableOpacity
-          style={[styles.card, styles.regularCard, { backgroundColor: colors.card }]}
+          style={[styles.card, styles.regularCard, { backgroundColor: colors.card, marginHorizontal: 16 }]}
           onPress={() => navigation.navigate('CategorySettings')}
           activeOpacity={0.7}
         >
           <View style={styles.toggleRow}>
             <View style={styles.toggleInfo}>
               <Text style={[styles.toggleTitle, { color: colors.text }]}>
-                Управление категориями
+                {t('plans.categoryManagement')}
               </Text>
               <Text style={[styles.toggleSubtitle, { color: colors.textSecondary }]}>
-                Создавайте и настраивайте категории
+                {t('plans.categoryManagementDescription')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
@@ -180,7 +183,7 @@ export const PlansScreen: React.FC = () => {
         {budgetSettings.enabled && (
           <>
             {/* Income Summary */}
-            <View style={[styles.card, styles.regularCard, { backgroundColor: colors.card }]}>
+            <View style={[styles.card, styles.regularCard, { backgroundColor: colors.card, marginHorizontal: 16, marginTop: 16 }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>
                 {t('plans.currentMonth')}
               </Text>
@@ -229,7 +232,7 @@ export const PlansScreen: React.FC = () => {
 
             {/* Budget Cards */}
             {trackingData.totalIncomeThisMonth > 0 && (
-              <View style={styles.budgetGrid}>
+              <View style={[styles.budgetGrid, { paddingHorizontal: 16 }]}>
                 {renderBudgetCard(
                   t('plans.essentialExpenses'),
                   budgetSettings.essentialPercentage,
@@ -267,9 +270,18 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 16,
+  },
+  topCard: {
+    height: 50,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   card: {
     borderRadius: 16,
@@ -277,10 +289,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   firstCard: {
-    marginTop: 60,
+    marginTop: 16,
   },
   regularCard: {
-    marginTop: 16,
+    marginTop: 0,
   },
   toggleRow: {
     flexDirection: 'row',

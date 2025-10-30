@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalization } from '../context/LocalizationContext';
 import { getCurrentLanguage } from '../services/i18n';
+import { BannerAd } from '../components/ads/BannerAd';
 
 export const MoreScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -116,31 +117,33 @@ export const MoreScreen: React.FC = () => {
 
   return (
     <>
-      <StatusBar backgroundColor={colors.background} barStyle={colors.text === '#FFFFFF' ? 'light-content' : 'dark-content'} />
+      <StatusBar backgroundColor={colors.card} barStyle={colors.text === '#FFFFFF' ? 'light-content' : 'dark-content'} />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 10 }}>
-        {user && !user.isGuest && (
-          <View style={[styles.userCard, { backgroundColor: colors.card }]}>
-            <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
-              <Text style={styles.userAvatarText}>
-                {(user.displayName || user.email || 'U')[0].toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.userInfo}>
-              {user.displayName && (
-                <Text style={[styles.userName, { color: colors.text }]}>
-                  {user.displayName}
+        <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Верхний блок с закругленным низом */}
+        <View style={[styles.topCard, { backgroundColor: colors.card }]}>
+          {user && !user.isGuest && (
+            <View style={styles.userCard}>
+              <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
+                <Text style={styles.userAvatarText}>
+                  {(user.displayName || user.email || 'U')[0].toUpperCase()}
                 </Text>
-              )}
-              <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
-                {user.email}
-              </Text>
+              </View>
+              <View style={styles.userInfo}>
+                {user.displayName && (
+                  <Text style={[styles.userName, { color: colors.text }]}>
+                    {user.displayName}
+                  </Text>
+                )}
+                <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
+                  {user.email}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Кнопка подписки */}
-        {!isPremium && (
+          {/* Кнопка подписки */}
+          {!isPremium && (
           <TouchableOpacity
             style={[styles.premiumBanner, { backgroundColor: colors.primary }]}
             onPress={() => {
@@ -200,8 +203,9 @@ export const MoreScreen: React.FC = () => {
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
+        </View>
 
-        <View style={[styles.menuSection, { backgroundColor: colors.card }]}>
+        <View style={[styles.menuSection, { backgroundColor: colors.card, marginTop: 16 }]}>
           {menuItems.map(renderMenuItem)}
         </View>
 
@@ -263,6 +267,11 @@ export const MoreScreen: React.FC = () => {
           checkIfPremium();
         }} />
       </Modal>
+
+      {/* Баннерная реклама (над навигацией) */}
+      <View style={styles.bannerContainer}>
+        <BannerAd />
+      </View>
       </SafeAreaView>
     </>
   );
@@ -271,6 +280,17 @@ export const MoreScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  topCard: {
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   header: {
     padding: 20,
@@ -284,8 +304,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 12,
     padding: 16,
     borderRadius: 12,
   },
@@ -315,7 +335,7 @@ const styles = StyleSheet.create({
   },
   premiumBanner: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 0,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -398,6 +418,13 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     width: 40,
+    alignItems: 'center',
+  },
+  bannerContainer: {
+    position: 'absolute',
+    bottom: 110, // Отступ для навигационной панели + высота баннера (50px nav + 60px banner)
+    left: 0,
+    right: 0,
     alignItems: 'center',
   },
 }); 

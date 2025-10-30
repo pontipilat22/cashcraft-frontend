@@ -53,36 +53,34 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionSKU>(SUBSCRIPTION_SKUS.MONTHLY);
   const [isLoading, setIsLoading] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   // Генерируем планы на основе доступных продуктов или используем дефолтные
   const plans: SubscriptionPlan[] = React.useMemo(() => {
     const defaultPlans: SubscriptionPlan[] = [
       {
         id: SUBSCRIPTION_SKUS.MONTHLY,
-        name: t('premium.monthlySubscription'),
-        price: '$2',
-        period: t('premium.perMonth'),
+        name: 'Premium на месяц',
+        price: '$2.99',
+        period: '/месяц',
         description: [
-          t('premium.features.unlimitedAccounts'),
-          t('premium.features.dataExport'),
-          t('premium.features.advancedAnalytics'),
-          t('premium.features.deviceSync'),
-          t('premium.features.prioritySupport'),
+          '🚫 Отключение ВСЕЙ рекламы',
+          '♾️ Неограниченное количество счетов',
+          '💰 Поддержка разработки приложения',
         ],
       },
       {
         id: SUBSCRIPTION_SKUS.YEARLY,
-        name: t('premium.yearlySubscription'),
-        price: '$15',
-        period: t('premium.perYear'),
-        pricePerMonth: '$1.25' + t('premium.perMonth'),
-        badge: t('premium.savingsBadge'),
+        name: 'Premium на год',
+        price: '$19.99',
+        period: '/год',
+        pricePerMonth: '$1.67/месяц',
+        badge: 'Экономия 44%',
         description: [
-          t('premium.features.unlimitedAccounts'),
-          t('premium.features.yearlySavings'),
-          t('premium.features.exclusiveThemes'),
-          t('premium.features.earlyAccess'),
-          t('premium.features.personalConsultations'),
+          '🚫 Отключение ВСЕЙ рекламы на год',
+          '♾️ Неограниченное количество счетов',
+          '💎 Самый выгодный план',
+          '💰 Поддержка разработки приложения',
         ],
       },
     ];
@@ -170,21 +168,29 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
       
       // Более дружелюбная обработка ошибок
       let errorMessage = t('premium.subscribeError');
+      let errorDetails = '';
+
       if (error instanceof Error) {
+        console.error('❌ [SubscriptionScreen] Purchase error details:', {
+          message: error.message,
+          stack: error.stack,
+        });
+
         if (error.message.includes('IAPService не инициализирован')) {
           errorMessage = 'Сервис покупок еще загружается. Попробуйте через несколько секунд.';
-        } else if (error.message.includes('User cancelled')) {
+        } else if (error.message.includes('User cancelled') || error.message.includes('cancelled')) {
           errorMessage = 'Покупка отменена пользователем.';
         } else if (error.message.includes('еще не активирована в Google Play Console')) {
-          errorMessage = 'Подписка настраивается. Попробуйте через 15-60 минут или обратитесь в поддержку.';
+          errorMessage = '⚠️ Подписки настраиваются в Google Play Console.\n\nВозможные причины:\n\n1. Подписки только что созданы (нужно подождать 1-24 часа)\n2. У подписок нет базового плана с ценой\n3. Подписки не активированы\n\nПроверьте логи приложения для подробностей.';
+          errorDetails = '\n\nID подписок:\n• cashcraft_monthly\n• cashcraft_yearly';
         } else if (error.message.includes('offerToken')) {
-          errorMessage = 'Подписки временно недоступны. Попробуйте позже.';
+          errorMessage = '⚠️ Не найден токен предложения подписки.\n\nЭто означает, что в Google Play Console:\n\n1. У подписки нет базового плана\n2. Или базовый план не активирован\n3. Или нужно подождать синхронизации (до 24 часов)\n\nПодробности в логах приложения.';
         } else {
           errorMessage = error.message;
         }
       }
-      
-      Alert.alert(t('common.error'), errorMessage);
+
+      Alert.alert(t('common.error'), errorMessage + errorDetails);
     } finally {
       setIsLoading(false);
     }
@@ -392,12 +398,76 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
             {t('premium.unlockAllFeatures')}
           </Text>
-          
+
           {/* Показываем индикатор загрузки цен */}
           {availableProducts.length === 0 && isLoading && (
             <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
               Загружаем актуальные цены...
             </Text>
+          )}
+
+          {/* Кнопка отладки */}
+          <TouchableOpacity
+            onPress={() => setShowDebugInfo(!showDebugInfo)}
+            style={[styles.debugButton, { backgroundColor: colors.border }]}
+          >
+            <Ionicons name="bug" size={16} color={colors.textSecondary} />
+            <Text style={[styles.debugButtonText, { color: colors.textSecondary }]}>
+              {showDebugInfo ? 'Скрыть отладку' : 'Показать отладку'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Отладочная информация */}
+          {showDebugInfo && (
+            <View style={[styles.debugInfo, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.debugTitle, { color: colors.text }]}>Информация о продуктах:</Text>
+              <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                Найдено продуктов: {availableProducts.length}
+              </Text>
+              {availableProducts.length === 0 ? (
+                <Text style={[styles.debugText, { color: colors.danger }]}>
+                  ⚠️ Продукты не загружены!{'\n'}
+                  Возможные причины:{'\n'}
+                  • Подписки не созданы в Google Play Console{'\n'}
+                  • Подписки не активированы{'\n'}
+                  • Нет базовых планов с ценами{'\n'}
+                  • Ожидание синхронизации (до 24 часов)
+                </Text>
+              ) : (
+                availableProducts.map((product, index) => (
+                  <View key={product.id} style={styles.debugProduct}>
+                    <Text style={[styles.debugProductTitle, { color: colors.primary }]}>
+                      Продукт {index + 1}: {product.id}
+                    </Text>
+                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                      Название: {product.title || 'Нет'}
+                    </Text>
+                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                      Цена: {product.displayPrice || String(product.price) || 'Нет'}
+                    </Text>
+                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                      Описание: {product.description || 'Нет'}
+                    </Text>
+                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                      Детали предложений: {(product as any).subscriptionOfferDetails?.length || 0}
+                    </Text>
+                    {(product as any).subscriptionOfferDetails && (
+                      <Text style={[styles.debugText, { color: colors.success }]}>
+                        ✅ Есть offerToken - можно покупать
+                      </Text>
+                    )}
+                    {!(product as any).subscriptionOfferDetails && (
+                      <Text style={[styles.debugText, { color: colors.danger }]}>
+                        ❌ НЕТ offerToken - нужен базовый план!
+                      </Text>
+                    )}
+                  </View>
+                ))
+              )}
+              <Text style={[styles.debugText, { color: colors.textSecondary, marginTop: 10 }]}>
+                Проверьте логи Metro (npx react-native log-android) для подробной информации
+              </Text>
+            </View>
           )}
         </View>
 
@@ -704,4 +774,105 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
   },
-}); 
+  rewardedAdSection: {
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 2,
+  },
+  rewardedAdHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  rewardedAdTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  rewardedAdDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  rewardedAdButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    padding: 14,
+    borderWidth: 2,
+  },
+  rewardedAdButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 14,
+    marginHorizontal: 12,
+  },
+  unlockedSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+  },
+  unlockedText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  debugButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 16,
+    gap: 6,
+  },
+  debugButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  debugInfo: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    width: '100%',
+  },
+  debugTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  debugText: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  debugProduct: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  debugProductTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+});

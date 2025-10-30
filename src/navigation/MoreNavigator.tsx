@@ -41,6 +41,9 @@ export const MoreNavigator: React.FC = () => {
         },
         headerTintColor: colors.text,
         headerShadowVisible: false,
+        contentStyle: {
+          backgroundColor: colors.background,
+        },
       }}
     >
       {/* Все ваши существующие экраны остаются без изменений */}

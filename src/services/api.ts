@@ -2,12 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ClientEncryption } from '../utils/encryption';
 import { Platform } from 'react-native';
 
-// 🔥 ЛОКАЛЬНЫЙ BACKEND ДЛЯ ТЕСТИРОВАНИЯ AI
-// Замените 192.168.1.100 на ваш локальный IP (найдите через ipconfig)
-const API_BASE_URL = 'http://10.0.2.2:3000/api/v1';
+// Backend URL - автоматически переключается между dev и production
+const getApiBaseUrl = () => {
+  if (__DEV__) {
+    // Режим разработки - локальный backend
+    return 'http://10.0.2.2:3000/api/v1';
+  } else {
+    // Production - Railway backend
+    return 'https://cashcraft-backend-production.up.railway.app/api/v1';
+  }
+};
 
-// Если хотите вернуть на Railway, раскомментируйте:
-// const API_BASE_URL = 'https://cashcraft-backend-production.up.railway.app/api/v1';
+const API_BASE_URL = getApiBaseUrl();
 
 
 const ACCESS_TOKEN_KEY = '@cashcraft_access_token';

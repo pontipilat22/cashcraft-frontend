@@ -203,8 +203,10 @@ export function recalculateScheduleAfterEarlyPayment(
   }
 
   const newPrincipal = round(paymentBeforeEarly.remainingBalance - earlyPaymentAmount);
-  if (newPrincipal <= 0) {
-    // Кредит полностью погашен
+
+  // Если остаток меньше 1 рубля (копейки), считаем кредит погашенным
+  if (newPrincipal < 1) {
+    console.log('  - Остаток меньше 1, кредит считается погашенным');
     return [];
   }
 

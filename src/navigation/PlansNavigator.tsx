@@ -27,6 +27,9 @@ export const PlansNavigator: React.FC = () => {
           elevation: 0,
         },
         headerTintColor: colors.text,
+        cardStyle: {
+          backgroundColor: colors.background,
+        },
       }}
     >
       <Stack.Screen

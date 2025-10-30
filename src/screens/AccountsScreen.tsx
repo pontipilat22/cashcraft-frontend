@@ -31,6 +31,7 @@ import { SubscriptionScreen } from './SubscriptionScreen';
 import { AddGoalModal } from '../components/AddGoalModal';
 import { EditGoalModal } from '../components/EditGoalModal';
 import { GoalActionsModal } from '../components/GoalActionsModal';
+import { useInterstitialAd } from '../hooks/useInterstitialAd';
 
 type AccountsScreenNavigationProp = StackNavigationProp<AccountsStackParamList, 'AccountsMain'>;
 
@@ -47,6 +48,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const { formatAmount, defaultCurrency } = useCurrency();
   const { isEnabled: isBudgetEnabled, reloadData: reloadBudgetData } = useBudgetContext();
   const { targetTab, setTargetTab } = useFAB();
+  const { trackAccountCreation } = useInterstitialAd();
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -149,68 +151,14 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const groupedAccounts = {
     cards: accounts.filter(a => a.type === 'cash' || a.type === 'card' || a.type === 'bank' || a.type === 'investment'),
     debts: accounts.filter(a => a.type === 'debt'),
-    credits: accounts.filter(a => a.type === 'credit'),
+    // Для кредитов показываем только активные (с отрицательным балансом, т.е. есть долг)
+    credits: accounts.filter(a => a.type === 'credit' && a.balance < 0),
   };
 
   const handleAddAccount = async (section: 'cards' | 'savings' | 'debts' | 'credits') => {
     console.log('🎯 [AccountsScreen] handleAddAccount called for section:', section);
-    
-    // Всегда проверяем актуальный статус подписки
-    const hasPremium = await checkIfPremium();
-    
-    console.log('📊 [AccountsScreen] Current state:');
-    console.log('  - hasPremium:', hasPremium);
-    console.log('  - total accounts:', accounts.length);
-    console.log('  - user:', user);
-    console.log('  - isGuest:', user?.isGuest);
-    
-    // Простая логика: без подписки - максимум 2 счета ВСЕГО
-    const MAX_FREE_ACCOUNTS = 2;
-    
-    if (!hasPremium && accounts.length >= MAX_FREE_ACCOUNTS) {
-      console.log('⚠️ [AccountsScreen] Account limit reached!');
-      console.log('  - Current accounts:', accounts.length);
-      console.log('  - Limit:', MAX_FREE_ACCOUNTS);
-      
-      if (user?.isGuest) {
-        Alert.alert(
-          'Требуется авторизация',
-          `Гостевые пользователи могут создать только ${MAX_FREE_ACCOUNTS} счета. Войдите в аккаунт и оформите подписку для неограниченного количества счетов.`,
-          [
-            {
-              text: t('common.cancel'),
-              style: 'cancel',
-            },
-            {
-              text: 'Войти в аккаунт',
-              onPress: () => {
-                navigation.navigate('More' as any);
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert(
-          'Требуется подписка Premium',
-          `Бесплатная версия позволяет создать только ${MAX_FREE_ACCOUNTS} счета. Оформите подписку для неограниченного количества счетов.`,
-          [
-            {
-              text: t('common.cancel'),
-              style: 'cancel',
-            },
-            {
-              text: 'Оформить подписку',
-              onPress: () => {
-                setShowSubscriptionModal(true);
-              },
-            },
-          ]
-        );
-      }
-      return;
-    }
 
-    // Если проверка пройдена, продолжаем создание счета
+    // Продолжаем создание счета (без лимитов)
     setSectionToAdd(section);
     
     if (section === 'cards') {
@@ -319,6 +267,9 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         type: selectedAccountType,
         currency: defaultCurrency
       });
+
+      // Отслеживаем создание счета для показа рекламы (каждый 3-й счет)
+      await trackAccountCreation();
 
       // ПОСЛЕ создания кредита создаём транзакцию зачисления
       if (shouldCreateDepositTransaction && depositAccountData) {
@@ -672,12 +623,14 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={isDark ? '#232323' : '#FFFFFF'}
+        backgroundColor={colors.card}
       />
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 0 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: 0 }}
+      >
         {/* Белая карточка для верхнего контента */}
-        <View style={[styles.topCard, { backgroundColor: isDark ? '#232323' : '#FFFFFF' }]}>
+        <View style={[styles.topCard, { backgroundColor: colors.card }]}>
           {/* <StatisticsCard /> */}
           <BalanceChart />
         </View>
@@ -892,7 +845,6 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         onEdit={handleEditGoal}
         onDelete={handleDeleteGoal}
       />
-
     </View>
   );
 };
@@ -907,8 +859,8 @@ const styles = StyleSheet.create({
   },
   topCard: {
     paddingBottom: 8,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

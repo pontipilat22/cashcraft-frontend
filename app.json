@@ -2,15 +2,12 @@
   "expo": {
     "name": "Cashcraft",
     "slug": "cashcraft3",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Управляйте финансами легко",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "packagerOpts": {
-      "port": 8081
-    },
     "scheme": "cashcraft",
     "splash": {
       "image": "./assets/splash-icon1.png",
@@ -29,21 +26,22 @@
       "buildNumber": "1"
     },
     "android": {
+      "permissions": ["com.google.android.gms.permission.AD_ID"],
       "package": "com.pontipilat.cashcraft",
-      "versionCode": 3,
-      "edgeToEdgeEnabled": false,
+      "versionCode": 4,
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#4287f5"
+        
       },
       "splash": {
         "image": "./assets/splash-icon1.png",
-        "resizeMode": "center",
+        "resizeMode": "contain",
         "backgroundColor": "#EAF4FF",
         "dark": {
           "image": "./assets/splash-icon1.png",
-          "resizeMode": "center",
+          "resizeMode": "contain",
           "backgroundColor": "#0B1220"
         }
       },
@@ -69,14 +67,16 @@
     "plugins": [
       "expo-web-browser",
       "expo-iap",
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.457720015497-urkrpt05vv1q1vtdbps1fnancbb984of"
-        }
-      ],
       "expo-localization",
       "expo-secure-store",
+      "expo-system-ui",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-8853061795959758~8255072189",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
       [
         "expo-build-properties",
         {

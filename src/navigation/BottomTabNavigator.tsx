@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { getFocusedRouteNameFromRoute, useNavigation } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -9,6 +9,7 @@ import { useBudgetContext } from '../context/BudgetContext';
 import { useFAB } from '../context/FABContext';
 import { BalanceHeader } from '../components/BalanceHeader';
 import { LiquidGlassTabBar } from '../components/LiquidGlassTabBar';
+import { useInterstitialAd } from '../hooks/useInterstitialAd';
 
 import { AccountsNavigator } from './AccountsNavigator';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
@@ -24,6 +25,23 @@ export type BottomTabParamList = {
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
+// Компонент для отслеживания фокуса экрана и показа рекламы
+const ScreenWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const navigation = useNavigation();
+  const { trackTabSwitch } = useInterstitialAd();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('[BottomTabNavigator] Tab focused, checking ad...');
+      trackTabSwitch();
+    });
+
+    return unsubscribe;
+  }, [navigation, trackTabSwitch]);
+
+  return <>{children}</>;
+};
+
 export const BottomTabNavigator: React.FC = () => {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
@@ -33,6 +51,7 @@ export const BottomTabNavigator: React.FC = () => {
   return (
     <Tab.Navigator
       tabBar={(props) => <LiquidGlassTabBar {...props} onFABPress={toggleFABMenu} />}
+      initialRouteName="Accounts"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
@@ -53,7 +72,7 @@ export const BottomTabNavigator: React.FC = () => {
         },
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
-        tabBarHideOnKeyboard: true, // Скрывает tab bar когда открывается клавиатура
+        tabBarHideOnKeyboard: true,
         headerShown: true,
         headerStyle: {
           backgroundColor: colors.background,
@@ -61,19 +80,30 @@ export const BottomTabNavigator: React.FC = () => {
           elevation: 0,
         },
         headerTintColor: colors.text,
+        sceneStyle: {
+          backgroundColor: colors.background,
+        },
+        animation: 'none', // Отключаем анимацию переходов
       })}
+      sceneContainerStyle={{
+        backgroundColor: colors.background,
+      }}
     >
       <Tab.Screen
         name="Accounts"
-        component={AccountsNavigator}
         options={{
           title: t('navigation.accounts'),
           headerShown: false,
         }}
-      />
+      >
+        {() => (
+          <ScreenWrapper>
+            <AccountsNavigator />
+          </ScreenWrapper>
+        )}
+      </Tab.Screen>
       <Tab.Screen
         name="Transactions"
-        component={TransactionsScreen}
         options={{
           title: t('navigation.transactions'),
           headerTitle: () => (
@@ -85,23 +115,33 @@ export const BottomTabNavigator: React.FC = () => {
           ),
           headerTitleAlign: 'left',
           headerStyle: {
-            backgroundColor: isDark ? '#232323' : '#FFFFFF',
+            backgroundColor: colors.card,
             shadowColor: 'transparent',
             elevation: 0,
           },
         }}
-      />
+      >
+        {() => (
+          <ScreenWrapper>
+            <TransactionsScreen />
+          </ScreenWrapper>
+        )}
+      </Tab.Screen>
       <Tab.Screen
         name="Plans"
-        component={PlansNavigator}
         options={{
           title: t('navigation.plans'),
           headerShown: false,
         }}
-      />
+      >
+        {() => (
+          <ScreenWrapper>
+            <PlansNavigator />
+          </ScreenWrapper>
+        )}
+      </Tab.Screen>
       <Tab.Screen
         name="More"
-        component={MoreNavigator}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route);
 
@@ -116,7 +156,13 @@ export const BottomTabNavigator: React.FC = () => {
               : { display: 'flex' }, // Явно указываем display: flex
           };
         }}
-      />
+      >
+        {() => (
+          <ScreenWrapper>
+            <MoreNavigator />
+          </ScreenWrapper>
+        )}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 };

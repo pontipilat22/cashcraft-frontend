@@ -156,9 +156,11 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
       throw new Error('Сумма досрочного погашения превышает остаток долга');
     }
 
-    // Если досрочное погашение полностью покрывает остаток
-    if (amount >= currentBalance) {
+    // Если досрочное погашение полностью покрывает остаток (или оставляет копейки)
+    const remainingAfterPayment = currentBalance - amount;
+    if (remainingAfterPayment < 1) {
       console.log('✅ Досрочное погашение покрывает весь остаток долга!');
+      console.log('  - Остаток после погашения:', remainingAfterPayment, '(менее 1, списывается)');
       // Удаляем все неоплаченные платежи
       const pendingPayments = allPayments.filter(p => p.status === 'pending');
       console.log('  - Удаляем', pendingPayments.length, 'неоплаченных платежей');
@@ -166,8 +168,10 @@ export async function makeEarlyRepayment(params: EarlyRepaymentParams): Promise<
         await payment.markAsDeleted();
       }
 
-      // Обновляем остаток долга в аккаунте
-      await updateAccountBalance(accountId);
+      // Устанавливаем баланс в 0 (кредит закрыт)
+      await account.update((record: any) => {
+        record.balance = 0;
+      });
       console.log('🎉 Кредит полностью погашен!');
       return;
     }

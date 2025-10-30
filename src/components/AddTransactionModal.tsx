@@ -22,6 +22,7 @@ import { useBudgetContext } from '../context/BudgetContext';
 import { getLocalizedCategory } from '../utils/categoryUtils';
 import { CURRENCIES } from '../config/currencies';
 import { AddCategoryModal } from './AddCategoryModal';
+import { useInterstitialAd } from '../hooks/useInterstitialAd';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -40,6 +41,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const { accounts, categories, createTransaction } = useData();
   const { t } = useLocalization();
   const { processIncome, recordExpense, reloadData } = useBudgetContext();
+  const { trackTransaction } = useInterstitialAd(); // Отслеживание транзакций для рекламы
   
   // Используем новый хук для DatePicker
   const datePicker = useDatePicker({
@@ -201,6 +203,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       await reloadData();
 
       console.log('✅ [AddTransactionModal] Transaction created and budget data reloaded');
+
+      // Отслеживаем создание транзакции для рекламы (каждые 6 транзакций)
+      await trackTransaction();
 
       // Очищаем форму и ошибки
       setAmount('');

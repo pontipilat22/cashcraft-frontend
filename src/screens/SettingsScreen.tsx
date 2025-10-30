@@ -20,16 +20,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { CURRENCIES } from '../config/currencies';
 import { useNavigation } from '@react-navigation/native';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { ExchangeRatesManager } from '../components/ExchangeRatesManager';
-import { ApiService } from '../services/api';
-import { AuthService } from '../services/auth';
 import { pinService } from '../services/pinService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 type ExchangeRates = { [accountId: string]: { 
@@ -44,7 +40,6 @@ export const SettingsScreen: React.FC = () => {
   const { colors, isDark, toggleTheme } = useTheme();
   const { t, currentLanguage, setLanguage, languages } = useLocalization();
   const { defaultCurrency, setDefaultCurrency, currencies, formatAmount } = useCurrency();
-  const { user, logout } = useAuth();
   const { accounts, updateAccount } = useData();
   const navigation = useNavigation();
   
@@ -104,17 +99,6 @@ export const SettingsScreen: React.FC = () => {
 
     return unsubscribe;
   }, [navigation]);
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-
-
 
   const handleCurrencySelect = async (currencyCode: string) => {
     setShowCurrencyModal(false);
@@ -430,31 +414,6 @@ export const SettingsScreen: React.FC = () => {
           )}
         </View>
 
-        {user && !user.isGuest && (
-          <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('common.account')}
-            </Text>
-            
-            <View style={[styles.userInfo, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.userEmail, { color: colors.text }]}>
-                {user.email}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {user && (
-          <TouchableOpacity
-            style={[styles.logoutButton, { backgroundColor: user.isGuest ? colors.primary : colors.danger }]}
-            onPress={user.isGuest ? logout : handleLogout}
-          >
-            <Ionicons name={user.isGuest ? "log-in-outline" : "log-out-outline"} size={20} color="#fff" />
-            <Text style={styles.logoutButtonText}>
-              {user.isGuest ? t('auth.login') : t('auth.logout')}
-            </Text>
-          </TouchableOpacity>
-        )}
       </ScrollView>
 
       {renderLanguageModal()}

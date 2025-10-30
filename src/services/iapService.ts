@@ -80,9 +80,37 @@ class IAPService {
 
       const skus = Object.values(SUBSCRIPTION_SKUS);
       console.log('🔍 [IAPService] Getting products for SKUs:', skus);
-      
+
       const products = await getSubscriptions(skus);
-      console.log('📦 [IAPService] Retrieved products:', products);
+      console.log('📦 [IAPService] Retrieved products count:', products.length);
+
+      // Детальное логирование каждого продукта
+      products.forEach((product, index) => {
+        console.log(`📋 [IAPService] Product ${index + 1}:`, {
+          id: product.id,
+          title: product.title,
+          description: product.description,
+          price: product.price,
+          displayPrice: product.displayPrice,
+          hasOfferDetails: 'subscriptionOfferDetails' in product,
+          offerDetailsCount: (product as any).subscriptionOfferDetails?.length || 0,
+        });
+
+        // Логируем детали предложений для Android
+        if ('subscriptionOfferDetails' in product) {
+          const offerDetails = (product as any).subscriptionOfferDetails;
+          if (offerDetails && Array.isArray(offerDetails)) {
+            offerDetails.forEach((offer: any, offerIndex: number) => {
+              console.log(`  🎫 [IAPService] Offer ${offerIndex + 1}:`, {
+                offerToken: offer.offerToken,
+                basePlanId: offer.basePlanId,
+                offerId: offer.offerId,
+                pricingPhases: offer.pricingPhases?.length || 0,
+              });
+            });
+          }
+        }
+      });
 
       return products;
     } catch (error) {
