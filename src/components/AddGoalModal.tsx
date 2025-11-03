@@ -8,14 +8,17 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { validateNumericInput } from '../utils/numberInput';
+import { modalStyles } from '../styles/modalStyles';
+import { ModalWrapper } from './common/ModalWrapper';
+import { ModalFooter } from './common/ModalFooter';
+import { InputField } from './common/InputField';
 
 interface AddGoalModalProps {
   visible: boolean;
@@ -185,180 +188,102 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
   );
 
   return (
-    <Modal
+    <ModalWrapper
       visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
+      onClose={handleClose}
+      title={t('goals.addGoal') || 'Добавить цель'}
+      showScrollView={false}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalContainer}
-      >
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {t('goals.addGoal') || 'Добавить цель'}
-            </Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Icon */}
+        <View style={modalStyles.iconContainer}>
+          <View style={[modalStyles.iconCircleLarge, { backgroundColor: colors.primary }]}>
+            <Ionicons name={selectedIcon as any} size={40} color="#fff" />
           </View>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={styles.iconContainer}>
-              <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}>
-                <Ionicons name={selectedIcon as any} size={32} color="#fff" />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.iconSelector, { backgroundColor: colors.background }]}
-              onPress={() => setShowIconPicker(true)}
-            >
-              <Text style={[styles.iconSelectorText, { color: colors.text }]}>
-                {t('goals.selectIcon')}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('goals.goalName')}
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.background,
-                    color: colors.text,
-                    borderColor: showErrors && errors.name ? '#FF4444' : colors.border,
-                  }
-                ]}
-                value={name}
-                onChangeText={(text) => {
-                  setName(text);
-                  if (showErrors && errors.name && text.trim()) {
-                    setErrors(prev => ({ ...prev, name: false }));
-                  }
-                }}
-                placeholder={t('goals.goalNamePlaceholder')}
-                placeholderTextColor={colors.textSecondary}
-              />
-              {showErrors && errors.name && (
-                <Text style={styles.errorText}>
-                  {t('goals.goalNameRequired')}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('goals.targetAmount')}
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.background,
-                    color: colors.text,
-                    borderColor: showErrors && errors.targetAmount ? '#FF4444' : colors.border,
-                  }
-                ]}
-                value={targetAmount}
-                onChangeText={(text) => {
-                  setTargetAmount(text);
-                  if (showErrors && errors.targetAmount && text && parseFloat(text) > 0) {
-                    setErrors(prev => ({ ...prev, targetAmount: false }));
-                  }
-                }}
-                placeholder="0"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-              />
-              {showErrors && errors.targetAmount && (
-                <Text style={styles.errorText}>
-                  {t('goals.targetAmountRequired')}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('goals.description')} ({t('common.optional')})
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.textArea,
-                  {
-                    backgroundColor: colors.background,
-                    color: colors.text,
-                    borderColor: colors.border,
-                  }
-                ]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder={t('goals.descriptionPlaceholder')}
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </View>
-          </ScrollView>
-
-          <TouchableOpacity
-            style={[styles.saveButton, { backgroundColor: colors.primary }]}
-            onPress={handleSave}
-          >
-            <Text style={styles.saveButtonText}>
-              {t('common.save')}
-            </Text>
-          </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+
+        {/* Icon Selector */}
+        <TouchableOpacity
+          style={[styles.iconSelector, { backgroundColor: colors.background }]}
+          onPress={() => setShowIconPicker(true)}
+        >
+          <Text style={[styles.iconSelectorText, { color: colors.text }]}>
+            {t('goals.selectIcon')}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+
+        {/* Goal Name */}
+        <InputField
+          label={t('goals.goalName')}
+          value={name}
+          onChangeText={(text) => {
+            setName(text);
+            if (showErrors && errors.name && text.trim()) {
+              setErrors(prev => ({ ...prev, name: false }));
+            }
+          }}
+          placeholder={t('goals.goalNamePlaceholder')}
+          showError={showErrors && errors.name}
+          errorMessage={t('goals.goalNameRequired')}
+        />
+
+        {/* Target Amount */}
+        <InputField
+          label={t('goals.targetAmount')}
+          value={targetAmount}
+          onChangeText={(text) => {
+            const validated = validateNumericInput(text);
+            setTargetAmount(validated);
+            if (showErrors && errors.targetAmount && validated && parseFloat(validated) > 0) {
+              setErrors(prev => ({ ...prev, targetAmount: false }));
+            }
+          }}
+          placeholder="0"
+          keyboardType="numeric"
+          showError={showErrors && errors.targetAmount}
+          errorMessage={t('goals.targetAmountRequired')}
+        />
+
+        {/* Description */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('goals.description')} ({t('common.optional')})
+          </Text>
+          <TextInput
+            style={[
+              modalStyles.input,
+              styles.textArea,
+              {
+                backgroundColor: colors.background,
+                color: colors.text,
+                borderColor: colors.border,
+              }
+            ]}
+            value={description}
+            onChangeText={setDescription}
+            placeholder={t('goals.descriptionPlaceholder')}
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+        </View>
+      </ScrollView>
+
+      {/* Footer */}
+      <ModalFooter
+        onCancel={handleClose}
+        onSave={handleSave}
+      />
+
+      {/* Icon Picker Modal */}
       {renderIconPicker()}
-    </Modal>
+    </ModalWrapper>
   );
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    minHeight: '60%',
-    maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  iconContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   iconSelector: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -371,39 +296,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-  },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
-  },
-  errorText: {
-    color: '#FF4444',
-    fontSize: 14,
-    marginTop: 8,
-  },
-  saveButton: {
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

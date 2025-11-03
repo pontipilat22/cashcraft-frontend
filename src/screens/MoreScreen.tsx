@@ -122,26 +122,6 @@ export const MoreScreen: React.FC = () => {
         <ScrollView showsVerticalScrollIndicator={false}>
         {/* Верхний блок с закругленным низом */}
         <View style={[styles.topCard, { backgroundColor: colors.card }]}>
-          {user && !user.isGuest && (
-            <View style={styles.userCard}>
-              <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
-                <Text style={styles.userAvatarText}>
-                  {(user.displayName || user.email || 'U')[0].toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.userInfo}>
-                {user.displayName && (
-                  <Text style={[styles.userName, { color: colors.text }]}>
-                    {user.displayName}
-                  </Text>
-                )}
-                <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
-                  {user.email}
-                </Text>
-              </View>
-            </View>
-          )}
-
           {/* Кнопка подписки */}
           {!isPremium && (
           <TouchableOpacity

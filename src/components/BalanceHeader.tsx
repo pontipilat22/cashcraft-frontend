@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { K2D_400Regular, K2D_600SemiBold, useFonts } from '@expo-google-fonts/k2d';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useLocalization } from '../context/LocalizationContext';
@@ -21,6 +22,11 @@ export const BalanceHeader: React.FC<BalanceHeaderProps> = ({
   const { formatAmount } = useCurrency();
   const { isEnabled: contextIsBudgetEnabled, getDailyAllowance, trackingData } = useBudgetContext();
 
+  const [fontsLoaded] = useFonts({
+    K2D_400Regular,
+    K2D_600SemiBold,
+  });
+
   // Используем проп, если передан, иначе берем из контекста
   const isBudgetEnabled = propIsBudgetEnabled !== undefined ? propIsBudgetEnabled : contextIsBudgetEnabled;
 
@@ -40,6 +46,14 @@ export const BalanceHeader: React.FC<BalanceHeaderProps> = ({
     });
     return allowance;
   }, [isBudgetEnabled, getDailyAllowance, trackingData.dailyBudget, trackingData.spentToday, showDailyAllowance]);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.balanceHeader}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.balanceHeader}>
@@ -84,13 +98,14 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontSize: 12,
+    fontFamily: 'K2D_400Regular',
   },
   balanceAmount: {
     fontSize: 24,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
   dailyAllowanceAmount: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
 });

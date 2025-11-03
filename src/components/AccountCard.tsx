@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Vibration, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Defs, RadialGradient, Stop, Circle, Mask } from 'react-native-svg';
@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useData } from '../context/DataContext';
+import { K2D_400Regular, K2D_600SemiBold, useFonts } from '@expo-google-fonts/k2d';
 
 // Type workaround for React 19 compatibility
 const SvgComponent = Svg as any;
@@ -82,200 +83,233 @@ interface AccountCardProps {
   onLongPress?: () => void;
 }
 
-export const AccountCard: React.FC<AccountCardProps> = ({
+const AccountCardComponent: React.FC<AccountCardProps> = ({
   account,
   onPress,
   onLongPress,
 }) => {
+  // ВСЕ ХУКИ ДОЛЖНЫ БЫТЬ ДО УСЛОВНОГО ВОЗВРАТА
+  const [fontsLoaded] = useFonts({
+    K2D_400Regular,
+    K2D_600SemiBold,
+  });
+
   const { colors, isDark } = useTheme();
   const { defaultCurrency, formatAmount, getCurrencyInfo } = useCurrency();
   const { t } = useLocalization();
   const { accounts, getAccountReservedAmount } = useData();
   const [isPressed, setIsPressed] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
-  
+
   // Логируем для отладки
   React.useEffect(() => {
     if (account.currency && account.currency !== defaultCurrency) {
       console.log(`AccountCard ${account.name}: currency=${account.currency}, exchangeRate=${(account as any).exchangeRate}`);
     }
   }, [account]);
-  
-  // Получаем связанный счет для накоплений
-  const linkedAccount = account.linkedAccountId 
-    ? accounts.find(acc => acc.id === account.linkedAccountId) 
-    : null;
 
-  const handlePressIn = () => {
+  // Мемоизация всех обработчиков
+  const handlePressIn = useCallback(() => {
     setIsPressed(true);
     Animated.spring(scaleAnim, {
       toValue: 0.98,
       useNativeDriver: true,
     }).start();
-  };
+  }, [scaleAnim]);
 
-  const handlePressOut = () => {
+  const handlePressOut = useCallback(() => {
     setIsPressed(false);
     Animated.spring(scaleAnim, {
       toValue: 1,
       useNativeDriver: true,
     }).start();
-  };
+  }, [scaleAnim]);
 
-  const handleLongPress = () => {
+  const handleLongPress = useCallback(() => {
     if (Platform.OS !== 'web') {
       Vibration.vibrate(50);
     }
     if (onLongPress) {
       onLongPress();
     }
-  };
+  }, [onLongPress]);
 
-  const getIcon = () => {
-    // Если есть кастомная иконка, используем её
-    if (account.icon) {
-      return account.icon as keyof typeof Ionicons.glyphMap;
-    }
-    
-    if (account.type === 'savings' && account.icon) {
-      return account.icon as keyof typeof Ionicons.glyphMap;
-    }
-    
-    switch (account.type) {
-      case 'cash':
-        return 'cash-outline';
-      case 'card':
-        return 'card-outline';
-      case 'savings':
-        return 'trending-up-outline';
-      case 'debt':
-        return 'arrow-down-circle-outline';
-      case 'credit':
-        return 'card-outline';
-      default:
-        return 'wallet-outline';
-    }
-  };
-
-  const getBalanceDisplay = (amount: number, showConverted: boolean = false) => {
-    const accountCurrency = account.currency || defaultCurrency;
-    const currencyInfo = getCurrencyInfo(accountCurrency);
-    
-    // Форматируем сумму в валюте счета
-    const formattedAmount = formatAmount(amount, accountCurrency);
-    
-    // Если валюта счета отличается от основной и есть курс обмена, показываем конвертированную сумму
-    if (showConverted && accountCurrency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
-      const convertedAmount = amount * ((account as any).exchangeRate || 1);
-      const convertedFormatted = formatAmount(convertedAmount, defaultCurrency);
-      
-      return (
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}>
-            {formattedAmount}
-          </Text>
-          <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 2 }}>
-            ≈ {convertedFormatted}
-          </Text>
-        </View>
-      );
-    }
-    
-    return (
-      <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}>
-        {formattedAmount}
-      </Text>
-    );
-  };
-
-  const formatBalance = (amount: number) => {
-    const accountCurrency = account.currency || defaultCurrency;
-    return formatAmount(amount, accountCurrency);
-  };
-  
-  const getProgress = () => {
-    if (account.type !== 'savings' || !account.targetAmount) return 0;
-    // Для накоплений используем savedAmount вместо balance
-    const saved = account.savedAmount || 0;
-    return Math.min((saved / account.targetAmount) * 100, 100);
-  };
-  
-  // Получаем сумму зарезервированную в целях для данного счета
-  const getReservedAmount = () => {
-    if (account.type === 'savings') return 0;
-    return getAccountReservedAmount(account.id);
-  };
-
-  const calculateMonthlyPayment = () => {
-    if (account.type !== 'credit' || !account.creditRate || !account.creditTerm || !account.creditInitialAmount) {
-      return 0;
-    }
-
-    const principal = account.creditInitialAmount;
-    const monthlyRate = account.creditRate / 100 / 12;
-    const months = account.creditTerm;
-
-    if (account.creditPaymentType === 'annuity') {
-      // Аннуитетный платеж
-      if (monthlyRate === 0) {
-        return principal / months;
+  // Объединенная мемоизация всех вычислений
+  const computed = useMemo(() => {
+    // getIcon
+    const getIcon = () => {
+      if (account.icon) {
+        return account.icon as keyof typeof Ionicons.glyphMap;
       }
-      const payment = principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
-      return Math.round(payment);
-    } else {
-      // Дифференцированный платеж (возвращаем первый платеж)
-      const principalPayment = principal / months;
-      const interestPayment = principal * monthlyRate;
-      return Math.round(principalPayment + interestPayment);
-    }
-  };
 
-  const calculateTotalPayment = () => {
-    if (account.type !== 'credit' || !account.creditRate || !account.creditTerm || !account.creditInitialAmount) {
-      return 0;
-    }
-
-    const principal = account.creditInitialAmount;
-    const monthlyRate = account.creditRate / 100 / 12;
-    const months = account.creditTerm;
-
-    if (account.creditPaymentType === 'annuity') {
-      if (monthlyRate === 0) {
-        return principal;
+      if (account.type === 'savings' && account.icon) {
+        return account.icon as keyof typeof Ionicons.glyphMap;
       }
-      const monthlyPayment = calculateMonthlyPayment();
-      return monthlyPayment * months;
-    } else {
-      // Дифференцированный платеж
-      let totalPayment = 0;
-      for (let i = 0; i < months; i++) {
-        const remainingPrincipal = principal - (principal / months) * i;
-        const interestPayment = remainingPrincipal * monthlyRate;
+
+      switch (account.type) {
+        case 'cash':
+          return 'cash-outline';
+        case 'card':
+          return 'card-outline';
+        case 'savings':
+          return 'trending-up-outline';
+        case 'debt':
+          return 'arrow-down-circle-outline';
+        case 'credit':
+          return 'card-outline';
+        default:
+          return 'wallet-outline';
+      }
+    };
+
+    // formatBalance
+    const formatBalance = (amount: number) => {
+      const accountCurrency = account.currency || defaultCurrency;
+      return formatAmount(amount, accountCurrency);
+    };
+
+    // getProgress
+    const getProgress = () => {
+      if (account.type !== 'savings' || !account.targetAmount) return 0;
+      const saved = account.savedAmount || 0;
+      return Math.min((saved / account.targetAmount) * 100, 100);
+    };
+
+    // getReservedAmount
+    const getReservedAmount = () => {
+      if (account.type === 'savings') return 0;
+      return getAccountReservedAmount(account.id);
+    };
+
+    // calculateMonthlyPayment
+    const calculateMonthlyPayment = () => {
+      if (account.type !== 'credit' || !account.creditRate || !account.creditTerm || !account.creditInitialAmount) {
+        return 0;
+      }
+
+      const principal = account.creditInitialAmount;
+      const monthlyRate = account.creditRate / 100 / 12;
+      const months = account.creditTerm;
+
+      if (account.creditPaymentType === 'annuity') {
+        if (monthlyRate === 0) {
+          return principal / months;
+        }
+        const payment = principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+        return Math.round(payment);
+      } else {
         const principalPayment = principal / months;
-        totalPayment += principalPayment + interestPayment;
+        const interestPayment = principal * monthlyRate;
+        return Math.round(principalPayment + interestPayment);
       }
-      return Math.round(totalPayment);
-    }
-  };
+    };
 
-  // Определяем цвет иконки в зависимости от типа счета и темы
-  const getIconColor = () => {
-    if (account.isDefault) {
-      // Для счета по умолчанию - яркий цвет
-      return isDark ? '#FFA726' : '#2196F3';
-    }
-    if (account.type === 'savings') {
-      return isDark ? '#FF9800' : '#3B82F6';
-    }
-    if (account.type === 'credit') {
-      return isDark ? '#FF6B6B' : '#EF4444';
-    }
-    if (account.type === 'debt' as any) {
-      return isDark ? '#4CAF50' : '#10B981';
-    }
-    // Для обычных счетов - серый цвет
-    return isDark ? '#9CA3AF' : '#6B7280';
-  };
+    // calculateTotalPayment
+    const calculateTotalPayment = () => {
+      if (account.type !== 'credit' || !account.creditRate || !account.creditTerm || !account.creditInitialAmount) {
+        return 0;
+      }
+
+      const principal = account.creditInitialAmount;
+      const monthlyRate = account.creditRate / 100 / 12;
+      const months = account.creditTerm;
+
+      if (account.creditPaymentType === 'annuity') {
+        if (monthlyRate === 0) {
+          return principal;
+        }
+        const monthlyPayment = calculateMonthlyPayment();
+        return monthlyPayment * months;
+      } else {
+        let totalPayment = 0;
+        for (let i = 0; i < months; i++) {
+          const remainingPrincipal = principal - (principal / months) * i;
+          const interestPayment = remainingPrincipal * monthlyRate;
+          const principalPayment = principal / months;
+          totalPayment += principalPayment + interestPayment;
+        }
+        return Math.round(totalPayment);
+      }
+    };
+
+    // getIconColor
+    const getIconColor = () => {
+      if (account.isDefault) {
+        return isDark ? '#FFA726' : '#2196F3';
+      }
+      if (account.type === 'savings') {
+        return isDark ? '#FF9800' : '#3B82F6';
+      }
+      if (account.type === 'credit') {
+        return isDark ? '#FF6B6B' : '#EF4444';
+      }
+      if (account.type === 'debt' as any) {
+        return isDark ? '#4CAF50' : '#10B981';
+      }
+      return isDark ? '#9CA3AF' : '#6B7280';
+    };
+
+    // getBalanceDisplay
+    const getBalanceDisplay = (amount: number, showConverted: boolean = false) => {
+      const accountCurrency = account.currency || defaultCurrency;
+      const currencyInfo = getCurrencyInfo(accountCurrency);
+
+      const formattedAmount = formatAmount(amount, accountCurrency);
+
+      if (showConverted && accountCurrency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+        const convertedAmount = amount * ((account as any).exchangeRate || 1);
+        const convertedFormatted = formatAmount(convertedAmount, defaultCurrency);
+
+        return (
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}>
+              {formattedAmount}
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 2, fontFamily: 'K2D_400Regular' }}>
+              ≈ {convertedFormatted}
+            </Text>
+          </View>
+        );
+      }
+
+      return (
+        <Text style={[styles.balance, { color: isDark ? '#fff' : '#232323' }]}>
+          {formattedAmount}
+        </Text>
+      );
+    };
+
+    // linkedAccount
+    const linkedAccount = account.linkedAccountId
+      ? accounts.find(acc => acc.id === account.linkedAccountId)
+      : null;
+
+    return {
+      icon: getIcon(),
+      formatBalance,
+      progress: getProgress(),
+      reservedAmount: getReservedAmount(),
+      monthlyPayment: calculateMonthlyPayment(),
+      totalPayment: calculateTotalPayment(),
+      iconColor: getIconColor(),
+      getBalanceDisplay,
+      linkedAccount,
+    };
+  }, [
+    account,
+    defaultCurrency,
+    formatAmount,
+    getCurrencyInfo,
+    isDark,
+    colors.textSecondary,
+    accounts,
+    getAccountReservedAmount,
+  ]);
+
+  // Условный возврат ПОСЛЕ всех хуков
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -298,7 +332,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           onLongPress={handleLongPress}
           delayLongPress={500}
         >
-          
+
           {account.type === 'savings' && ((account as any).isTargetedSavings !== false) && account.targetAmount ? (
             <>
               <View style={styles.progressContainer}>
@@ -309,16 +343,16 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                   style={[
                     styles.progressFill,
                     {
-                      width: `${Math.round(getProgress())}%`,
+                      width: `${Math.round(computed.progress)}%`,
                     },
                   ]}
                 />
               </View>
               <View style={styles.content}>
                 <View style={styles.row}>
-                  <IconDisc 
-                    icon={getIcon()} 
-                    iconColor={getIconColor()}
+                  <IconDisc
+                    icon={computed.icon}
+                    iconColor={computed.iconColor}
                     isDark={isDark}
                   />
                   <View style={styles.textBlock}>
@@ -328,7 +362,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                           styles.title,
                           {
                             color: isDark ? '#fff' : '#232323',
-                            fontWeight: '700',
+                            fontFamily: 'K2D_600SemiBold',
                           },
                         ]}
                         numberOfLines={1}
@@ -339,22 +373,22 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     <Text
                       style={{
                         color: isDark ? '#fff' : '#232323',
-                        fontWeight: '500',
+                        fontFamily: 'K2D_400Regular',
                         marginTop: 2,
                         fontSize: 14,
                       }}
                     >
-                      {formatBalance(account.savedAmount || 0)} / {formatBalance(account.targetAmount || 0)}
+                      {computed.formatBalance(account.savedAmount || 0)} / {computed.formatBalance(account.targetAmount || 0)}
                     </Text>
-                    {linkedAccount && (
+                    {computed.linkedAccount && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                        <Ionicons 
-                          name={linkedAccount.type === 'cash' ? 'cash-outline' : 'card-outline'} 
-                          size={10} 
-                          color={colors.textSecondary} 
+                        <Ionicons
+                          name={computed.linkedAccount.type === 'cash' ? 'cash-outline' : 'card-outline'}
+                          size={10}
+                          color={colors.textSecondary}
                         />
-                        <Text style={{ fontSize: 11, color: colors.textSecondary, marginLeft: 3 }}>
-                          {linkedAccount.name}
+                        <Text style={{ fontSize: 11, color: colors.textSecondary, marginLeft: 3, fontFamily: 'K2D_400Regular' }}>
+                          {computed.linkedAccount.name}
                         </Text>
                       </View>
                     )}
@@ -363,14 +397,14 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     <Text
                       style={{
                         color: isDark ? '#fff' : '#232323',
-                        fontWeight: '700',
+                        fontFamily: 'K2D_600SemiBold',
                         fontSize: 20,
                         textShadowColor: isDark ? 'rgba(0,0,0,0.15)' : 'transparent',
                         textShadowOffset: { width: 0, height: 1 },
                         textShadowRadius: 2,
                       }}
                     >
-                      {Math.floor(getProgress())}%
+                      {Math.floor(computed.progress)}%
                     </Text>
                   </View>
                 </View>
@@ -379,9 +413,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           ) : (
             <View style={styles.content}>
               <View style={styles.row}>
-                <IconDisc 
-                  icon={getIcon()} 
-                  iconColor={getIconColor()}
+                <IconDisc
+                  icon={computed.icon}
+                  iconColor={computed.iconColor}
                   isDark={isDark}
                 />
                 <View style={styles.textBlock}>
@@ -391,7 +425,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     </Text>
                   </View>
                   {account.type === 'card' && account.cardNumber && (
-                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}> 
+                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                       •••• {account.cardNumber}
                     </Text>
                   )}
@@ -401,16 +435,16 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                         {account.creditTerm} {t('accounts.monthsShort')} • {account.creditRate}% • {account.creditPaymentType === 'annuity' ? t('accounts.annuity') : t('accounts.differentiated')}
                       </Text>
                       <Text style={[styles.creditPayment, { color: colors.primary }]}>
-                        {formatBalance(calculateMonthlyPayment())}{t('accounts.perMonth')}
+                        {computed.formatBalance(computed.monthlyPayment)}{t('accounts.perMonth')}
                       </Text>
                       {/* Прогресс выплаты кредита */}
                       {account.creditInitialAmount && account.creditInitialAmount > 0 && (
                         <View style={{ marginTop: 8 }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                            <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'K2D_400Regular' }}>
                               {t('accounts.paidOff')}
                             </Text>
-                            <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
+                            <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'K2D_600SemiBold' }}>
                               {Math.round(((account.creditInitialAmount - Math.abs(account.balance)) / account.creditInitialAmount) * 100)}%
                             </Text>
                           </View>
@@ -432,18 +466,18 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                       <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: 12, marginBottom: 2 }]}>
                         {t('accounts.remainingPayment')}
                       </Text>
-                      {getBalanceDisplay(Math.abs(account.balance), true)}
+                      {computed.getBalanceDisplay(Math.abs(account.balance), true)}
                     </>
                   ) : (
                     <>
-                      {getBalanceDisplay(account.balance, true)}
-                      {getReservedAmount() > 0 ? (
+                      {computed.getBalanceDisplay(account.balance, true)}
+                      {computed.reservedAmount > 0 ? (
                         <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
-                          <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                            {t('accounts.available')}: {formatBalance(account.balance - getReservedAmount())}
+                          <Text style={{ fontSize: 12, color: colors.textSecondary, fontFamily: 'K2D_400Regular' }}>
+                            {t('accounts.available')}: {computed.formatBalance(account.balance - computed.reservedAmount)}
                           </Text>
-                          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>
-                            {t('accounts.inGoals')}: {formatBalance(getReservedAmount())}
+                          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1, fontFamily: 'K2D_400Regular' }}>
+                            {t('accounts.inGoals')}: {computed.formatBalance(computed.reservedAmount)}
                           </Text>
                         </View>
                       ) : null}
@@ -457,6 +491,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     </Animated.View>
   );
 };
+
+// Экспорт мемоизированного компонента
+export const AccountCard = React.memo(AccountCardComponent);
 
 const styles = StyleSheet.create({
   card: {
@@ -534,17 +571,18 @@ const styles = StyleSheet.create({
   
   title: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
     marginBottom: 2,
   },
   
   subtitle: {
     fontSize: 13,
+    fontFamily: 'K2D_400Regular',
   },
   
   balance: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: 'K2D_600SemiBold',
     textAlign: 'right',
   },
   
@@ -566,7 +604,7 @@ const styles = StyleSheet.create({
   
   creditPayment: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'K2D_600SemiBold',
     marginTop: 2,
   },
 

@@ -259,6 +259,34 @@ class AdServiceClass {
   }
 
   /**
+   * Разблокировать 3-й счет (награда за просмотр видео)
+   * Для бесплатных пользователей: 2 счета базово, 3-й через просмотр рекламы
+   */
+  async unlockThirdAccount() {
+    try {
+      // Сохраняем флаг разблокировки
+      await AsyncStorage.setItem('third_account_unlocked', 'true');
+      console.log('[AdService] Third account unlocked successfully');
+      return true;
+    } catch (error) {
+      console.error('[AdService] Error unlocking third account:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Проверить, разблокирован ли 3-й счет
+   */
+  async isThirdAccountUnlocked(): Promise<boolean> {
+    try {
+      const value = await AsyncStorage.getItem('third_account_unlocked');
+      return value === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Сбросить все данные (для тестирования)
    */
   async reset() {
@@ -271,6 +299,7 @@ class AdServiceClass {
       STORAGE_KEYS.ACCOUNT_COUNT,
       STORAGE_KEYS.AD_FREE_UNTIL,
       STORAGE_KEYS.LAST_TAB_SWITCH_AD,
+      'third_account_unlocked',
     ]);
     console.log('[AdService] Reset complete');
   }

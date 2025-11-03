@@ -29,8 +29,9 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { SplashScreen } from './src/components/SplashScreen';
 import { LocalDatabaseService } from './src/services/localDatabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import mobileAds from 'react-native-google-mobile-ads';
+import mobileAds, { MaxAdContentRating } from 'react-native-google-mobile-ads';
 import { AdService } from './src/services/AdService';
+import { AdMobInitService } from './src/services/AdMobInitService';
 
 // Предотвращаем автоматическое скрытие нативного splash screen
 SplashScreenExpo.preventAutoHideAsync();
@@ -274,18 +275,35 @@ export default function App() {
   useEffect(() => {
     console.log('📱 [App] Initializing AdMob...');
 
+    // ✅ ШАГ 1: Устанавливаем request configuration ПЕРЕД initialize
     mobileAds()
-      .initialize()
+      .setRequestConfiguration({
+        maxAdContentRating: MaxAdContentRating.PG,
+        tagForChildDirectedTreatment: false,
+        tagForUnderAgeOfConsent: false,
+        testDeviceIdentifiers: __DEV__ ? ['EMULATOR'] : [],
+      })
+      .then(() => {
+        console.log('✅ [App] AdMob request configuration set');
+
+        // ✅ ШАГ 2: Инициализируем AdMob
+        return mobileAds().initialize();
+      })
       .then(adapterStatuses => {
         console.log('✅ [App] AdMob initialized:', adapterStatuses);
+
+        // ✅ ШАГ 3: Отмечаем AdMob как инициализированный
+        AdMobInitService.markAsInitialized();
+
+        // ✅ ШАГ 4: Инициализируем AdService только ПОСЛЕ AdMob
+        return AdService.init();
+      })
+      .then(() => {
+        console.log('✅ [App] AdService initialized');
       })
       .catch(error => {
         console.error('❌ [App] AdMob initialization error:', error);
       });
-
-    // Инициализация сервиса рекламы
-    AdService.init();
-    console.log('✅ [App] AdService initialized');
   }, []);
 
   return (

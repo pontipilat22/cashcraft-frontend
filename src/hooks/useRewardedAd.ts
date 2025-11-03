@@ -46,13 +46,6 @@ export const useRewardedAd = (onRewarded?: (reward: AdReward) => void) => {
       setIsLoading(false);
     });
 
-    const errorListener = rewarded.addAdEventListener(RewardedAdEventType.ERROR, (error) => {
-      console.error('[RewardedAd] Load error:', error);
-      setIsLoaded(false);
-      setIsLoading(false);
-      setIsShowing(false);
-    });
-
     const earnedRewardListener = rewarded.addAdEventListener(
       RewardedAdEventType.EARNED_REWARD,
       (reward) => {
@@ -61,18 +54,18 @@ export const useRewardedAd = (onRewarded?: (reward: AdReward) => void) => {
         if (onRewarded) {
           onRewarded(reward);
         }
+
+        // После получения награды сбрасываем состояния и загружаем следующую рекламу
+        setIsLoaded(false);
+        setIsShowing(false);
+        setIsLoading(true);
+
+        // Небольшая задержка перед загрузкой следующей рекламы
+        setTimeout(() => {
+          rewarded.load();
+        }, 1000);
       }
     );
-
-    const closedListener = rewarded.addAdEventListener(RewardedAdEventType.CLOSED, () => {
-      console.log('[RewardedAd] Ad closed');
-      setIsLoaded(false);
-      setIsShowing(false);
-
-      // Загружаем следующую рекламу
-      setIsLoading(true);
-      rewarded.load();
-    });
 
     // Загружаем рекламу
     setIsLoading(true);
@@ -80,9 +73,7 @@ export const useRewardedAd = (onRewarded?: (reward: AdReward) => void) => {
 
     return () => {
       loadedListener();
-      errorListener();
       earnedRewardListener();
-      closedListener();
     };
   }, [onRewarded]);
 
@@ -121,13 +112,13 @@ export const useRewardedAd = (onRewarded?: (reward: AdReward) => void) => {
 };
 
 /**
- * Хук для награды "Отключить рекламу на 24 часа"
+ * Хук для награды "Отключить рекламу на 20 минут"
  *
  * @example
  * const { showAdForNoAds, isLoaded } = useRewardedAdForNoAds();
  *
  * <Button
- *   title="Смотреть видео и отключить рекламу на 24ч"
+ *   title="Смотреть видео и отключить рекламу на 20 мин"
  *   onPress={showAdForNoAds}
  *   disabled={!isLoaded}
  * />
@@ -136,11 +127,11 @@ export const useRewardedAdForNoAds = () => {
   const handleReward = useCallback(async (reward: AdReward) => {
     console.log('[RewardedAd] No-ads reward earned');
 
-    // Активируем период без рекламы на 24 часа
-    await AdService.activateAdFree(24);
+    // Активируем период без рекламы на 20 минут (0.333 часа)
+    await AdService.activateAdFree(0.333);
 
     // Можно показать уведомление пользователю
-    console.log('✅ Реклама отключена на 24 часа!');
+    console.log('✅ Реклама отключена на 20 минут!');
   }, []);
 
   const {

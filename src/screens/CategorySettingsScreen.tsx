@@ -240,7 +240,7 @@ export const CategorySettingsScreen: React.FC = () => {
       <AddCategoryModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
-        initialType="expense"
+        type="expense"
       />
     </SafeAreaView>
   );

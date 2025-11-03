@@ -31,7 +31,12 @@
       "Bash(dir:*)",
       "Bash(findstr:*)",
       "WebFetch(domain:docs.expo.dev)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:reactscript.com)",
+      "Bash(npx react-native bundle:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(npx tsc:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

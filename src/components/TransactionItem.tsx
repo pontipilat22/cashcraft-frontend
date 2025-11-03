@@ -8,6 +8,7 @@ import {
   Vibration,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { K2D_400Regular, K2D_600SemiBold, useFonts } from '@expo-google-fonts/k2d';
 import { useTheme } from '../context/ThemeContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
@@ -25,8 +26,8 @@ interface TransactionItemProps {
   isSelectionMode?: boolean;
 }
 
-const TransactionItemComponent: React.FC<TransactionItemProps> = ({ 
-  transaction, 
+const TransactionItemComponent: React.FC<TransactionItemProps> = ({
+  transaction,
   category,
   account,
   onPress,
@@ -34,32 +35,38 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
   isSelected = false,
   isSelectionMode = false,
 }) => {
+  const [fontsLoaded] = useFonts({
+    K2D_400Regular,
+    K2D_600SemiBold,
+  });
+
   const { colors } = useTheme();
   const { defaultCurrency } = useCurrency();
   const { t } = useLocalization();
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const [isLongPressed, setIsLongPressed] = React.useState(false);
-  
-  const handlePressIn = () => {
+
+  // Мемоизация обработчиков событий
+  const handlePressIn = React.useCallback(() => {
     Animated.spring(scaleAnim, {
       toValue: 0.95,
       useNativeDriver: true,
     }).start();
-  };
-  
-  const handlePressOut = () => {
+  }, [scaleAnim]);
+
+  const handlePressOut = React.useCallback(() => {
     Animated.spring(scaleAnim, {
       toValue: 1,
       useNativeDriver: true,
     }).start();
     setIsLongPressed(false);
-  };
-  
-  const handleLongPress = () => {
+  }, [scaleAnim]);
+
+  const handleLongPress = React.useCallback(() => {
     setIsLongPressed(true);
     Vibration.vibrate(50);
     onLongPress?.();
-  };
+  }, [onLongPress]);
   
   const isIncome = transaction.type === 'income';
   const amountColor = isIncome ? '#4CAF50' : colors.text;
@@ -110,9 +117,11 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
   };
   
   const debtIconData = getDebtIconAndColor();
-  
-  // Убираем префикс [DEBT:type] из отображаемого описания
-  const displayDescription = transaction.description?.replace(/\[DEBT:\w+\]\s*/, '');
+
+  // Убираем префикс [DEBT:type] из отображаемого описания - МЕМОИЗИРОВАНО
+  const displayDescription = React.useMemo(() => {
+    return transaction.description?.replace(/\[DEBT:\w+\]\s*/, '') ?? '';
+  }, [transaction.description]);
   
   return (
     <Animated.View
@@ -252,14 +261,16 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: 'K2D_400Regular',
     marginBottom: 2,
   },
   description: {
     fontSize: 14,
+    fontFamily: 'K2D_400Regular',
   },
   accountName: {
     fontSize: 12,
+    fontFamily: 'K2D_400Regular',
     marginTop: 2,
   },
   rightSection: {
@@ -267,11 +278,12 @@ const styles = StyleSheet.create({
   },
   amount: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
     marginBottom: 2,
   },
   date: {
     fontSize: 12,
+    fontFamily: 'K2D_400Regular',
   },
 });
 

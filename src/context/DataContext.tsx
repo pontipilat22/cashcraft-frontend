@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef, useMemo } from 'react';
 import { Account, Transaction, Category, Debt, Goal, GoalTransfer } from '../types/index';
 import { LocalDatabaseService } from '../services/localDatabase';
 import { ApiService } from '../services/api';
@@ -73,7 +73,25 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalTransfers, setGoalTransfers] = useState<GoalTransfer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [totalBalance, setTotalBalance] = useState(0);
+
+  // Refs для debouncing и отмены запросов
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isRefreshingRef = useRef(false);
+
+  // Мемоизированное вычисление общего баланса
+  const totalBalance = useMemo(() => {
+    const total = accounts
+      .filter(account => account.isIncludedInTotal !== false)
+      .reduce((sum, account) => {
+        let balance = account.balance;
+        // Если валюта счета отличается от основной и есть курс обмена
+        if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
+          balance = account.balance * (account as any).exchangeRate;
+        }
+        return sum + balance;
+      }, 0);
+    return total;
+  }, [accounts, defaultCurrency]);
 
   // Инициализация БД и загрузка данных
   useEffect(() => {
@@ -87,7 +105,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       setDebts([]);
       setGoals([]);
       setGoalTransfers([]);
-      setTotalBalance(0);
+      // totalBalance вычисляется автоматически через useMemo
     }
   }, [userId]);
 
@@ -135,17 +153,24 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
     }
   };
 
-  const refreshData = useCallback(async () => {
+  // Внутренняя функция для немедленного обновления данных
+  const refreshDataImmediate = useCallback(async () => {
+    if (isRefreshingRef.current) {
+      console.log('📊 [DataContext] RefreshData уже выполняется, пропускаем...');
+      return;
+    }
+
+    isRefreshingRef.current = true;
     try {
       console.log('📊 [DataContext] RefreshData called...');
-      
+
       if (!LocalDatabaseService.isDatabaseReady()) {
         console.log('🗄️ [DataContext] Проверка готовности базы данных в refreshData:', false);
         return;
       }
-      
+
       console.log('🗄️ [DataContext] Проверка готовности базы данных в refreshData:', true);
-      
+
       const [accountsFromDb, transactionsFromDb, categoriesFromDb, debtsFromDb, goalsFromDb, goalTransfersFromDb] = await Promise.all([
         LocalDatabaseService.getAccounts(),
         LocalDatabaseService.getTransactions(),
@@ -172,19 +197,19 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
             try {
               // Пробуем получить прямой курс
               let rate = await ExchangeRateService.getRate(account.currency, defaultCurrency);
-              
+
               // Если прямого курса нет, пробуем через USD
               if (!rate && account.currency !== 'USD' && defaultCurrency !== 'USD') {
                 console.log(`No direct rate ${account.currency}->${defaultCurrency}, trying through USD`);
                 const toUsd = await ExchangeRateService.getRate(account.currency, 'USD');
                 const fromUsd = await ExchangeRateService.getRate('USD', defaultCurrency);
-                
+
                 if (toUsd && fromUsd) {
                   rate = toUsd * fromUsd;
                   console.log(`Cross rate ${account.currency}->${defaultCurrency} = ${rate} (via USD)`);
                 }
               }
-              
+
               if (rate) {
                 return { ...account, exchangeRate: rate };
               }
@@ -198,7 +223,7 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
 
       console.log('📊 [DataContext] Счета с курсами валют:', accountsWithRates);
 
-      // Обновляем состояние
+      // Обновляем состояние (totalBalance будет автоматически пересчитан через useMemo)
       setAccounts(accountsWithRates);
       setTransactions(transactionsFromDb);
       setCategories(categoriesFromDb);
@@ -206,28 +231,39 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
       setGoals(goalsFromDb);
       setGoalTransfers(goalTransfersFromDb);
 
-      // Вычисляем общий баланс с конвертацией валют
-      const total = accountsWithRates
-        .filter(account => account.isIncludedInTotal !== false)
-        .reduce((sum, account) => {
-          let balance = account.balance;
-          // Если валюта счета отличается от основной и есть курс обмена
-          if (account.currency && account.currency !== defaultCurrency && 'exchangeRate' in account && (account as any).exchangeRate) {
-            balance = account.balance * (account as any).exchangeRate;
-          }
-          return sum + balance;
-        }, 0);
-
-      console.log('💰 [DataContext] Общий баланс:', total);
-      setTotalBalance(total);
-
       console.log('✅ [DataContext] RefreshData завершен успешно');
     } catch (error) {
       console.error('❌ [DataContext] Ошибка обновления данных:', error);
     } finally {
       setIsLoading(false);
+      isRefreshingRef.current = false;
     }
   }, [defaultCurrency]);
+
+  // Debounced версия refreshData с задержкой 300ms
+  const refreshData = useCallback(async () => {
+    // Отменяем предыдущий запланированный вызов
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+
+    // Планируем новый вызов через 300ms
+    return new Promise<void>((resolve) => {
+      refreshTimeoutRef.current = setTimeout(async () => {
+        await refreshDataImmediate();
+        resolve();
+      }, 300);
+    });
+  }, [refreshDataImmediate]);
+
+  // Cleanup timeout при размонтировании
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const createAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {

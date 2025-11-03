@@ -32,7 +32,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPreparing, setIsPreparing] = useState(false);
-  const [hasShownOfflineNotification, setHasShownOfflineNotification] = useState(false);
   const { defaultCurrency } = useCurrency();
 
   const setupUserSession = useCallback(async (authUser: AuthUser, preserveLocalData: boolean = true) => {
@@ -123,48 +122,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.log('⚠️ [AuthContext] Не удалось обновить токен, но пользователь остается в системе');
             // НЕ выходим из системы, пользователь остается авторизованным
             await setupUserSession(savedUser);
-            
-            // Показываем уведомление только один раз
-            if (!hasShownOfflineNotification && !savedUser.isGuest) {
-              setHasShownOfflineNotification(true);
-              Alert.alert(
-                'Режим офлайн',
-                'Соединение с сервером временно недоступно. Вы можете продолжать работать с приложением. Данные будут синхронизированы при восстановлении соединения.',
-                [{ text: 'Понятно', style: 'default' }]
-              );
-            }
             return;
           }
                  } catch (refreshError) {
            console.log('⚠️ [AuthContext] Ошибка обновления токена, но пользователь остается в системе:', refreshError);
            // НЕ выходим из системы, пользователь остается авторизованным
            await setupUserSession(savedUser);
-           
-           // Показываем уведомление только один раз
-           if (!hasShownOfflineNotification && !savedUser.isGuest) {
-             setHasShownOfflineNotification(true);
-             Alert.alert(
-               'Режим офлайн',
-               'Соединение с сервером временно недоступно. Вы можете продолжать работать с приложением. Данные будут синхронизированы при восстановлении соединения.',
-               [{ text: 'Понятно', style: 'default' }]
-             );
-           }
            return;
          }
              } else {
          console.log('⚠️ [AuthContext] Токены отсутствуют, но пользователь остается в системе');
          // НЕ выходим из системы, пользователь остается авторизованным
          await setupUserSession(savedUser);
-         
-         // Показываем уведомление только один раз
-         if (!hasShownOfflineNotification && !savedUser.isGuest) {
-           setHasShownOfflineNotification(true);
-           Alert.alert(
-             'Режим офлайн',
-             'Соединение с сервером временно недоступно. Вы можете продолжать работать с приложением. Данные будут синхронизированы при восстановлении соединения.',
-             [{ text: 'Понятно', style: 'default' }]
-           );
-         }
        }
     } catch (error) {
       console.error('❌ [AuthContext] Критическая ошибка проверки состояния авторизации:', error);
@@ -240,9 +209,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isPremium: response.user.isPremium,
     };
     await setupUserSession(authUser, preserveLocalData);
-    
-    // Сбрасываем флаг уведомления при успешном входе
-    setHasShownOfflineNotification(false);
   }
 
   const login = async (email: string, password: string) => {

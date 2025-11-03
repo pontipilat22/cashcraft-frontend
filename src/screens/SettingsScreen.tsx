@@ -21,6 +21,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useData } from '../context/DataContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { CURRENCIES } from '../config/currencies';
 import { useNavigation } from '@react-navigation/native';
 import { LocalDatabaseService } from '../services/localDatabase';
@@ -41,7 +42,11 @@ export const SettingsScreen: React.FC = () => {
   const { t, currentLanguage, setLanguage, languages } = useLocalization();
   const { defaultCurrency, setDefaultCurrency, currencies, formatAmount } = useCurrency();
   const { accounts, updateAccount } = useData();
+  const { availableProducts } = useSubscription();
   const navigation = useNavigation();
+
+  // Статус соединения с сервером (если есть продукты - сервер доступен)
+  const isServerConnected = availableProducts.length > 0;
   
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
@@ -332,28 +337,44 @@ export const SettingsScreen: React.FC = () => {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             {t('common.preferences')}
           </Text>
-          
+
+          {/* Индикатор соединения с сервером */}
+          <View style={[styles.settingItem, { borderBottomColor: colors.border }]}>
+            <View style={styles.settingItemLeft}>
+              <Ionicons name="server-outline" size={24} color={colors.primary} />
+              <Text style={[styles.settingItemTitle, { color: colors.text }]}>
+                {t('settings.serverStatus') || 'Статус сервера'}
+              </Text>
+            </View>
+            <View style={styles.settingItemRight}>
+              <View style={[
+                styles.serverIndicator,
+                { backgroundColor: isServerConnected ? '#4CAF50' : '#9E9E9E' }
+              ]} />
+            </View>
+          </View>
+
           {renderSettingItem(
             'language-outline',
             t('settings.language'),
             languages[currentLanguage]?.nativeName,
             () => setShowLanguageModal(true)
           )}
-          
+
           {renderSettingItem(
             'cash-outline',
             t('settings.currency'),
             `${CURRENCIES[defaultCurrency]?.symbol} ${defaultCurrency}`,
             () => setShowCurrencyModal(true)
           )}
-          
+
           {renderSettingItem(
             'calculator-outline',
             t('settings.exchangeRates'),
             isAutoMode ? t('settings.autoMode') : t('settings.manualMode'),
             () => setShowExchangeRatesManager(true)
           )}
-          
+
           {renderSettingItem(
             'moon-outline',
             t('settings.darkMode'),
@@ -710,6 +731,11 @@ const styles = StyleSheet.create({
   settingItemValue: {
     fontSize: 14,
     marginRight: 8,
+  },
+  serverIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   userInfo: {
     paddingHorizontal: 16,

@@ -4,6 +4,7 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Q } from '@nozbe/watermelondb';
+import { K2D_400Regular, K2D_600SemiBold, useFonts } from '@expo-google-fonts/k2d';
 import { useTheme } from '../context/ThemeContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
@@ -48,6 +49,11 @@ export const CreditDetailsScreen: React.FC = () => {
   const { formatAmount, convertAmount } = useCurrency();
   const { t } = useLocalization();
   const { accounts } = useData();
+
+  const [fontsLoaded] = useFonts({
+    K2D_400Regular,
+    K2D_600SemiBold,
+  });
 
   const [loading, setLoading] = useState(true);
   const [paymentSchedule, setPaymentSchedule] = useState<CreditPaymentScheduleType[]>([]);
@@ -563,6 +569,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+    fontFamily: 'K2D_400Regular',
   },
   errorContainer: {
     flex: 1,
@@ -573,6 +580,7 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 16,
     fontSize: 16,
+    fontFamily: 'K2D_400Regular',
     textAlign: 'center',
   },
   headerCard: {
@@ -587,12 +595,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: 'K2D_400Regular',
     marginBottom: 8,
   },
   headerAmount: {
     fontSize: 36,
-    fontWeight: '700',
+    fontFamily: 'K2D_600SemiBold',
     marginBottom: 20,
   },
   statsRow: {
@@ -605,11 +613,12 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
+    fontFamily: 'K2D_400Regular',
     marginBottom: 4,
   },
   statValue: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
   progressContainer: {
     marginTop: 8,
@@ -625,6 +634,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
+    fontFamily: 'K2D_400Regular',
     marginTop: 8,
     textAlign: 'center',
   },
@@ -646,7 +656,7 @@ const styles = StyleSheet.create({
   },
   nextPaymentTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
     marginLeft: 12,
   },
   nextPaymentContent: {
@@ -659,10 +669,11 @@ const styles = StyleSheet.create({
   },
   nextPaymentLabel: {
     fontSize: 14,
+    fontFamily: 'K2D_400Regular',
   },
   nextPaymentValue: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
   markPaidButton: {
     paddingVertical: 12,
@@ -673,7 +684,7 @@ const styles = StyleSheet.create({
   markPaidButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
   scheduleCard: {
     marginHorizontal: 16,
@@ -688,7 +699,7 @@ const styles = StyleSheet.create({
   },
   scheduleTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
     marginBottom: 16,
   },
   paymentItem: {
@@ -704,11 +715,11 @@ const styles = StyleSheet.create({
   },
   paymentNumber: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: 'K2D_400Regular',
   },
   paymentDate: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
   paymentDetails: {
     gap: 8,
@@ -719,10 +730,11 @@ const styles = StyleSheet.create({
   },
   paymentDetailLabel: {
     fontSize: 13,
+    fontFamily: 'K2D_400Regular',
   },
   paymentDetailValue: {
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: 'K2D_400Regular',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -735,7 +747,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
     marginLeft: 4,
   },
   earlyRepaymentButton: {
@@ -751,6 +763,6 @@ const styles = StyleSheet.create({
   },
   earlyRepaymentButtonText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
 });

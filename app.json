@@ -26,14 +26,15 @@
       "buildNumber": "1"
     },
     "android": {
-      "permissions": ["com.google.android.gms.permission.AD_ID"],
+      "permissions": [
+        "com.google.android.gms.permission.AD_ID"
+      ],
       "package": "com.pontipilat.cashcraft",
       "versionCode": 4,
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#4287f5"
-        
       },
       "splash": {
         "image": "./assets/splash-icon1.png",
@@ -84,7 +85,8 @@
             "kotlinVersion": "2.1.20"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

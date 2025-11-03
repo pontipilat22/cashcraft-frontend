@@ -187,6 +187,19 @@ export const TransactionsScreen = () => {
   // Состояние для отложенной загрузки
   const [isFilteringTransactions, setIsFilteringTransactions] = useState(false);
 
+  // Создаем Map индексы для быстрого поиска O(1) вместо O(n)
+  const categoryMap = useMemo(() => {
+    const map = new Map();
+    categories.forEach(cat => map.set(cat.id, cat));
+    return map;
+  }, [categories]);
+
+  const accountMap = useMemo(() => {
+    const map = new Map();
+    accounts.forEach(acc => map.set(acc.id, acc));
+    return map;
+  }, [accounts]);
+
   // Обновляем данные при фокусе экрана (для синхронизации между вкладками)
   useFocusEffect(
     useCallback(() => {
@@ -209,72 +222,102 @@ export const TransactionsScreen = () => {
     }
 
     let result = [...transactions];
-    
-    // Фильтрация по дате
+
+    // Фильтрация по дате - ОПТИМИЗИРОВАНО: вычисления дат вынесены за пределы цикла
     if (dateFilter !== 'all') {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayTime = today.getTime();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayTime = yesterday.getTime();
       const weekAgo = new Date(today);
       weekAgo.setDate(weekAgo.getDate() - 7);
+      const weekAgoTime = weekAgo.getTime();
       const monthAgo = new Date(today);
       monthAgo.setMonth(monthAgo.getMonth() - 1);
-      
+      const monthAgoTime = monthAgo.getTime();
+
+      // Для custom фильтра предвычисляем границы
+      let customStartTime = 0;
+      let customEndTime = 0;
+      if (dateFilter === 'custom') {
+        const startDateOnly = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), customStartDate.getDate());
+        customStartTime = startDateOnly.getTime();
+        const endDateOnly = new Date(customEndDate.getFullYear(), customEndDate.getMonth(), customEndDate.getDate());
+        endDateOnly.setHours(23, 59, 59, 999);
+        customEndTime = endDateOnly.getTime();
+      }
+
       result = result.filter(transaction => {
-        const transactionDate = new Date(transaction.date);
-        const transactionDateOnly = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
-        
+        const transactionTime = new Date(transaction.date).getTime();
+        const transactionDate = new Date(transactionTime);
+        const transactionDateOnlyTime = new Date(
+          transactionDate.getFullYear(),
+          transactionDate.getMonth(),
+          transactionDate.getDate()
+        ).getTime();
+
         switch (dateFilter) {
           case 'today':
-            return transactionDateOnly.getTime() === today.getTime();
+            return transactionDateOnlyTime === todayTime;
           case 'yesterday':
-            return transactionDateOnly.getTime() === yesterday.getTime();
+            return transactionDateOnlyTime === yesterdayTime;
           case 'week':
-            return transactionDate >= weekAgo;
+            return transactionTime >= weekAgoTime;
           case 'month':
-            return transactionDate >= monthAgo;
+            return transactionTime >= monthAgoTime;
           case 'custom':
-            const startDateOnly = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), customStartDate.getDate());
-            const endDateOnly = new Date(customEndDate.getFullYear(), customEndDate.getMonth(), customEndDate.getDate());
-            endDateOnly.setHours(23, 59, 59, 999); // Включаем весь последний день
-            return transactionDate >= startDateOnly && transactionDate <= endDateOnly;
+            return transactionTime >= customStartTime && transactionTime <= customEndTime;
           default:
             return true;
         }
       });
     }
     
-    // Объединяем парные транзакции переводов
+    // Объединяем парные транзакции переводов - ОПТИМИЗИРОВАНО O(n) вместо O(n²)
     const transferPairs = new Map<string, Transaction[]>();
     const processedIds = new Set<string>();
-    
+
+    // Индексируем трансферы по секундам для быстрого поиска пар
+    const transfersByTimestamp = new Map<number, Transaction[]>();
+
     result.forEach(transaction => {
-      if (processedIds.has(transaction.id)) return;
-      
-      // Проверяем, является ли это переводом
-      const isTransfer = (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
+      const isTransfer = (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense')
         && transaction.description?.match(/[→←]/);
-      
+
       if (isTransfer) {
-        // Ищем парную транзакцию
-        const pairTransaction = result.find(t => 
-          t.id !== transaction.id &&
-          !processedIds.has(t.id) &&
-          Math.abs(new Date(t.date).getTime() - new Date(transaction.date).getTime()) < 1000 && // В пределах 1 секунды
-          ((transaction.type === 'expense' && t.type === 'income') || 
-           (transaction.type === 'income' && t.type === 'expense')) &&
-          (t.categoryId === 'other_income' || t.categoryId === 'other_expense')
-        );
-        
-        if (pairTransaction) {
-          // Помечаем обе транзакции как обработанные
-          processedIds.add(transaction.id);
-          processedIds.add(pairTransaction.id);
-          
-          // Оставляем только расходную транзакцию для отображения
-          const expenseTransaction = transaction.type === 'expense' ? transaction : pairTransaction;
-          transferPairs.set(expenseTransaction.id, [expenseTransaction, pairTransaction]);
+        // Округляем timestamp до секунд
+        const timestamp = Math.floor(new Date(transaction.date).getTime() / 1000);
+
+        if (!transfersByTimestamp.has(timestamp)) {
+          transfersByTimestamp.set(timestamp, []);
+        }
+        transfersByTimestamp.get(timestamp)!.push(transaction);
+      }
+    });
+
+    // Ищем пары только среди транзакций в одну секунду
+    transfersByTimestamp.forEach((transactionsInSecond) => {
+      for (let i = 0; i < transactionsInSecond.length; i++) {
+        if (processedIds.has(transactionsInSecond[i].id)) continue;
+
+        for (let j = i + 1; j < transactionsInSecond.length; j++) {
+          const t1 = transactionsInSecond[i];
+          const t2 = transactionsInSecond[j];
+
+          if (processedIds.has(t2.id)) continue;
+
+          // Проверяем что это пара (expense + income)
+          if ((t1.type === 'expense' && t2.type === 'income') ||
+              (t1.type === 'income' && t2.type === 'expense')) {
+            processedIds.add(t1.id);
+            processedIds.add(t2.id);
+
+            const expenseTransaction = t1.type === 'expense' ? t1 : t2;
+            transferPairs.set(expenseTransaction.id, [expenseTransaction, t1.type === 'expense' ? t2 : t1]);
+            break; // Нашли пару, переходим к следующей транзакции
+          }
         }
       }
     });
@@ -287,13 +330,13 @@ export const TransactionsScreen = () => {
       return true;
     });
     
-    // Применяем поисковый фильтр
+    // Применяем поисковый фильтр - ОПТИМИЗИРОВАНО O(1) поиск вместо O(n)
     if (debouncedSearchQuery.trim()) {
       const query = debouncedSearchQuery.toLowerCase();
       result = result.filter(transaction => {
-        const category = categories.find(cat => cat.id === transaction.categoryId);
-        const account = accounts.find(acc => acc.id === transaction.accountId);
-        
+        const category = categoryMap.get(transaction.categoryId);
+        const account = accountMap.get(transaction.accountId);
+
         return (
           transaction.description?.toLowerCase().includes(query) ||
           category?.name.toLowerCase().includes(query) ||
@@ -304,7 +347,7 @@ export const TransactionsScreen = () => {
     }
     
     return result;
-  }, [transactions, debouncedSearchQuery, categories, accounts, dateFilter, customStartDate, customEndDate]);
+  }, [transactions, debouncedSearchQuery, categoryMap, accountMap, dateFilter, customStartDate, customEndDate]);
 
   // Группировка транзакций по дням
   const groupedTransactions = useMemo(() => {

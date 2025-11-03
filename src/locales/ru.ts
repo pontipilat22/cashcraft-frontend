@@ -366,6 +366,7 @@ export default {
   },
   settings: {
     title: 'Настройки',
+    serverStatus: 'Статус сервера',
     language: 'Язык',
     currency: 'Валюта',
     theme: 'Тема',

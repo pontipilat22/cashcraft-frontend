@@ -389,6 +389,7 @@ export default {
   },
   settings: {
     title: 'Settings',
+    serverStatus: 'Server Status',
     language: 'Language',
     currency: 'Currency',
     theme: 'Theme',

@@ -1,24 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Modal,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  KeyboardAvoidingView,
+  Modal,
   Platform,
-  Alert,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useBudgetContext } from '../context/BudgetContext';
-import { CURRENCIES } from '../config/currencies';
+import { ModalWrapper } from './common/ModalWrapper';
+import { ModalFooter } from './common/ModalFooter';
+import { AmountInput } from './common/AmountInput';
+import { DatePickerField } from './common/DatePickerField';
+import { InputField } from './common/InputField';
+import { modalStyles } from '../styles/modalStyles';
 
 interface TransferModalProps {
   visible: boolean;
@@ -29,12 +30,12 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   visible,
   onClose,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { accounts, goals, createTransaction, transferToGoal } = useData();
-  const { formatAmount, defaultCurrency } = useCurrency();
+  const { formatAmount } = useCurrency();
   const { t } = useLocalization();
   const { reloadData: reloadBudgetData } = useBudgetContext();
-  
+
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [fromAccountId, setFromAccountId] = useState<string>('');
@@ -42,9 +43,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showFromAccountPicker, setShowFromAccountPicker] = useState(false);
   const [showToAccountPicker, setShowToAccountPicker] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
-  
+
   // Состояние для валидации
   const [errors, setErrors] = useState<{
     amount?: boolean;
@@ -52,10 +51,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     toAccount?: boolean;
   }>({});
   const [showErrors, setShowErrors] = useState(false);
-  
+
   // Фильтруем счета
   const sourceAccounts = accounts.filter(acc => acc.type !== 'savings');
-  
+
   // Создаем список целей как псевдо-счетов для выбора
   const goalTargets = goals.map(goal => ({
     id: `goal-${goal.id}`,
@@ -66,60 +65,56 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     isGoal: true,
     goalData: goal
   }));
-  
+
   const targetAccounts = [
     ...accounts.filter(acc => acc.id !== fromAccountId),
     ...goalTargets
   ];
-  
-  // Проверяем, достаточно ли счетов для перевода
-  // Для переводов в цели нужен только 1 счет, для переводов между счетами - 2
-  const canTransfer = accounts.length >= 1;
-  
+
   useEffect(() => {
     if (!fromAccountId && sourceAccounts.length > 0) {
       setFromAccountId(sourceAccounts[0].id);
     }
   }, [sourceAccounts, fromAccountId]);
-  
+
   const handleSave = async () => {
     // Валидация обязательных полей
     const newErrors: typeof errors = {};
-    
+
     if (!amount || parseFloat(amount) <= 0) {
       newErrors.amount = true;
     }
-    
+
     if (!fromAccountId) {
       newErrors.fromAccount = true;
     }
-    
+
     if (!toAccountId) {
       newErrors.toAccount = true;
     }
-    
+
     setErrors(newErrors);
-    
+
     // Если есть ошибки, показываем их и не сохраняем
     if (Object.keys(newErrors).length > 0) {
       setShowErrors(true);
       return;
     }
-    
+
     try {
       const fromAccount = accounts.find(a => a.id === fromAccountId);
       const transferAmount = parseFloat(amount);
       const transferDate = selectedDate.toISOString();
       const transferDescription = description.trim() || t('transactions.transfer');
-      
+
       if (!fromAccount) {
         console.error('Source account not found');
         return;
       }
-      
+
       // Проверяем, это перевод в цель или между счетами
       const isGoalTransfer = toAccountId.startsWith('goal-');
-      
+
       if (isGoalTransfer) {
         // Перевод в цель
         const goalId = toAccountId.replace('goal-', '');
@@ -127,19 +122,19 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       } else {
         // Обычный перевод между счетами
         const toAccount = accounts.find(a => a.id === toAccountId);
-        
+
         if (!toAccount) {
           console.error('Target account not found');
           return;
         }
-        
+
         // Конвертируем сумму в валюту счета-получателя если валюты разные
         let toAmount = transferAmount;
         if (fromAccount.currency !== toAccount.currency) {
           // TODO: Использовать курсы обмена
           toAmount = transferAmount; // Пока без конвертации
         }
-        
+
         // Создаем расходную транзакцию (в валюте счета-источника)
         await createTransaction({
           amount: transferAmount,
@@ -149,7 +144,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           description: `${transferDescription} → ${toAccount.name}`,
           date: transferDate,
         });
-        
+
         // Создаем доходную транзакцию (в валюте счета-получателя)
         await createTransaction({
           amount: toAmount,
@@ -170,7 +165,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       console.error('Error creating transfer:', error);
     }
   };
-  
+
   const handleClose = () => {
     setAmount('');
     setDescription('');
@@ -181,282 +176,136 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     setShowErrors(false);
     onClose();
   };
-  
-  const formatDate = (date: Date) => {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    if (date.toDateString() === today.toDateString()) {
-      return t('transactions.today');
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return t('transactions.yesterday');
-    } else {
-      return date.toLocaleDateString();
-    }
-  };
-  
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    console.log('📅 [TransferModal] DatePicker onChange:', {
-      event: event?.type,
-      selectedDate: selectedDate?.toISOString(),
-      platform: Platform.OS
-    });
-    
-    // Для Android всегда закрываем пикер при любом событии
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    
-    // Устанавливаем дату только если она действительно выбрана
-    if (selectedDate && event?.type !== 'dismissed') {
-      setSelectedDate(selectedDate);
-      console.log('✅ [TransferModal] Date set:', selectedDate.toISOString());
-    } else {
-      console.log('❌ [TransferModal] Date not set:', { selectedDate: !!selectedDate, eventType: event?.type });
-    }
-  };
-  
+
   const fromAccount = accounts.find(a => a.id === fromAccountId);
   const toAccount = targetAccounts.find(a => a.id === toAccountId);
-  
-  // Получаем символ валюты из счета-источника
-  const accountCurrency = fromAccount?.currency || defaultCurrency;
-  const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
-  
+  const accountCurrency = fromAccount?.currency;
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalContainer}
+    <>
+      <ModalWrapper
+        visible={visible}
+        onClose={handleClose}
+        title={t('transactions.transfer')}
+        footer={
+          <ModalFooter
+            onCancel={handleClose}
+            onSave={handleSave}
+            saveDisabled={!amount || parseFloat(amount) === 0 || !fromAccountId || !toAccountId || (fromAccountId === toAccountId && !toAccountId.startsWith('goal-'))}
+          />
+        }
       >
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {t('transactions.transfer')}
-            </Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Сумма */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.amount')}
-              </Text>
-              <View style={[styles.amountInput, { 
-                backgroundColor: colors.background, 
-                borderColor: showErrors && errors.amount ? '#FF4444' : colors.border 
-              }]}>
-                <Text style={[styles.currencySymbol, { color: colors.primary }]}>
-                  {currencySymbol}
-                </Text>
-                <TextInput
-                  style={[styles.amountTextInput, { color: colors.text }]}
-                  value={amount}
-                  onChangeText={(text) => {
-                    setAmount(text);
-                    if (showErrors && errors.amount && text && parseFloat(text) > 0) {
-                      setErrors(prev => ({ ...prev, amount: false }));
-                    }
-                  }}
-                  placeholder="0"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                />
-              </View>
-              {showErrors && errors.amount && (
-                <Text style={[styles.errorText, { color: '#FF4444' }]}>
-                  {t('validation.amountRequired')}
-                </Text>
-              )}
-            </View>
-
-            {/* Со счета */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.fromAccount')}
-              </Text>
-              <TouchableOpacity
-                style={[styles.selector, { 
-                  backgroundColor: colors.background, 
-                  borderColor: showErrors && errors.fromAccount ? '#FF4444' : colors.border 
-                }]}
-                onPress={() => setShowFromAccountPicker(true)}
-              >
-                <Text style={[styles.selectorText, { color: colors.text }]}>
-                  {fromAccount?.name || t('transactions.selectAccount')}
-                </Text>
-                <View style={styles.accountBalance}>
-                  {fromAccount && (
-                    <Text style={[styles.balanceText, { color: colors.textSecondary }]}>
-                      {formatAmount(fromAccount.balance)}
-                    </Text>
-                  )}
-                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-                </View>
-              </TouchableOpacity>
-              {showErrors && errors.fromAccount && (
-                <Text style={[styles.errorText, { color: '#FF4444' }]}>
-                  {t('validation.accountRequired')}
-                </Text>
-              )}
-            </View>
-
-            {/* На счет */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.toAccount')}
-              </Text>
-              <TouchableOpacity
-                style={[styles.selector, { 
-                  backgroundColor: colors.background, 
-                  borderColor: showErrors && errors.toAccount ? '#FF4444' : colors.border 
-                }]}
-                onPress={() => setShowToAccountPicker(true)}
-                disabled={!fromAccountId}
-              >
-                <Text style={[styles.selectorText, { color: !fromAccountId ? colors.textSecondary : colors.text }]}>
-                  {toAccount?.name || t('transactions.selectAccount')}
-                </Text>
-                <View style={styles.accountBalance}>
-                  {toAccount && (
-                    <Text style={[styles.balanceText, { color: colors.textSecondary }]}>
-                      {formatAmount(toAccount.balance)}
-                    </Text>
-                  )}
-                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-                </View>
-              </TouchableOpacity>
-              {showErrors && errors.toAccount && (
-                <Text style={[styles.errorText, { color: '#FF4444' }]}>
-                  {t('validation.accountRequired')}
-                </Text>
-              )}
-            </View>
-
-            {/* Дата */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.date')}
-              </Text>
-              <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => {
-                  if (!showDatePicker && !isDatePickerOpening) {
-                    console.log('📅 [TransferModal] Opening DatePicker...');
-                    setIsDatePickerOpening(true);
-                    setTimeout(() => {
-                      setShowDatePicker(true);
-                      setIsDatePickerOpening(false);
-                    }, 100);
-                  } else {
-                    console.log('📅 [TransferModal] DatePicker already opening/open, ignoring...');
-                  }
-                }}
-              >
-                <View style={styles.selectorContent}>
-                  <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
-                  <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {formatDate(selectedDate)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Описание */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.description')} ({t('common.optional')})
-              </Text>
-              <TextInput
-                style={[styles.input, { 
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderColor: colors.border,
-                }]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder={t('transactions.enterDescription')}
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
-              onPress={handleClose}
-            >
-              <Text style={[styles.buttonText, { color: colors.text }]}>
-                {t('common.cancel')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.button, 
-                styles.saveButton, 
-                { backgroundColor: colors.primary }
-              ]}
-              onPress={handleSave}
-              disabled={!amount || parseFloat(amount) === 0 || !fromAccountId || !toAccountId || (fromAccountId === toAccountId && !toAccountId.startsWith('goal-'))}
-            >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>
-                {t('common.save')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {/* Сумма */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('transactions.amount')}
+          </Text>
+          <AmountInput
+            value={amount}
+            onChangeText={(text) => {
+              setAmount(text);
+              if (showErrors && errors.amount && text && parseFloat(text) > 0) {
+                setErrors(prev => ({ ...prev, amount: false }));
+              }
+            }}
+            currency={accountCurrency}
+            showError={showErrors && errors.amount}
+            errorMessage={t('validation.amountRequired')}
+          />
         </View>
-      </KeyboardAvoidingView>
 
-      {/* Date Picker */}
-      {showDatePicker && Platform.OS === 'android' && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-        />
-      )}
-      {showDatePicker && Platform.OS === 'ios' && (
-        <Modal
-          visible={showDatePicker}
-          transparent={true}
-          animationType="slide"
-        >
+        {/* Со счета */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('transactions.fromAccount')}
+          </Text>
           <TouchableOpacity
-            style={styles.datePickerOverlay}
-            activeOpacity={1}
-            onPress={() => setShowDatePicker(false)}
+            style={[
+              modalStyles.selector,
+              {
+                backgroundColor: colors.background,
+                borderColor: showErrors && errors.fromAccount ? '#FF4444' : colors.border
+              }
+            ]}
+            onPress={() => setShowFromAccountPicker(true)}
           >
-            <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
-              <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display="spinner"
-                onChange={handleDateChange}
-                themeVariant={isDark ? 'dark' : 'light'}
-              />
+            <Text style={[modalStyles.selectorText, { color: colors.text }]}>
+              {fromAccount?.name || t('transactions.selectAccount')}
+            </Text>
+            <View style={styles.accountBalance}>
+              {fromAccount && (
+                <Text style={[styles.balanceText, { color: colors.textSecondary }]}>
+                  {formatAmount(fromAccount.balance)}
+                </Text>
+              )}
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
             </View>
           </TouchableOpacity>
-        </Modal>
-      )}
+          {showErrors && errors.fromAccount && (
+            <Text style={modalStyles.errorText}>
+              {t('validation.accountRequired')}
+            </Text>
+          )}
+        </View>
+
+        {/* На счет */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('transactions.toAccount')}
+          </Text>
+          <TouchableOpacity
+            style={[
+              modalStyles.selector,
+              {
+                backgroundColor: colors.background,
+                borderColor: showErrors && errors.toAccount ? '#FF4444' : colors.border
+              }
+            ]}
+            onPress={() => setShowToAccountPicker(true)}
+            disabled={!fromAccountId}
+          >
+            <Text style={[modalStyles.selectorText, { color: !fromAccountId ? colors.textSecondary : colors.text }]}>
+              {toAccount?.name || t('transactions.selectAccount')}
+            </Text>
+            <View style={styles.accountBalance}>
+              {toAccount && (
+                <Text style={[styles.balanceText, { color: colors.textSecondary }]}>
+                  {formatAmount(toAccount.balance)}
+                </Text>
+              )}
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+          {showErrors && errors.toAccount && (
+            <Text style={modalStyles.errorText}>
+              {t('validation.accountRequired')}
+            </Text>
+          )}
+        </View>
+
+        {/* Дата */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('transactions.date')}
+          </Text>
+          <DatePickerField
+            value={selectedDate}
+            onChange={setSelectedDate}
+          />
+        </View>
+
+        {/* Описание */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('transactions.description')} ({t('common.optional')})
+          </Text>
+          <InputField
+            value={description}
+            onChangeText={setDescription}
+            placeholder={t('transactions.enterDescription')}
+          />
+        </View>
+      </ModalWrapper>
 
       {/* From Account Picker */}
       <Modal
@@ -466,16 +315,20 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         onRequestClose={() => setShowFromAccountPicker(false)}
       >
         <TouchableOpacity
-          style={styles.pickerOverlay}
+          style={modalStyles.pickerOverlay}
           activeOpacity={1}
           onPress={() => setShowFromAccountPicker(false)}
         >
-          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <View style={styles.pickerHeader}>
-              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[modalStyles.pickerContent, { backgroundColor: colors.card }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={modalStyles.pickerHeader}>
+              <Text style={[modalStyles.pickerTitle, { color: colors.text }]}>
                 {t('transactions.fromAccount')}
               </Text>
-              <TouchableOpacity onPress={() => setShowFromAccountPicker(false)} style={styles.pickerCloseButton}>
+              <TouchableOpacity onPress={() => setShowFromAccountPicker(false)} style={modalStyles.pickerCloseButton}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -483,7 +336,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
               {sourceAccounts.map(account => (
                 <TouchableOpacity
                   key={account.id}
-                  style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                  style={[modalStyles.pickerItem, { backgroundColor: colors.background }]}
                   onPress={() => {
                     setFromAccountId(account.id);
                     if (toAccountId === account.id) {
@@ -492,7 +345,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                     setShowFromAccountPicker(false);
                   }}
                 >
-                  <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                  <Text style={[modalStyles.pickerItemText, { color: colors.text }]}>
                     {account.name}
                   </Text>
                   <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
@@ -501,7 +354,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
@@ -513,16 +366,20 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         onRequestClose={() => setShowToAccountPicker(false)}
       >
         <TouchableOpacity
-          style={styles.pickerOverlay}
+          style={modalStyles.pickerOverlay}
           activeOpacity={1}
           onPress={() => setShowToAccountPicker(false)}
         >
-          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <View style={styles.pickerHeader}>
-              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[modalStyles.pickerContent, { backgroundColor: colors.card }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={modalStyles.pickerHeader}>
+              <Text style={[modalStyles.pickerTitle, { color: colors.text }]}>
                 {t('transactions.toAccount')}
               </Text>
-              <TouchableOpacity onPress={() => setShowToAccountPicker(false)} style={styles.pickerCloseButton}>
+              <TouchableOpacity onPress={() => setShowToAccountPicker(false)} style={modalStyles.pickerCloseButton}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -538,13 +395,13 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                   {accounts.filter(acc => acc.id !== fromAccountId).map(account => (
                     <TouchableOpacity
                       key={account.id}
-                      style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                      style={[modalStyles.pickerItem, { backgroundColor: colors.background }]}
                       onPress={() => {
                         setToAccountId(account.id);
                         setShowToAccountPicker(false);
                       }}
                     >
-                      <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                      <Text style={[modalStyles.pickerItemText, { color: colors.text }]}>
                         {account.name}
                       </Text>
                       <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
@@ -554,7 +411,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                   ))}
                 </>
               )}
-              
+
               {/* Секция целей */}
               {goals.length > 0 && (
                 <>
@@ -566,13 +423,13 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                   {goalTargets.map(goal => (
                     <TouchableOpacity
                       key={goal.id}
-                      style={[styles.pickerItem, { backgroundColor: colors.background }]}
+                      style={[modalStyles.pickerItem, { backgroundColor: colors.background }]}
                       onPress={() => {
                         setToAccountId(goal.id);
                         setShowToAccountPicker(false);
                       }}
                     >
-                      <Text style={[styles.pickerItemText, { color: colors.text }]}>
+                      <Text style={[modalStyles.pickerItemText, { color: colors.text }]}>
                         {goal.name}
                       </Text>
                       <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
@@ -583,83 +440,14 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 </>
               )}
             </ScrollView>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-    </Modal>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  amountInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-  },
-  currencySymbol: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginRight: 4,
-  },
-  amountTextInput: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '600',
-    paddingVertical: 12,
-  },
-  selector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-  },
-  selectorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  selectorText: {
-    fontSize: 16,
-    flex: 1,
-  },
   accountBalance: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -668,91 +456,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginRight: 8,
   },
-  footer: {
-    flexDirection: 'row',
-    marginTop: 20,
-  },
-  button: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    borderWidth: 1,
-    marginRight: 12,
-  },
-  saveButton: {},
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  pickerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  pickerContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '50%',
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  pickerCloseButton: {
-    padding: 4,
-    marginLeft: 12,
-  },
-  pickerItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  pickerItemText: {
-    fontSize: 16,
-  },
   pickerItemBalance: {
     fontSize: 14,
-  },
-  datePickerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  datePickerContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  datePickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  datePickerButton: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#FF4444',
-    marginTop: 4,
   },
   sectionHeader: {
     paddingHorizontal: 16,

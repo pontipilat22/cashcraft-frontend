@@ -4,7 +4,6 @@ const path = require('path');
 const defaultConfig = getDefaultConfig(__dirname);
 
 defaultConfig.resolver.sourceExts.push('cjs');
-defaultConfig.resolver.unstable_enablePackageExports = false;
 
 // Более агрессивный фикс для путей с кириллицей
 const originalServerEnhanceMiddleware = defaultConfig.server.enhanceMiddleware;

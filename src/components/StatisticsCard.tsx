@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { K2D_400Regular, K2D_600SemiBold, useFonts } from '@expo-google-fonts/k2d';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -17,7 +18,12 @@ export const StatisticsCard: React.FC<StatisticsCardProps> = ({ onPeriodPress })
   const { t } = useLocalization();
   const { formatAmount } = useCurrency();
   const { getStatistics, transactions } = useData();
-  
+
+  const [fontsLoaded] = useFonts({
+    K2D_400Regular,
+    K2D_600SemiBold,
+  });
+
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -194,7 +200,7 @@ const styles = StyleSheet.create({
   statsTitle: {
     color: '#fff',
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
   periodButton: {
     flexDirection: 'row',
@@ -208,7 +214,7 @@ const styles = StyleSheet.create({
   periodText: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '500',
+    fontFamily: 'K2D_400Regular',
   },
   statsRow: {
     flexDirection: 'row',
@@ -222,13 +228,14 @@ const styles = StyleSheet.create({
   statLabel: {
     color: '#fff',
     fontSize: 15,
+    fontFamily: 'K2D_400Regular',
     marginTop: 12,
     marginBottom: 6,
   },
   statAmount: {
     color: '#fff',
     fontSize: 22,
-    fontWeight: '700',
+    fontFamily: 'K2D_600SemiBold',
   },
   statDivider: {
     width: 1,
@@ -255,7 +262,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'K2D_600SemiBold',
   },
   periodOption: {
     paddingVertical: 16,
@@ -273,5 +280,6 @@ const styles = StyleSheet.create({
   },
   periodOptionText: {
     fontSize: 16,
+    fontFamily: 'K2D_400Regular',
   },
 }); 

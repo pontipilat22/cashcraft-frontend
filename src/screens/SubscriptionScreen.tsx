@@ -53,7 +53,6 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionSKU>(SUBSCRIPTION_SKUS.MONTHLY);
   const [isLoading, setIsLoading] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   // Генерируем планы на основе доступных продуктов или используем дефолтные
   const plans: SubscriptionPlan[] = React.useMemo(() => {
@@ -138,10 +137,6 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
         console.log('🔄 [SubscriptionScreen] IAP не инициализирован, пытаемся инициализировать...');
         const initialized = await initializeIAP();
         if (!initialized) {
-          Alert.alert(
-            t('common.error'), 
-            'Сервис покупок временно недоступен. Попробуйте позже.'
-          );
           return;
         }
       }
@@ -205,10 +200,6 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
         console.log('🔄 [SubscriptionScreen] IAP не инициализирован для восстановления, пытаемся инициализировать...');
         const initialized = await initializeIAP();
         if (!initialized) {
-          Alert.alert(
-            t('common.error'), 
-            'Сервис покупок временно недоступен. Попробуйте позже.'
-          );
           return;
         }
       }
@@ -406,69 +397,6 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
             </Text>
           )}
 
-          {/* Кнопка отладки */}
-          <TouchableOpacity
-            onPress={() => setShowDebugInfo(!showDebugInfo)}
-            style={[styles.debugButton, { backgroundColor: colors.border }]}
-          >
-            <Ionicons name="bug" size={16} color={colors.textSecondary} />
-            <Text style={[styles.debugButtonText, { color: colors.textSecondary }]}>
-              {showDebugInfo ? 'Скрыть отладку' : 'Показать отладку'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Отладочная информация */}
-          {showDebugInfo && (
-            <View style={[styles.debugInfo, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.debugTitle, { color: colors.text }]}>Информация о продуктах:</Text>
-              <Text style={[styles.debugText, { color: colors.textSecondary }]}>
-                Найдено продуктов: {availableProducts.length}
-              </Text>
-              {availableProducts.length === 0 ? (
-                <Text style={[styles.debugText, { color: colors.danger }]}>
-                  ⚠️ Продукты не загружены!{'\n'}
-                  Возможные причины:{'\n'}
-                  • Подписки не созданы в Google Play Console{'\n'}
-                  • Подписки не активированы{'\n'}
-                  • Нет базовых планов с ценами{'\n'}
-                  • Ожидание синхронизации (до 24 часов)
-                </Text>
-              ) : (
-                availableProducts.map((product, index) => (
-                  <View key={product.id} style={styles.debugProduct}>
-                    <Text style={[styles.debugProductTitle, { color: colors.primary }]}>
-                      Продукт {index + 1}: {product.id}
-                    </Text>
-                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
-                      Название: {product.title || 'Нет'}
-                    </Text>
-                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
-                      Цена: {product.displayPrice || String(product.price) || 'Нет'}
-                    </Text>
-                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
-                      Описание: {product.description || 'Нет'}
-                    </Text>
-                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
-                      Детали предложений: {(product as any).subscriptionOfferDetails?.length || 0}
-                    </Text>
-                    {(product as any).subscriptionOfferDetails && (
-                      <Text style={[styles.debugText, { color: colors.success }]}>
-                        ✅ Есть offerToken - можно покупать
-                      </Text>
-                    )}
-                    {!(product as any).subscriptionOfferDetails && (
-                      <Text style={[styles.debugText, { color: colors.danger }]}>
-                        ❌ НЕТ offerToken - нужен базовый план!
-                      </Text>
-                    )}
-                  </View>
-                ))
-              )}
-              <Text style={[styles.debugText, { color: colors.textSecondary, marginTop: 10 }]}>
-                Проверьте логи Metro (npx react-native log-android) для подробной информации
-              </Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.plansSection}>

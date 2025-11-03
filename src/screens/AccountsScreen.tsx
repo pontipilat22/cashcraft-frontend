@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar, TouchableOpacity, Modal } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
@@ -6,7 +6,7 @@ import { useSubscription } from '../context/SubscriptionContext';
 import { useAuth } from '../context/AuthContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { useBudgetContext } from '../context/BudgetContext'; // Импорт хука BudgetContext
+import { useBudgetContext } from '../context/BudgetContext'; // РРјРїРѕСЂС‚ С…СѓРєР° BudgetContext
 import { useFAB } from '../context/FABContext';
 import { AccountSection } from '../components/AccountSection';
 import { AccountCard } from '../components/AccountCard';
@@ -26,7 +26,7 @@ import { LocalDatabaseService } from '../services/localDatabase';
 import { useFocusEffect } from '@react-navigation/native';
 import { TransferModal } from '../components/TransferModal';
 import { StatisticsCard } from '../components/StatisticsCard';
-import { BalanceChart } from '../components/BalanceChart';
+import BalanceChart from '../components/BalanceChart';
 import { SubscriptionScreen } from './SubscriptionScreen';
 import { AddGoalModal } from '../components/AddGoalModal';
 import { EditGoalModal } from '../components/EditGoalModal';
@@ -69,31 +69,26 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const [showGoalActionsModal, setShowGoalActionsModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<any>(null);
 
-  // Логирование состояния модалок
+  // Р›РѕРіРёСЂРѕРІР°РЅРёРµ СЃРѕСЃС‚РѕСЏРЅРёСЏ РјРѕРґР°Р»РѕРє
   React.useEffect(() => {
-    console.log('🔍 [AccountsScreen] Modal states:', {
-      showEditGoalModal,
-      showGoalActionsModal,
-      selectedGoalId: selectedGoal?.id
-    });
   }, [showEditGoalModal, showGoalActionsModal, selectedGoal]);
   const [activeTab, setActiveTab] = useState<string>('cards');
 
-  // Автоматическое переключение на нужную вкладку
+  // РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРµ РїРµСЂРµРєР»СЋС‡РµРЅРёРµ РЅР° РЅСѓР¶РЅСѓСЋ РІРєР»Р°РґРєСѓ
   useEffect(() => {
     if (targetTab) {
       setActiveTab(targetTab);
-      // Сбрасываем targetTab после переключения
+      // РЎР±СЂР°СЃС‹РІР°РµРј targetTab РїРѕСЃР»Рµ РїРµСЂРµРєР»СЋС‡РµРЅРёСЏ
       setTargetTab(null);
     }
   }, [targetTab, setTargetTab]);
 
-  // Загружаем долги при фокусе экрана
+  // Р—Р°РіСЂСѓР¶Р°РµРј РґРѕР»РіРё РїСЂРё С„РѕРєСѓСЃРµ СЌРєСЂР°РЅР°
   useFocusEffect(
     React.useCallback(() => {
       loadDebts();
       
-      // Добавляем слушатель для обновления долгов
+      // Р”РѕР±Р°РІР»СЏРµРј СЃР»СѓС€Р°С‚РµР»СЊ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ РґРѕР»РіРѕРІ
       const unsubscribe = navigation.addListener('focus', () => {
         loadDebts();
       });
@@ -102,11 +97,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     }, [navigation])
   );
 
-  // Следим за изменениями в DataContext для обновления долгов при сбросе
+  // РЎР»РµРґРёРј Р·Р° РёР·РјРµРЅРµРЅРёСЏРјРё РІ DataContext РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ РґРѕР»РіРѕРІ РїСЂРё СЃР±СЂРѕСЃРµ
   useEffect(() => {
-    // Проверяем признаки сброса данных
-    if (accounts.length === 1 && accounts[0].name === 'Наличные' && accounts[0].balance === 0) {
-      // Небольшая задержка чтобы БД успела обновиться
+    // РџСЂРѕРІРµСЂСЏРµРј РїСЂРёР·РЅР°РєРё СЃР±СЂРѕСЃР° РґР°РЅРЅС‹С…
+    if (accounts.length === 1 && accounts[0].name === 'РќР°Р»РёС‡РЅС‹Рµ' && accounts[0].balance === 0) {
+      // РќРµР±РѕР»СЊС€Р°СЏ Р·Р°РґРµСЂР¶РєР° С‡С‚РѕР±С‹ Р‘Р” СѓСЃРїРµР»Р° РѕР±РЅРѕРІРёС‚СЊСЃСЏ
       setTimeout(() => {
         loadDebts();
       }, 100);
@@ -116,7 +111,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   useFocusEffect(
     React.useCallback(() => {
       checkIfPremium();
-      // Добавляем небольшую задержку для гарантии обновления состояния
+      // Р”РѕР±Р°РІР»СЏРµРј РЅРµР±РѕР»СЊС€СѓСЋ Р·Р°РґРµСЂР¶РєСѓ РґР»СЏ РіР°СЂР°РЅС‚РёРё РѕР±РЅРѕРІР»РµРЅРёСЏ СЃРѕСЃС‚РѕСЏРЅРёСЏ
       const timer = setTimeout(() => {
         checkIfPremium();
       }, 500);
@@ -124,11 +119,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     }, [checkIfPremium])
   );
 
-  // Обновляем данные при фокусе экрана (для синхронизации между вкладками)
+  // РћР±РЅРѕРІР»СЏРµРј РґР°РЅРЅС‹Рµ РїСЂРё С„РѕРєСѓСЃРµ СЌРєСЂР°РЅР° (РґР»СЏ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РјРµР¶РґСѓ РІРєР»Р°РґРєР°РјРё)
   useFocusEffect(
     React.useCallback(() => {
       refreshData();
-      // Обновляем данные бюджета для актуального отображения в BalanceHeader
+      // РћР±РЅРѕРІР»СЏРµРј РґР°РЅРЅС‹Рµ Р±СЋРґР¶РµС‚Р° РґР»СЏ Р°РєС‚СѓР°Р»СЊРЅРѕРіРѕ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ BalanceHeader
       if (isBudgetEnabled) {
         reloadBudgetData();
       }
@@ -140,35 +135,34 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     setDebts(allDebts);
   };
 
-  // Считаем суммы долгов
+  // РЎС‡РёС‚Р°РµРј СЃСѓРјРјС‹ РґРѕР»РіРѕРІ
   const debtTotals = useMemo(() => {
     const owed = debts.filter(d => d.type === 'owed_to_me').reduce((sum, d) => sum + d.amount, 0);
     const owe = debts.filter(d => d.type === 'owed_by_me').reduce((sum, d) => sum + d.amount, 0);
     return { owed, owe };
   }, [debts]);
 
-  // Группируем счета по типам (исключаем savings, так как теперь есть независимые цели)
+  // Р“СЂСѓРїРїРёСЂСѓРµРј СЃС‡РµС‚Р° РїРѕ С‚РёРїР°Рј (РёСЃРєР»СЋС‡Р°РµРј savings, С‚Р°Рє РєР°Рє С‚РµРїРµСЂСЊ РµСЃС‚СЊ РЅРµР·Р°РІРёСЃРёРјС‹Рµ С†РµР»Рё)
   const groupedAccounts = {
     cards: accounts.filter(a => a.type === 'cash' || a.type === 'card' || a.type === 'bank' || a.type === 'investment'),
     debts: accounts.filter(a => a.type === 'debt'),
-    // Для кредитов показываем только активные (с отрицательным балансом, т.е. есть долг)
+    // Р”Р»СЏ РєСЂРµРґРёС‚РѕРІ РїРѕРєР°Р·С‹РІР°РµРј С‚РѕР»СЊРєРѕ Р°РєС‚РёРІРЅС‹Рµ (СЃ РѕС‚СЂРёС†Р°С‚РµР»СЊРЅС‹Рј Р±Р°Р»Р°РЅСЃРѕРј, С‚.Рµ. РµСЃС‚СЊ РґРѕР»Рі)
     credits: accounts.filter(a => a.type === 'credit' && a.balance < 0),
   };
 
   const handleAddAccount = async (section: 'cards' | 'savings' | 'debts' | 'credits') => {
-    console.log('🎯 [AccountsScreen] handleAddAccount called for section:', section);
 
-    // Продолжаем создание счета (без лимитов)
+    // РџСЂРѕРґРѕР»Р¶Р°РµРј СЃРѕР·РґР°РЅРёРµ СЃС‡РµС‚Р° (Р±РµР· Р»РёРјРёС‚РѕРІ)
     setSectionToAdd(section);
     
     if (section === 'cards') {
-      // Для карт и счетов показываем селектор типа
+      // Р”Р»СЏ РєР°СЂС‚ Рё СЃС‡РµС‚РѕРІ РїРѕРєР°Р·С‹РІР°РµРј СЃРµР»РµРєС‚РѕСЂ С‚РёРїР°
       setTypeSelectorVisible(true);
     } else if (section === 'debts') {
-      // Для долгов открываем селектор типов
+      // Р”Р»СЏ РґРѕР»РіРѕРІ РѕС‚РєСЂС‹РІР°РµРј СЃРµР»РµРєС‚РѕСЂ С‚РёРїРѕРІ
       setShowDebtTypeSelector(true);
     } else {
-      // Для остальных сразу открываем модальное окно
+      // Р”Р»СЏ РѕСЃС‚Р°Р»СЊРЅС‹С… СЃСЂР°Р·Сѓ РѕС‚РєСЂС‹РІР°РµРј РјРѕРґР°Р»СЊРЅРѕРµ РѕРєРЅРѕ
       const typeMap = {
         savings: 'savings' as AccountType,
         debts: 'debt' as AccountType,
@@ -198,14 +192,11 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     creditPaymentType?: 'annuity' | 'differentiated';
     creditInitialAmount?: number;
     creditDepositAccountId?: string | null;
-    [key: string]: any; // Для остальных полей
+    [key: string]: any; // Р”Р»СЏ РѕСЃС‚Р°Р»СЊРЅС‹С… РїРѕР»РµР№
   }) => {
     try {
-      console.log('🚀 [AccountsScreen] handleSaveAccount ВЫЗВАН');
-      console.log('📦 [AccountsScreen] Полученные данные:', JSON.stringify(data, null, 2));
-      console.log('🏷️ [AccountsScreen] Тип счета (selectedAccountType):', selectedAccountType);
 
-      // Если новый счет должен быть по умолчанию, снимаем флаг с предыдущего
+      // Р•СЃР»Рё РЅРѕРІС‹Р№ СЃС‡РµС‚ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ, СЃРЅРёРјР°РµРј С„Р»Р°Рі СЃ РїСЂРµРґС‹РґСѓС‰РµРіРѕ
       if (data.isDefault) {
         const currentDefault = accounts.find(acc => acc.isDefault);
         if (currentDefault) {
@@ -215,31 +206,16 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         }
       }
 
-      // Если это кредит и указан счёт для зачисления - подготавливаем данные ДО создания счёта
-      console.log('=== 🏦 НАЧАЛО СОЗДАНИЯ КРЕДИТА ===');
-      console.log('📝 Тип счета:', selectedAccountType);
-      console.log('📊 Все данные:', JSON.stringify(data, null, 2));
-      console.log('💰 Данные кредита:', {
-        типСчета: selectedAccountType,
-        счетДляЗачисления: data.creditDepositAccountId,
-        суммаЗачисления: data.creditDepositAmount,
-        суммаКредита: data.creditInitialAmount
-      });
+      // Р•СЃР»Рё СЌС‚Рѕ РєСЂРµРґРёС‚ Рё СѓРєР°Р·Р°РЅ СЃС‡С‘С‚ РґР»СЏ Р·Р°С‡РёСЃР»РµРЅРёСЏ - РїРѕРґРіРѕС‚Р°РІР»РёРІР°РµРј РґР°РЅРЅС‹Рµ Р”Рћ СЃРѕР·РґР°РЅРёСЏ СЃС‡С‘С‚Р°
 
       let shouldCreateDepositTransaction = false;
       let depositAccountData = null;
 
-      console.log('🔍 Проверяем условия для транзакции зачисления:');
-      console.log('  ✓ Это кредит?', selectedAccountType === 'credit');
-      console.log('  ✓ ID счета для зачисления:', data.creditDepositAccountId);
-      console.log('  ✓ Сумма зачисления:', data.creditDepositAmount);
-      console.log('  ✓ Сумма определена?', data.creditDepositAmount !== undefined);
 
-      // Проверяем, нужно ли создавать транзакцию зачисления
-      // Условия: это кредит, указан счет для зачисления, и сумма > 0
+      // РџСЂРѕРІРµСЂСЏРµРј, РЅСѓР¶РЅРѕ Р»Рё СЃРѕР·РґР°РІР°С‚СЊ С‚СЂР°РЅР·Р°РєС†РёСЋ Р·Р°С‡РёСЃР»РµРЅРёСЏ
+      // РЈСЃР»РѕРІРёСЏ: СЌС‚Рѕ РєСЂРµРґРёС‚, СѓРєР°Р·Р°РЅ СЃС‡РµС‚ РґР»СЏ Р·Р°С‡РёСЃР»РµРЅРёСЏ, Рё СЃСѓРјРјР° > 0
       if (selectedAccountType === 'credit' && data.creditDepositAccountId && typeof data.creditDepositAmount === 'number' && data.creditDepositAmount > 0) {
         const depositAccount = accounts.find(acc => acc.id === data.creditDepositAccountId);
-        console.log('✅ Счет для зачисления найден:', depositAccount?.name, '| Сумма для зачисления:', data.creditDepositAmount);
         if (depositAccount) {
           shouldCreateDepositTransaction = true;
           depositAccountData = {
@@ -249,46 +225,34 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
             creditName: data.name,
             creditStartDate: data.creditStartDate
           };
-          console.log('✅ БУДЕТ СОЗДАНА транзакция зачисления после создания кредитного счета');
         } else {
-          console.log('❌ Зачисление пропущено: счет не найден в списке счетов');
         }
       } else {
-        console.log('❌ Транзакция зачисления НЕ БУДЕТ СОЗДАНА. Причины:');
-        console.log('   - Это кредит?', selectedAccountType === 'credit');
-        console.log('   - Есть ID счета для зачисления?', !!data.creditDepositAccountId, '(значение:', data.creditDepositAccountId, ')');
-        console.log('   - Сумма является числом?', typeof data.creditDepositAmount === 'number', '(тип:', typeof data.creditDepositAmount, ')');
-        console.log('   - Сумма больше 0?', data.creditDepositAmount > 0, '(значение:', data.creditDepositAmount, ')');
       }
 
-      // Создаём кредитный счёт
+      // РЎРѕР·РґР°С‘Рј РєСЂРµРґРёС‚РЅС‹Р№ СЃС‡С‘С‚
       const newAccount = await createAccount({
         ...data,
         type: selectedAccountType,
         currency: defaultCurrency
       });
 
-      // Отслеживаем создание счета для показа рекламы (каждый 3-й счет)
+      // РћС‚СЃР»РµР¶РёРІР°РµРј СЃРѕР·РґР°РЅРёРµ СЃС‡РµС‚Р° РґР»СЏ РїРѕРєР°Р·Р° СЂРµРєР»Р°РјС‹ (РєР°Р¶РґС‹Р№ 3-Р№ СЃС‡РµС‚)
       await trackAccountCreation();
 
-      // ПОСЛЕ создания кредита создаём транзакцию зачисления
+      // РџРћРЎР›Р• СЃРѕР·РґР°РЅРёСЏ РєСЂРµРґРёС‚Р° СЃРѕР·РґР°С‘Рј С‚СЂР°РЅР·Р°РєС†РёСЋ Р·Р°С‡РёСЃР»РµРЅРёСЏ
       if (shouldCreateDepositTransaction && depositAccountData) {
-        console.log('💳 Создаю транзакцию зачисления кредита...');
 
-        // Создаём транзакцию зачисления (она автоматически обновит баланс счета)
+        // РЎРѕР·РґР°С‘Рј С‚СЂР°РЅР·Р°РєС†РёСЋ Р·Р°С‡РёСЃР»РµРЅРёСЏ (РѕРЅР° Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РѕР±РЅРѕРІРёС‚ Р±Р°Р»Р°РЅСЃ СЃС‡РµС‚Р°)
         await createTransaction({
           accountId: depositAccountData.id,
           amount: depositAccountData.depositAmount,
           type: 'income',
-          categoryId: '', // Без категории для кредитных транзакций
-          description: `Получение кредита "${depositAccountData.creditName}"`,
+          categoryId: '', // Р‘РµР· РєР°С‚РµРіРѕСЂРёРё РґР»СЏ РєСЂРµРґРёС‚РЅС‹С… С‚СЂР°РЅР·Р°РєС†РёР№
+          description: `РџРѕР»СѓС‡РµРЅРёРµ РєСЂРµРґРёС‚Р° "${depositAccountData.creditName}"`,
           date: depositAccountData.creditStartDate || new Date().toISOString(),
         });
-        console.log('💵 Баланс счета автоматически обновлен транзакцией:', depositAccountData.currentBalance, '+', depositAccountData.depositAmount, '=', depositAccountData.currentBalance + depositAccountData.depositAmount);
-        console.log('✅ ТРАНЗАКЦИЯ ЗАЧИСЛЕНИЯ СОЗДАНА УСПЕШНО!');
-        console.log('=== 🎉 КРЕДИТ СОЗДАН И ЗАЧИСЛЕН ===');
       } else {
-        console.log('⚠️ Транзакция зачисления НЕ создана (shouldCreate:', shouldCreateDepositTransaction, ', hasData:', !!depositAccountData, ')');
       }
 
       setModalVisible(false);
@@ -305,7 +269,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     isIncludedInTotal?: boolean;
   }) => {
     try {
-      // Если счет становится по умолчанию, снимаем флаг с предыдущего
+      // Р•СЃР»Рё СЃС‡РµС‚ СЃС‚Р°РЅРѕРІРёС‚СЃСЏ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ, СЃРЅРёРјР°РµРј С„Р»Р°Рі СЃ РїСЂРµРґС‹РґСѓС‰РµРіРѕ
       if (data.isDefault) {
         const currentDefault = accounts.find(acc => acc.isDefault && acc.id !== accountId);
         if (currentDefault) {
@@ -379,7 +343,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   const formatAccountName = (account: Account) => {
     if (!account) return '';
     if (account.cardNumber) {
-      return `${String(account.name || '')} •••• ${String(account.cardNumber || '')}`;
+      return `${String(account.name || '')} вЂўвЂўвЂўвЂў ${String(account.cardNumber || '')}`;
     }
     return String(account.name || '');
   };
@@ -399,22 +363,22 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   };
 
   const handleQuickTransfer = () => {
-    // Проверяем возможность перевода: нужен минимум 1 счет и либо еще один счет, либо цели
+    // РџСЂРѕРІРµСЂСЏРµРј РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ РїРµСЂРµРІРѕРґР°: РЅСѓР¶РµРЅ РјРёРЅРёРјСѓРј 1 СЃС‡РµС‚ Рё Р»РёР±Рѕ РµС‰Рµ РѕРґРёРЅ СЃС‡РµС‚, Р»РёР±Рѕ С†РµР»Рё
     const canTransfer = accounts.length >= 1 && (accounts.length >= 2 || goals.length > 0);
 
     if (!canTransfer) {
       Alert.alert(
         t('transactions.transfer'),
-        t('accounts.needAccountsOrGoalsForTransfer') || 'Для перевода необходимо иметь минимум один счет и еще один счет или цель для перевода',
+        t('accounts.needAccountsOrGoalsForTransfer') || 'Р”Р»СЏ РїРµСЂРµРІРѕРґР° РЅРµРѕР±С…РѕРґРёРјРѕ РёРјРµС‚СЊ РјРёРЅРёРјСѓРј РѕРґРёРЅ СЃС‡РµС‚ Рё РµС‰Рµ РѕРґРёРЅ СЃС‡РµС‚ РёР»Рё С†РµР»СЊ РґР»СЏ РїРµСЂРµРІРѕРґР°',
         [
           {
-            text: t('common.close') || 'Закрыть',
+            text: t('common.close') || 'Р—Р°РєСЂС‹С‚СЊ',
             style: 'cancel'
           },
           {
-            text: t('accounts.openAccount') || 'Открыть счет',
+            text: t('accounts.openAccount') || 'РћС‚РєСЂС‹С‚СЊ СЃС‡РµС‚',
             onPress: () => {
-              // Открываем селектор типа счета для создания нового
+              // РћС‚РєСЂС‹РІР°РµРј СЃРµР»РµРєС‚РѕСЂ С‚РёРїР° СЃС‡РµС‚Р° РґР»СЏ СЃРѕР·РґР°РЅРёСЏ РЅРѕРІРѕРіРѕ
               setTypeSelectorVisible(true);
             }
           }
@@ -426,18 +390,18 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   };
 
   const handleGoalPress = (goal: Goal) => {
-    // Проверяем, есть ли счета для перевода в цель
+    // РџСЂРѕРІРµСЂСЏРµРј, РµСЃС‚СЊ Р»Рё СЃС‡РµС‚Р° РґР»СЏ РїРµСЂРµРІРѕРґР° РІ С†РµР»СЊ
     if (accounts.length < 1) {
       Alert.alert(
         t('transactions.transfer'),
-        t('accounts.needAccountForGoalTransfer') || 'Для перевода в цель необходимо иметь минимум один счет',
+        t('accounts.needAccountForGoalTransfer') || 'Р”Р»СЏ РїРµСЂРµРІРѕРґР° РІ С†РµР»СЊ РЅРµРѕР±С…РѕРґРёРјРѕ РёРјРµС‚СЊ РјРёРЅРёРјСѓРј РѕРґРёРЅ СЃС‡РµС‚',
         [
           {
-            text: t('common.close') || 'Закрыть',
+            text: t('common.close') || 'Р—Р°РєСЂС‹С‚СЊ',
             style: 'cancel'
           },
           {
-            text: t('accounts.openAccount') || 'Открыть счет',
+            text: t('accounts.openAccount') || 'РћС‚РєСЂС‹С‚СЊ СЃС‡РµС‚',
             onPress: () => {
               setTypeSelectorVisible(true);
             }
@@ -446,17 +410,17 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       );
       return;
     }
-    // Открываем модалку переводов
+    // РћС‚РєСЂС‹РІР°РµРј РјРѕРґР°Р»РєСѓ РїРµСЂРµРІРѕРґРѕРІ
     setShowTransferModal(true);
   };
 
   const handleAccountPress = (account: Account) => {
-    // Если это кредит, открываем экран деталей кредита
+    // Р•СЃР»Рё СЌС‚Рѕ РєСЂРµРґРёС‚, РѕС‚РєСЂС‹РІР°РµРј СЌРєСЂР°РЅ РґРµС‚Р°Р»РµР№ РєСЂРµРґРёС‚Р°
     if (account.type === 'credit') {
       navigation.navigate('CreditDetails', { accountId: account.id });
     }
-    // Для других типов счетов пока ничего не делаем
-    // В будущем можно добавить экраны деталей для других типов
+    // Р”Р»СЏ РґСЂСѓРіРёС… С‚РёРїРѕРІ СЃС‡РµС‚РѕРІ РїРѕРєР° РЅРёС‡РµРіРѕ РЅРµ РґРµР»Р°РµРј
+    // Р’ Р±СѓРґСѓС‰РµРј РјРѕР¶РЅРѕ РґРѕР±Р°РІРёС‚СЊ СЌРєСЂР°РЅС‹ РґРµС‚Р°Р»РµР№ РґР»СЏ РґСЂСѓРіРёС… С‚РёРїРѕРІ
   };
 
   const handleDebtTypeSelect = (type: 'give' | 'return' | 'borrow' | 'payback') => {
@@ -481,35 +445,26 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
   };
 
   const handleAddGoal = async () => {
-    // Всегда проверяем актуальный статус подписки
+    // Р’СЃРµРіРґР° РїСЂРѕРІРµСЂСЏРµРј Р°РєС‚СѓР°Р»СЊРЅС‹Р№ СЃС‚Р°С‚СѓСЃ РїРѕРґРїРёСЃРєРё
     const hasPremium = await checkIfPremium();
 
-    console.log('🎯 [AccountsScreen] handleAddGoal called');
-    console.log('📊 [AccountsScreen] Current goals state:');
-    console.log('  - hasPremium:', hasPremium);
-    console.log('  - total goals:', goals.length);
-    console.log('  - user:', user);
-    console.log('  - isGuest:', user?.isGuest);
 
-    // Простая логика: без подписки - максимум 2 цели ВСЕГО
+    // РџСЂРѕСЃС‚Р°СЏ Р»РѕРіРёРєР°: Р±РµР· РїРѕРґРїРёСЃРєРё - РјР°РєСЃРёРјСѓРј 2 С†РµР»Рё Р’РЎР•Р“Рћ
     const MAX_FREE_GOALS = 2;
 
     if (!hasPremium && goals.length >= MAX_FREE_GOALS) {
-      console.log('⚠️ [AccountsScreen] Goal limit reached!');
-      console.log('  - Current goals:', goals.length);
-      console.log('  - Limit:', MAX_FREE_GOALS);
 
       if (user?.isGuest) {
         Alert.alert(
-          'Требуется авторизация',
-          `Гостевые пользователи могут создать только ${MAX_FREE_GOALS} цели. Войдите в аккаунт и оформите подписку для неограниченного количества целей.`,
+          'РўСЂРµР±СѓРµС‚СЃСЏ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ',
+          `Р“РѕСЃС‚РµРІС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»Рё РјРѕРіСѓС‚ СЃРѕР·РґР°С‚СЊ С‚РѕР»СЊРєРѕ ${MAX_FREE_GOALS} С†РµР»Рё. Р’РѕР№РґРёС‚Рµ РІ Р°РєРєР°СѓРЅС‚ Рё РѕС„РѕСЂРјРёС‚Рµ РїРѕРґРїРёСЃРєСѓ РґР»СЏ РЅРµРѕРіСЂР°РЅРёС‡РµРЅРЅРѕРіРѕ РєРѕР»РёС‡РµСЃС‚РІР° С†РµР»РµР№.`,
           [
             {
               text: t('common.cancel'),
               style: 'cancel',
             },
             {
-              text: 'Войти в аккаунт',
+              text: 'Р’РѕР№С‚Рё РІ Р°РєРєР°СѓРЅС‚',
               onPress: () => {
                 navigation.navigate('More' as any);
               },
@@ -518,15 +473,15 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         );
       } else {
         Alert.alert(
-          'Требуется подписка Premium',
-          `Бесплатная версия позволяет создать только ${MAX_FREE_GOALS} цели. Оформите подписку для неограниченного количества целей.`,
+          'РўСЂРµР±СѓРµС‚СЃСЏ РїРѕРґРїРёСЃРєР° Premium',
+          `Р‘РµСЃРїР»Р°С‚РЅР°СЏ РІРµСЂСЃРёСЏ РїРѕР·РІРѕР»СЏРµС‚ СЃРѕР·РґР°С‚СЊ С‚РѕР»СЊРєРѕ ${MAX_FREE_GOALS} С†РµР»Рё. РћС„РѕСЂРјРёС‚Рµ РїРѕРґРїРёСЃРєСѓ РґР»СЏ РЅРµРѕРіСЂР°РЅРёС‡РµРЅРЅРѕРіРѕ РєРѕР»РёС‡РµСЃС‚РІР° С†РµР»РµР№.`,
           [
             {
               text: t('common.cancel'),
               style: 'cancel',
             },
             {
-              text: 'Оформить подписку',
+              text: 'РћС„РѕСЂРјРёС‚СЊ РїРѕРґРїРёСЃРєСѓ',
               onPress: () => {
                 setShowSubscriptionModal(true);
               },
@@ -537,24 +492,19 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
       return;
     }
 
-    // Если проверка пройдена, показываем модал создания цели
+    // Р•СЃР»Рё РїСЂРѕРІРµСЂРєР° РїСЂРѕР№РґРµРЅР°, РїРѕРєР°Р·С‹РІР°РµРј РјРѕРґР°Р» СЃРѕР·РґР°РЅРёСЏ С†РµР»Рё
     setShowGoalModal(true);
   };
 
   const handleGoalLongPress = (goal: any) => {
-    console.log('🔄 [AccountsScreen] handleGoalLongPress called:', goal.id);
     setSelectedGoal(goal);
     setShowGoalActionsModal(true);
-    console.log('📂 [AccountsScreen] GoalActionsModal opened');
   };
 
   const handleEditGoal = () => {
-    console.log('✏️ [AccountsScreen] handleEditGoal called');
     setShowGoalActionsModal(false);
-    console.log('📂 [AccountsScreen] GoalActionsModal closed');
-    // Не сбрасываем selectedGoal здесь, так как он нужен для EditGoalModal
+    // РќРµ СЃР±СЂР°СЃС‹РІР°РµРј selectedGoal Р·РґРµСЃСЊ, С‚Р°Рє РєР°Рє РѕРЅ РЅСѓР¶РµРЅ РґР»СЏ EditGoalModal
     setShowEditGoalModal(true);
-    console.log('✨ [AccountsScreen] EditGoalModal opened');
   };
 
   const handleGoalActionsClose = () => {
@@ -566,8 +516,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     if (!selectedGoal) return;
 
     Alert.alert(
-      'Удалить цель',
-      `Удалить цель "${selectedGoal.name}"? Все связанные переводы также будут удалены.`,
+      'РЈРґР°Р»РёС‚СЊ С†РµР»СЊ',
+      `РЈРґР°Р»РёС‚СЊ С†РµР»СЊ "${selectedGoal.name}"? Р’СЃРµ СЃРІСЏР·Р°РЅРЅС‹Рµ РїРµСЂРµРІРѕРґС‹ С‚Р°РєР¶Рµ Р±СѓРґСѓС‚ СѓРґР°Р»РµРЅС‹.`,
       [
         {
           text: t('common.cancel'),
@@ -599,14 +549,12 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
     icon?: string;
     description?: string;
   }) => {
-    console.log('🎯 [AccountsScreen] handleUpdateGoal called:', { goalId, data });
     try {
       await updateGoal(goalId, data);
-      console.log('✅ [AccountsScreen] Goal updated successfully');
       setShowEditGoalModal(false);
       setSelectedGoal(null);
     } catch (error) {
-      console.error('❌ [AccountsScreen] Error updating goal:', error);
+      console.error('вќЊ [AccountsScreen] Error updating goal:', error);
       Alert.alert(t('common.error'), t('common.somethingWentWrong'));
     }
   };
@@ -629,11 +577,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 0 }}
       >
-        {/* Белая карточка для верхнего контента */}
-        <View style={[styles.topCard, { backgroundColor: colors.card }]}>
-          {/* <StatisticsCard /> */}
-          <BalanceChart />
-        </View>
+        {/* График баланса */}
+        <BalanceChart />
 
         <View style={{ marginTop: 16 }}>
           <AccountTabs activeTab={activeTab} onTabChange={setActiveTab} />
@@ -658,7 +603,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
           <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
           {goals.length > 0
             ? goals.map(goal => {
-                // Преобразуем Goal в Account-подобный объект для совместимости с AccountCard
+                // РџСЂРµРѕР±СЂР°Р·СѓРµРј Goal РІ Account-РїРѕРґРѕР±РЅС‹Р№ РѕР±СЉРµРєС‚ РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё СЃ AccountCard
                 const goalAsAccount = {
                   id: goal.id,
                   name: goal.name,
@@ -856,15 +801,5 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  topCard: {
-    paddingBottom: 8,
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
 }); 

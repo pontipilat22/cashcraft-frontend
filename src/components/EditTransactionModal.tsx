@@ -1,27 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Modal,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useBudgetContext } from '../context/BudgetContext';
 import { Transaction } from '../types/index';
-import { getLocalizedCategory } from '../utils/categoryUtils';
-import { CURRENCIES } from '../config/currencies';
-import { LocalDatabaseService } from '../services/localDatabase';
 import { AddCategoryModal } from './AddCategoryModal';
+import { ModalWrapper } from './common/ModalWrapper';
+import { ModalFooter } from './common/ModalFooter';
+import { AmountInput } from './common/AmountInput';
+import { DatePickerField } from './common/DatePickerField';
+import { AccountPicker } from './common/AccountPicker';
+import { CategoryPicker } from './common/CategoryPicker';
+import { InputField } from './common/InputField';
+import { modalStyles } from '../styles/modalStyles';
 
 interface EditTransactionModalProps {
   visible: boolean;
@@ -34,28 +34,24 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   transaction,
   onClose,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { accounts, categories, updateTransaction, transactions } = useData();
   const { t } = useLocalization();
   const { defaultCurrency } = useCurrency();
   const { reloadData: reloadBudgetData } = useBudgetContext();
-  
+
   const [isIncome, setIsIncome] = useState(false);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [showAccountPicker, setShowAccountPicker] = useState(false);
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [isDatePickerOpening, setIsDatePickerOpening] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
-  
+
   // Проверяем, является ли транзакция переводом
-  const isTransfer = transaction && (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
+  const isTransfer = transaction && (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense')
     && transaction.description?.match(/[→←]/);
-  
+
   // Извлекаем чистое описание перевода (без стрелок и названий счетов)
   const getCleanTransferDescription = (desc: string) => {
     if (!desc) return '';
@@ -64,79 +60,75 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     if (arrowIndex === -1) return desc;
     return desc.substring(0, arrowIndex).trim();
   };
-  
+
   // Для переводов нужно найти второй счет
   const [transferToAccountId, setTransferToAccountId] = useState<string>('');
-  const [showTransferAccountPicker, setShowTransferAccountPicker] = useState(false);
-  
+
   // Заполняем форму данными транзакции
   useEffect(() => {
     if (transaction) {
       setIsIncome(transaction.type === 'income');
       setAmount(transaction.amount.toString());
-      
+
       // Проверяем, является ли транзакция переводом
-      const checkIsTransfer = (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense') 
+      const checkIsTransfer = (transaction.categoryId === 'other_income' || transaction.categoryId === 'other_expense')
         && transaction.description?.match(/[→←]/);
-      
+
       // Для переводов используем чистое описание
       if (checkIsTransfer) {
         setDescription(getCleanTransferDescription(transaction.description || ''));
-        
+
         // Для перевода нужно определить второй счет
         // Если это расход (→), то нужно найти парную доходную транзакцию
         // Если это доход (←), то нужно найти парную расходную транзакцию
         const findPairedTransferAccount = () => {
           // Находим все транзакции в эту же дату
-          const sameDate = transactions.filter(t => 
+          const sameDate = transactions.filter(t =>
             new Date(t.date).toDateString() === new Date(transaction.date).toDateString()
           );
-          
+
           // Ищем парную транзакцию
           const pairedTransaction = sameDate.find(t => {
             if (t.id === transaction.id) return false;
-            
+
             // Проверяем, что это перевод
-            const isOtherTransfer = (t.categoryId === 'other_income' || t.categoryId === 'other_expense') 
+            const isOtherTransfer = (t.categoryId === 'other_income' || t.categoryId === 'other_expense')
               && t.description?.match(/[→←]/);
             if (!isOtherTransfer) return false;
-            
+
             // Проверяем, что описания совпадают (без учета стрелок и счетов)
             const otherCleanDesc = getCleanTransferDescription(t.description || '');
             const thisCleanDesc = getCleanTransferDescription(transaction.description || '');
             if (otherCleanDesc !== thisCleanDesc) return false;
-            
+
             // Проверяем, что типы противоположные
             if (transaction.type === 'expense' && t.type === 'income') {
               return true;
             } else if (transaction.type === 'income' && t.type === 'expense') {
               return true;
             }
-            
+
             return false;
           });
-          
+
           if (pairedTransaction) {
             // Для расходной транзакции второй счет - это счет парной доходной транзакции
             // Для доходной транзакции второй счет - это счет парной расходной транзакции
             setTransferToAccountId(pairedTransaction.accountId);
           }
         };
-        
+
         findPairedTransferAccount();
       } else {
         setDescription(transaction.description || '');
       }
-      
+
       setSelectedAccountId(transaction.accountId);
       setSelectedCategoryId(transaction.categoryId || '');
       setSelectedDate(new Date(transaction.date));
     }
   }, [transaction?.id]); // Используем только id для избежания циклов
-  
-  // Фильтруем категории по типу транзакции
-  const filteredCategories = categories.filter(cat => cat.type === (isIncome ? 'income' : 'expense'));
-  
+
   const handleSave = async () => {
     if (!amount || !selectedAccountId || !transaction) return;
 
@@ -161,7 +153,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           if (new Date(t.date).toDateString() !== new Date(transaction.date).toDateString()) return false;
 
           return (transaction.type === 'expense' && t.type === 'income') ||
-                 (transaction.type === 'income' && t.type === 'expense');
+            (transaction.type === 'income' && t.type === 'expense');
         });
 
         if (pairedTransaction) {
@@ -244,531 +236,171 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       console.error('Error updating transaction:', error);
     }
   };
-  
-  const formatDate = (date: Date) => {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    if (date.toDateString() === today.toDateString()) {
-      return t('transactions.today');
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return t('transactions.yesterday');
-    } else {
-      return date.toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'long',
-        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
-      });
-    }
-  };
-  
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    console.log('📅 [EditTransactionModal] DatePicker onChange:', {
-      event: event?.type,
-      selectedDate: selectedDate?.toISOString(),
-      platform: Platform.OS
-    });
-    
-    // Для Android всегда закрываем пикер при любом событии
-    if (Platform.OS === 'android') {
-      console.log('📅 [EditTransactionModal] Closing DatePicker (Android)...');
-      setShowDatePicker(false);
-      setIsDatePickerOpening(false);
-    }
-    
-    // Устанавливаем дату только если она действительно выбрана
-    if (selectedDate && event?.type !== 'dismissed') {
-      setSelectedDate(selectedDate);
-      console.log('✅ [EditTransactionModal] Date set:', selectedDate.toISOString());
-    } else {
-      console.log('❌ [EditTransactionModal] Date not set:', { selectedDate: !!selectedDate, eventType: event?.type });
-    }
-  };
-  
+
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
-  
-  // Получаем символ валюты выбранного счета
-  const accountCurrency = selectedAccount?.currency || defaultCurrency;
-  const currencySymbol = CURRENCIES[accountCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol || '$';
-  
+  const accountCurrency = selectedAccount?.currency;
+
   if (!transaction) return null;
-  
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalContainer}
+    <>
+      <ModalWrapper
+        visible={visible}
+        onClose={onClose}
+        title={t('transactions.editTransaction')}
+        footer={
+          <ModalFooter
+            onCancel={onClose}
+            onSave={handleSave}
+            saveColor={isIncome ? '#4CAF50' : colors.primary}
+            saveDisabled={!amount || parseFloat(amount) === 0}
+          />
+        }
       >
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {t('transactions.editTransaction')}
+        {/* Для переводов показываем специальную метку */}
+        {isTransfer && (
+          <View style={modalStyles.inputContainer}>
+            <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+              {t('common.type')}
             </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Для переводов показываем специальную метку */}
-            {isTransfer && (
-              <View style={styles.typeContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
-                  {t('common.type')}
-                </Text>
-                <View style={[styles.transferLabel, { backgroundColor: '#2196F3' + '20' }]}>
-                  <Ionicons name="swap-horizontal" size={20} color="#2196F3" style={{ marginRight: 8 }} />
-                  <Text style={[styles.transferLabelText, { color: '#2196F3' }]}>
-                    {t('transactions.transfer')}
-                  </Text>
-                </View>
-              </View>
-            )}
-            
-            {/* Переключатель типа транзакции (скрываем для переводов) */}
-            {!isTransfer && (
-              <View style={styles.typeContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
-                  {t('common.type')}
-                </Text>
-                <View style={[styles.typeSwitch, { backgroundColor: colors.background }]}>
-                  <TouchableOpacity
-                    style={[
-                      styles.typeButton,
-                      !isIncome && { backgroundColor: colors.primary },
-                    ]}
-                    onPress={() => setIsIncome(false)}
-                  >
-                    <Text style={[
-                      styles.typeButtonText,
-                      { color: !isIncome ? '#fff' : colors.text }
-                    ]}>
-                      {t('transactions.expense')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.typeButton,
-                      isIncome && { backgroundColor: '#4CAF50' },
-                    ]}
-                    onPress={() => setIsIncome(true)}
-                  >
-                    <Text style={[
-                      styles.typeButtonText,
-                      { color: isIncome ? '#fff' : colors.text }
-                    ]}>
-                      {t('transactions.income')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* Сумма */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.amount')}
+            <View style={[styles.transferLabel, { backgroundColor: '#2196F3' + '20' }]}>
+              <Ionicons name="swap-horizontal" size={20} color="#2196F3" style={{ marginRight: 8 }} />
+              <Text style={[styles.transferLabelText, { color: '#2196F3' }]}>
+                {t('transactions.transfer')}
               </Text>
-              <View style={[styles.amountInput, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                <Text style={[styles.currencySymbol, { color: isIncome ? '#4CAF50' : colors.primary }]}>
-                  {isIncome ? '+' : '-'}{currencySymbol}
-                </Text>
-                <TextInput
-                  style={[styles.amountTextInput, { color: colors.text }]}
-                  value={amount}
-                  onChangeText={setAmount}
-                  placeholder="0"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                />
-              </View>
             </View>
+          </View>
+        )}
 
-            {/* Дата */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.date')}
-              </Text>
+        {/* Переключатель типа транзакции (скрываем для переводов) */}
+        {!isTransfer && (
+          <View style={modalStyles.inputContainer}>
+            <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+              {t('common.type')}
+            </Text>
+            <View style={[styles.typeSwitch, { backgroundColor: colors.background }]}>
               <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => {
-                  if (!showDatePicker && !isDatePickerOpening) {
-                    console.log('📅 [EditTransactionModal] Opening DatePicker...');
-                    setIsDatePickerOpening(true);
-                    setTimeout(() => {
-                      setShowDatePicker(true);
-                      setIsDatePickerOpening(false);
-                    }, 100);
-                  } else {
-                    console.log('📅 [EditTransactionModal] DatePicker already opening/open, ignoring...');
-                  }
-                }}
+                style={[
+                  styles.typeButton,
+                  !isIncome && { backgroundColor: colors.primary },
+                ]}
+                onPress={() => setIsIncome(false)}
               >
-                <View style={styles.selectorContent}>
-                  <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
-                  <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {formatDate(selectedDate)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                <Text style={[
+                  styles.typeButtonText,
+                  { color: !isIncome ? '#fff' : colors.text }
+                ]}>
+                  {t('transactions.expense')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.typeButton,
+                  isIncome && { backgroundColor: '#4CAF50' },
+                ]}
+                onPress={() => setIsIncome(true)}
+              >
+                <Text style={[
+                  styles.typeButtonText,
+                  { color: isIncome ? '#fff' : colors.text }
+                ]}>
+                  {t('transactions.income')}
+                </Text>
               </TouchableOpacity>
             </View>
-
-            {/* Категория (скрываем для переводов) */}
-            {!isTransfer && (
-              <View style={styles.inputContainer}>
-                              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.category')}
-              </Text>
-                <TouchableOpacity
-                  style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                  onPress={() => setShowCategoryPicker(true)}
-                >
-                  <View style={styles.selectorContent}>
-                    {selectedCategory && (
-                      <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color + '20' }]}>
-                        <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
-                      </View>
-                    )}
-                    <Text style={[styles.selectorText, { color: colors.text }]}>
-                      {selectedCategory ? getLocalizedCategory(selectedCategory, t).name : t('transactions.selectCategory')}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Счет */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {isTransfer && transaction?.type === 'expense' ? t('transactions.fromAccountLabel') : isTransfer && transaction?.type === 'income' ? t('transactions.toAccountLabel') : t('transactions.account')}
-              </Text>
-              <TouchableOpacity
-                style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => setShowAccountPicker(true)}
-              >
-                <Text style={[styles.selectorText, { color: colors.text }]}>
-                  {selectedAccount?.name || t('transactions.selectAccount')}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            
-            {/* Второй счет для переводов */}
-            {isTransfer && (
-              <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
-                  {transaction?.type === 'expense' ? t('transactions.toAccountLabel') : t('transactions.fromAccountLabel')}
-                </Text>
-                <TouchableOpacity
-                  style={[styles.selector, { backgroundColor: colors.background, borderColor: colors.border }]}
-                  onPress={() => setShowTransferAccountPicker(true)}
-                >
-                  <Text style={[styles.selectorText, { color: colors.text }]}>
-                    {accounts.find(a => a.id === transferToAccountId)?.name || t('transactions.selectAccount')}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Описание */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('transactions.description')} ({t('common.optional')})
-              </Text>
-              <TextInput
-                style={[styles.input, { 
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderColor: colors.border,
-                }]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder={isIncome ? t('transactions.exampleIncome') : t('transactions.exampleExpense')}
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
-              onPress={onClose}
-            >
-              <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.cancel')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.button, 
-                styles.saveButton, 
-                { backgroundColor: isIncome ? '#4CAF50' : colors.primary }
-              ]}
-              onPress={handleSave}
-              disabled={!amount || parseFloat(amount) === 0}
-            >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>{t('common.save')}</Text>
-            </TouchableOpacity>
           </View>
+        )}
+
+        {/* Сумма */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('transactions.amount')}
+          </Text>
+          <AmountInput
+            value={amount}
+            onChangeText={setAmount}
+            currency={accountCurrency}
+            isIncome={isIncome}
+          />
         </View>
-      </KeyboardAvoidingView>
 
-      {showDatePicker && Platform.OS === 'android' && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-          locale="ru"
-        />
-      )}
-      {showDatePicker && Platform.OS === 'ios' && (
-        <Modal
-          visible={showDatePicker}
-          transparent={true}
-          animationType="slide"
-        >
-          <TouchableOpacity
-            style={styles.datePickerOverlay}
-            activeOpacity={1}
-            onPress={() => {
-              console.log('📅 [EditTransactionModal] Closing DatePicker (iOS overlay)...');
-              setShowDatePicker(false);
-              setIsDatePickerOpening(false);
-            }}
-          >
-            <View style={[styles.datePickerContent, { backgroundColor: colors.card }]}>
-              <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => {
-                  console.log('📅 [EditTransactionModal] Closing DatePicker (iOS cancel)...');
-                  setShowDatePicker(false);
-                  setIsDatePickerOpening(false);
-                }}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.cancel')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => {
-                  console.log('📅 [EditTransactionModal] Closing DatePicker (iOS done)...');
-                  setShowDatePicker(false);
-                  setIsDatePickerOpening(false);
-                }}>
-                  <Text style={[styles.datePickerButton, { color: colors.primary }]}>{t('common.done')}</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display="spinner"
-                onChange={handleDateChange}
-                locale="ru"
-                themeVariant={isDark ? 'dark' : 'light'}
-              />
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      )}
+        {/* Дата */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('transactions.date')}
+          </Text>
+          <DatePickerField
+            value={selectedDate}
+            onChange={setSelectedDate}
+          />
+        </View>
 
-      <Modal
-        visible={showCategoryPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCategoryPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.pickerOverlay}
-          activeOpacity={1}
-          onPress={() => setShowCategoryPicker(false)}
-        >
-          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <View style={styles.pickerHeader}>
-              <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                {t('transactions.selectCategory')}
-              </Text>
-              <TouchableOpacity onPress={() => setShowCategoryPicker(false)} style={styles.pickerCloseButton}>
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
-              {filteredCategories.map(category => {
-                const localizedCategory = getLocalizedCategory(category, t);
-                return (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={[styles.categoryPickerItem, { backgroundColor: colors.background }]}
-                    onPress={() => {
-                      setSelectedCategoryId(category.id);
-                      setShowCategoryPicker(false);
-                    }}
-                  >
-                    <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                      <Ionicons name={category.icon as any} size={20} color={category.color} />
-                    </View>
-                    <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                      {localizedCategory.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-              
-              {/* Кнопка добавления новой категории */}
-              <TouchableOpacity
-                style={[styles.categoryPickerItem, { 
-                  backgroundColor: colors.background,
-                  borderTopWidth: 1,
-                  borderTopColor: colors.border,
-                  marginTop: 8,
-                }]}
-                onPress={() => {
-                  setShowCategoryPicker(false);
-                  setShowAddCategoryModal(true);
-                }}
-              >
-                <View style={[styles.categoryIcon, { backgroundColor: colors.primary + '20' }]}>
-                  <Ionicons name="add" size={20} color={colors.primary} />
-                </View>
-                <Text style={[styles.pickerItemText, { color: colors.primary, fontWeight: '600' }]}>
-                  {t('categories.addCategory')}
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
+        {/* Категория (скрываем для переводов) */}
+        {!isTransfer && (
+          <View style={modalStyles.inputContainer}>
+            <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+              {t('transactions.category')}
+            </Text>
+            <CategoryPicker
+              value={selectedCategoryId}
+              onChange={setSelectedCategoryId}
+              type={isIncome ? 'income' : 'expense'}
+              onAddCategory={() => setShowAddCategoryModal(true)}
+            />
           </View>
-        </TouchableOpacity>
-      </Modal>
+        )}
 
-      <Modal
-        visible={showAccountPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowAccountPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.pickerOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAccountPicker(false)}
-        >
-          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <View style={styles.pickerHeader}>
-              <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                {t('transactions.selectAccount')}
-              </Text>
-              <TouchableOpacity onPress={() => setShowAccountPicker(false)} style={styles.pickerCloseButton}>
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
-              {accounts.map(account => (
-                <TouchableOpacity
-                  key={account.id}
-                  style={[styles.pickerItem, { backgroundColor: colors.background }]}
-                  onPress={() => {
-                    setSelectedAccountId(account.id);
-                    setShowAccountPicker(false);
-                  }}
-                >
-                  <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                    {account.name}
-                  </Text>
-                  <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
-                    {CURRENCIES[account.currency || defaultCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol}{account.balance.toLocaleString('ru-RU')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        {/* Счет */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {isTransfer && transaction?.type === 'expense' ? t('transactions.fromAccountLabel') : isTransfer && transaction?.type === 'income' ? t('transactions.toAccountLabel') : t('transactions.account')}
+          </Text>
+          <AccountPicker
+            value={selectedAccountId}
+            onChange={setSelectedAccountId}
+            showBalance={true}
+          />
+        </View>
+
+        {/* Второй счет для переводов */}
+        {isTransfer && (
+          <View style={modalStyles.inputContainer}>
+            <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+              {transaction?.type === 'expense' ? t('transactions.toAccountLabel') : t('transactions.fromAccountLabel')}
+            </Text>
+            <AccountPicker
+              value={transferToAccountId}
+              onChange={setTransferToAccountId}
+              filterAccounts={(acc) => acc.id !== selectedAccountId}
+              showBalance={true}
+              placeholder={t('transactions.selectAccount')}
+            />
           </View>
-        </TouchableOpacity>
-      </Modal>
-      
-      {/* Модальное окно для выбора второго счета при переводах */}
-      <Modal
-        visible={showTransferAccountPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowTransferAccountPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.pickerOverlay}
-          activeOpacity={1}
-          onPress={() => setShowTransferAccountPicker(false)}
-        >
-          <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
-            <View style={styles.pickerHeader}>
-              <Text style={[styles.pickerTitle, { color: colors.text }]}>
-                {transaction?.type === 'expense' ? t('transactions.selectDestinationAccount') : t('transactions.selectSourceAccount')}
-              </Text>
-              <TouchableOpacity onPress={() => setShowTransferAccountPicker(false)} style={styles.pickerCloseButton}>
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
-              {accounts
-                .filter(account => account.id !== selectedAccountId) // Исключаем уже выбранный счет
-                .map(account => (
-                  <TouchableOpacity
-                    key={account.id}
-                    style={[styles.pickerItem, { backgroundColor: colors.background }]}
-                    onPress={() => {
-                      setTransferToAccountId(account.id);
-                      setShowTransferAccountPicker(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerItemText, { color: colors.text }]}>
-                      {account.name}
-                    </Text>
-                    <Text style={[styles.pickerItemBalance, { color: colors.textSecondary }]}>
-                      {CURRENCIES[account.currency || defaultCurrency]?.symbol || CURRENCIES[defaultCurrency]?.symbol}{account.balance.toLocaleString('ru-RU')}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        )}
+
+        {/* Описание */}
+        <View style={modalStyles.inputContainer}>
+          <Text style={[modalStyles.label, { color: colors.textSecondary }]}>
+            {t('transactions.description')} ({t('common.optional')})
+          </Text>
+          <InputField
+            value={description}
+            onChangeText={setDescription}
+            placeholder={isIncome ? t('transactions.exampleIncome') : t('transactions.exampleExpense')}
+          />
+        </View>
+      </ModalWrapper>
 
       <AddCategoryModal
         visible={showAddCategoryModal}
         type={isIncome ? 'income' : 'expense'}
         onClose={() => setShowAddCategoryModal(false)}
       />
-    </Modal>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  typeContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
   typeSwitch: {
     flexDirection: 'row',
     borderRadius: 8,
@@ -784,145 +416,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  amountInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-  },
-  currencySymbol: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginRight: 4,
-  },
-  amountTextInput: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '600',
-    paddingVertical: 12,
-  },
-  selector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-  },
-  selectorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  selectorText: {
-    fontSize: 16,
-  },
-  categoryIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  categoryPickerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    marginTop: 20,
-  },
-  button: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    borderWidth: 1,
-    marginRight: 12,
-  },
-  saveButton: {},
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  pickerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  pickerContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '50%',
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  pickerCloseButton: {
-    padding: 4,
-    marginLeft: 12,
-  },
-  pickerItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  pickerItemText: {
-    fontSize: 16,
-  },
-  pickerItemBalance: {
-    fontSize: 14,
-  },
-  datePickerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  datePickerContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  datePickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  datePickerButton: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
   transferLabel: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -934,4 +427,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-}); 
+});

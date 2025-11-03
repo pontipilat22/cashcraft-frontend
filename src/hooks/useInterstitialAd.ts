@@ -1,15 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   InterstitialAd,
   AdEventType,
-  TestIds,
 } from 'react-native-google-mobile-ads';
 import { useSubscription } from '../context/SubscriptionContext';
 import { AdMobConfig } from '../config/admob.config';
 import { AdService } from '../services/AdService';
+import { AdMobInitService } from '../services/AdMobInitService';
+
+/**
+ * Singleton экземпляр InterstitialAd
+ * Создается один раз на все приложение для избежания утечек памяти
+ */
+let interstitialInstance: InterstitialAd | null = null;
+
+const getInterstitialInstance = (): InterstitialAd => {
+  if (!interstitialInstance) {
+    console.log('[InterstitialAd] Creating singleton instance');
+    interstitialInstance = InterstitialAd.createForAdRequest(
+      AdMobConfig.interstitial,
+      { requestNonPersonalizedAdsOnly: false }
+    );
+  }
+  return interstitialInstance;
+};
 
 /**
  * Хук для работы с межстраничной рекламой (Interstitial Ad)
+ *
+ * ИСПРАВЛЕНИЯ:
+ * - ✅ Singleton pattern для InterstitialAd (избежание утечек памяти)
+ * - ✅ Правильный cleanup event listeners
+ * - ✅ Синхронизация с AdMobInitService
+ * - ✅ Graceful fallback для ad blocker errors
  *
  * @example
  * const { showAd, isLoaded, isLoading } = useInterstitialAd();
@@ -23,50 +46,77 @@ export const useInterstitialAd = () => {
   const { isPremium } = useSubscription();
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [adInstance, setAdInstance] = useState<InterstitialAd | null>(null);
+
+  // Используем useRef для хранения функций отписки
+  const unsubscribeRef = useRef<(() => void)[]>([]);
 
   useEffect(() => {
-    // Создаем экземпляр рекламы
-    const interstitial = InterstitialAd.createForAdRequest(AdMobConfig.interstitial, {
-      requestNonPersonalizedAdsOnly: false,
-    });
+    // Получаем singleton экземпляр
+    const interstitial = getInterstitialInstance();
 
-    setAdInstance(interstitial);
-
-    // Подписываемся на события
-    const loadedListener = interstitial.addAdEventListener(AdEventType.LOADED, () => {
+    // ✅ ИСПРАВЛЕНО: Сохраняем функции отписки, а не сами listeners
+    const unsubscribeLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
       console.log('[InterstitialAd] Ad loaded');
       setIsLoaded(true);
       setIsLoading(false);
     });
 
-    const errorListener = interstitial.addAdEventListener(AdEventType.ERROR, (error) => {
+    const unsubscribeError = interstitial.addAdEventListener(AdEventType.ERROR, (error) => {
       console.error('[InterstitialAd] Load error:', error);
+
+      // ✅ Graceful fallback для ad blockers
+      if (error.message?.includes('JavascriptEngine') || error.code === 'googleMobileAds/internal-error') {
+        console.log('[InterstitialAd] Possible ad blocker or initialization issue - will retry later');
+      }
+
       setIsLoaded(false);
       setIsLoading(false);
     });
 
-    const closedListener = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+    const unsubscribeClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
       console.log('[InterstitialAd] Ad closed');
       setIsLoaded(false);
 
-      // Загружаем следующую рекламу
+      // Загружаем следующую рекламу для неподписчиков
       if (!isPremium) {
         setIsLoading(true);
-        interstitial.load();
+        // Небольшая задержка перед повторной загрузкой
+        setTimeout(() => {
+          console.log('[InterstitialAd] Loading next ad after close');
+          interstitial.load();
+        }, 1000);
       }
     });
 
-    // Загружаем рекламу для неподписчиков
+    // Сохраняем функции отписки
+    unsubscribeRef.current = [unsubscribeLoaded, unsubscribeError, unsubscribeClosed];
+
+    // ✅ Загружаем рекламу только для неподписчиков
+    // Ждем полной инициализации AdMob перед загрузкой
     if (!isPremium) {
       setIsLoading(true);
-      interstitial.load();
+
+      AdMobInitService.waitForInitialization()
+        .then(() => {
+          console.log('[InterstitialAd] AdMob initialized, waiting 1 second for JS engine...');
+          // Дополнительная задержка для Hermes + New Architecture + Skia
+          return new Promise(resolve => setTimeout(resolve, 1000));
+        })
+        .then(() => {
+          console.log('[InterstitialAd] Loading ad...');
+          interstitial.load();
+        })
+        .catch(error => {
+          console.error('[InterstitialAd] Error during initialization wait:', error);
+          setIsLoading(false);
+        });
     }
 
+    // ✅ ИСПРАВЛЕНО: Правильный cleanup
     return () => {
-      loadedListener();
-      errorListener();
-      closedListener();
+      console.log('[InterstitialAd] Cleaning up event listeners');
+      unsubscribeRef.current.forEach(unsubscribe => unsubscribe());
+      unsubscribeRef.current = [];
     };
   }, [isPremium]);
 
@@ -88,14 +138,16 @@ export const useInterstitialAd = () => {
     }
 
     // Проверяем, загружена ли реклама
-    if (!isLoaded || !adInstance) {
+    if (!isLoaded) {
       console.log('[InterstitialAd] Ad not loaded yet');
       return;
     }
 
     try {
+      const interstitial = getInterstitialInstance();
+
       // Показываем рекламу
-      await adInstance.show();
+      await interstitial.show();
 
       // Отмечаем показ
       await AdService.markInterstitialShown();
@@ -133,14 +185,16 @@ export const useInterstitialAd = () => {
     }
 
     // Проверяем, загружена ли реклама
-    if (!isLoaded || !adInstance) {
+    if (!isLoaded) {
       console.log('[InterstitialAd] Ad not loaded yet');
       return;
     }
 
     try {
+      const interstitial = getInterstitialInstance();
+
       // Показываем рекламу
-      await adInstance.show();
+      await interstitial.show();
 
       // Отмечаем показ
       await AdService.markInterstitialShown();
