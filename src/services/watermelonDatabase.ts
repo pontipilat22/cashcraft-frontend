@@ -287,6 +287,14 @@ export class WatermelonDatabaseService {
   }
 
   static async createTransaction(transactionData: any): Promise<any> {
+    console.log('🔧 [WatermelonDB] createTransaction вызван с данными:', {
+      amount: transactionData.amount,
+      type: transactionData.type,
+      accountId: transactionData.accountId,
+      categoryId: transactionData.categoryId,
+      description: transactionData.description
+    });
+
     const transaction = await database.write(async () => {
       const trans = await database.get<Transaction>('transactions').create(transaction => {
         const id = transactionData.id || uuidv4();
@@ -300,15 +308,36 @@ export class WatermelonDatabaseService {
         transaction.syncedAt = undefined;
       });
 
+      console.log('💾 [WatermelonDB] Транзакция создана, теперь обновляем баланс счета:', transactionData.accountId);
+
       // Обновляем баланс счета
-      const account = await database.get<Account>('accounts').find(transactionData.accountId);
-      await account.update(acc => {
-        const balanceChange = transactionData.type === 'income' ? transactionData.amount : -transactionData.amount;
-        acc.balance = acc.balance + balanceChange;
-      });
+      try {
+        const account = await database.get<Account>('accounts').find(transactionData.accountId);
+        console.log('📊 [WatermelonDB] Найден счет:', {
+          id: account.id,
+          currentBalance: account.balance,
+          type: account.type
+        });
+
+        await account.update(acc => {
+          const balanceChange = transactionData.type === 'income' ? transactionData.amount : -transactionData.amount;
+          const oldBalance = acc.balance;
+          acc.balance = acc.balance + balanceChange;
+          console.log('💰 [WatermelonDB] Баланс обновлен:', {
+            oldBalance,
+            balanceChange,
+            newBalance: acc.balance
+          });
+        });
+      } catch (error) {
+        console.error('❌ [WatermelonDB] Ошибка при обновлении баланса счета:', error);
+        throw error;
+      }
 
       return trans;
     });
+
+    console.log('✅ [WatermelonDB] createTransaction завершен успешно');
 
     return {
       ...transactionData,

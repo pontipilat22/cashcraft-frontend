@@ -198,6 +198,7 @@ export default {
     inSavings: 'в накоплениях',
     available: 'доступно',
     inGoals: 'в целях',
+    initialBalance: 'Начальный баланс',
     // Модальное окно накоплений
     addToSavings: 'Пополнение накопления',
     withdrawFromSavings: 'Снятие с накопления',
@@ -351,6 +352,8 @@ export default {
     health: 'Здоровье',
     shopping: 'Покупки',
     otherExpense: 'Другое',
+    otherIncome: 'Другое',
+    other: 'Другое',
     // Category management
     newCategory: 'Новая категория {{type}}',
     categoryName: 'Название категории',

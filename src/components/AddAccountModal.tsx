@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useData } from '../context/DataContext';
+import { useBudgetContext } from '../context/BudgetContext';
 import { AccountType, AccountTypeLabels } from '../types/index';
 import { useDatePicker } from '../hooks/useDatePicker';
 import { validateNumericInput } from '../utils/numberInput';
@@ -88,9 +89,11 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const { t } = useLocalization();
   const { defaultCurrency, currencies, formatAmount } = useCurrency();
   const { accounts } = useData();
+  const { isEnabled: isBudgetEnabled } = useBudgetContext();
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState(defaultCurrency);
+  const [includeBudget, setIncludeBudget] = useState(false);
   const [exchangeRate, setExchangeRate] = useState('1');
   const [cardNumber, setCardNumber] = useState('');
   const [isDefault, setIsDefault] = useState(false);
@@ -198,6 +201,13 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     loadSuggestedRate();
   }, [selectedCurrency, defaultCurrency]);
 
+  // Автоматически включаем отслеживание бюджета для начального баланса если система бюджетирования включена
+  useEffect(() => {
+    if (visible && isBudgetEnabled && accountType !== 'savings' && accountType !== 'credit') {
+      setIncludeBudget(true);
+    }
+  }, [visible, isBudgetEnabled, accountType]);
+
   const handleSave = async () => {
     // Валидация обязательных полей
     const newErrors: typeof errors = {};
@@ -247,6 +257,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       cardNumber: cardNumber.trim() ? cardNumber.trim() : undefined,
       isDefault: (accountType !== 'savings' && accountType !== 'credit' && accountType !== 'debt') ? isDefault : false,
       isIncludedInTotal: (accountType === 'savings' || accountType === 'credit') ? false : isIncludedInTotal,
+      includeBudget: (accountType !== 'savings' && accountType !== 'credit') ? includeBudget : undefined,
     };
 
     if (accountType === 'savings') {
@@ -303,6 +314,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     setCardNumber('');
     setIsDefault(false);
     setIsIncludedInTotal(true);
+    setIncludeBudget(false);
     setSelectedIcon(SAVINGS_ICONS[0]);
     setTargetAmount('');
     setLinkedAccountId('');
@@ -394,21 +406,45 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
         {/* Initial Balance - НЕ показываем для savings и credit */}
         {accountType !== 'savings' && accountType !== 'credit' && (
-          <InputField
-            label={t('accounts.initialBalance')}
-            value={balance}
-            onChangeText={(text) => {
-              const validated = validateNumericInput(text);
-              setBalance(validated);
-              if (showErrors && errors.balance && validated && parseFloat(validated) >= 0) {
-                setErrors(prev => ({ ...prev, balance: false }));
-              }
-            }}
-            placeholder="0"
-            keyboardType="numeric"
-            showError={showErrors && errors.balance}
-            errorMessage={t('validation.balanceRequired')}
-          />
+          <>
+            <InputField
+              label={t('accounts.initialBalance')}
+              value={balance}
+              onChangeText={(text) => {
+                const validated = validateNumericInput(text);
+                setBalance(validated);
+                if (showErrors && errors.balance && validated && parseFloat(validated) >= 0) {
+                  setErrors(prev => ({ ...prev, balance: false }));
+                }
+              }}
+              placeholder="0"
+              keyboardType="numeric"
+              showError={showErrors && errors.balance}
+              errorMessage={t('validation.balanceRequired')}
+            />
+
+            {/* Budget System Toggle - только если система бюджетирования включена */}
+            {isBudgetEnabled && (
+              <View style={modalStyles.inputContainer}>
+                <View style={[styles.budgetToggleContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View style={styles.budgetToggleInfo}>
+                    <Text style={[modalStyles.label, { color: colors.textSecondary, fontSize: 13 }]}>
+                      {t('plans.includeBudgetSystem')}
+                    </Text>
+                    <Text style={[styles.budgetToggleSubtitle, { color: colors.textSecondary, fontSize: 11 }]}>
+                      {includeBudget ? t('plans.budgetTrackingEnabled') : t('plans.budgetTrackingDisabled')}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={includeBudget}
+                    onValueChange={setIncludeBudget}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor={Platform.OS === 'android' ? (includeBudget ? '#fff' : '#f4f3f4') : undefined}
+                  />
+                </View>
+              </View>
+            )}
+          </>
         )}
 
         {/* Currency Picker - НЕ показываем для savings */}
@@ -1143,5 +1179,23 @@ const styles = StyleSheet.create({
   accountPickerBalance: {
     fontSize: 14,
     marginTop: 2,
+  },
+  budgetToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  budgetToggleInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  budgetToggleSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
   },
 });

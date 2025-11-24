@@ -36,7 +36,11 @@
       "Bash(npx react-native bundle:*)",
       "Bash(powershell -Command:*)",
       "Bash(npx tsc:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(del:*)",
+      "Bash(node temp_fix.js:*)",
+      "Bash(nul)",
+      "WebFetch(domain:shopify.github.io)"
     ],
     "deny": [],
     "ask": []

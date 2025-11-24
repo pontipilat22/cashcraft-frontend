@@ -41,12 +41,12 @@ interface AccountsScreenProps {
 
 export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
-  const { accounts, goals, isLoading, createAccount, updateAccount, deleteAccount, createGoal, updateGoal, deleteGoal, refreshData, createTransaction } = useData();
+  const { accounts, goals, categories, isLoading, createAccount, updateAccount, deleteAccount, createGoal, updateGoal, deleteGoal, refreshData, createTransaction } = useData();
   const { checkIfPremium } = useSubscription();
   const { user } = useAuth();
   const { t } = useLocalization();
   const { formatAmount, defaultCurrency } = useCurrency();
-  const { isEnabled: isBudgetEnabled, reloadData: reloadBudgetData } = useBudgetContext();
+  const { isEnabled: isBudgetEnabled, reloadData: reloadBudgetData, processIncome } = useBudgetContext();
   const { targetTab, setTargetTab } = useFAB();
   const { trackAccountCreation } = useInterstitialAd();
   const [modalVisible, setModalVisible] = useState(false);
@@ -237,8 +237,71 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({ navigation }) =>
         currency: defaultCurrency
       });
 
-      // РћС‚СЃР»РµР¶РёРІР°РµРј СЃРѕР·РґР°РЅРёРµ СЃС‡РµС‚Р° РґР»СЏ РїРѕРєР°Р·Р° СЂРµРєР»Р°РјС‹ (РєР°Р¶РґС‹Р№ 3-Р№ СЃС‡РµС‚)
+      console.log('🔍 [AccountsScreen] Созданный счет:', newAccount);
+
+      // Отслеживаем создание счета для показа рекламы (каждый 3-й счет)
       await trackAccountCreation();
+
+      // Если включена система бюджетирования и начальный баланс должен учитываться в бюджете
+      if (data.includeBudget && data.balance > 0 && selectedAccountType !== 'savings' && selectedAccountType !== 'credit') {
+        console.log('💰 [AccountsScreen] Обрабатываем начальный баланс через систему бюджетирования:', {
+          balance: data.balance,
+          includeBudget: data.includeBudget,
+          accountId: newAccount?.id
+        });
+
+        if (!newAccount || !newAccount.id) {
+          console.error('❌ [AccountsScreen] Ошибка: newAccount не содержит ID!', newAccount);
+          setModalVisible(false);
+          return;
+        }
+
+        // Сначала обрабатываем доход в системе бюджетирования
+        await processIncome(data.balance, true);
+
+        // Затем создаем транзакцию начального баланса
+        const incomeCategories = categories.filter(cat => cat.type === 'income');
+        console.log('📋 [AccountsScreen] Категории дохода:', incomeCategories.map(c => c.name));
+
+        let initialBalanceCategory = incomeCategories.find(
+          cat => cat.name.toLowerCase().includes(t('categories.other').toLowerCase())
+        );
+
+        if (!initialBalanceCategory && incomeCategories.length > 0) {
+          initialBalanceCategory = incomeCategories[0];
+        }
+
+        console.log('📋 [AccountsScreen] Выбранная категория:', initialBalanceCategory?.name);
+
+        // Если категория не найдена, создаем её
+        if (!initialBalanceCategory) {
+          console.warn('⚠️ [AccountsScreen] Категория дохода не найдена, создаем новую...');
+          const { LocalDatabaseService } = await import('../services/localDatabase');
+          const createdCategory = await LocalDatabaseService.createCategory({
+            name: t('categories.otherIncome') || t('categories.other') || 'Другое',
+            type: 'income',
+            icon: 'cash-outline',
+            color: '#4CAF50',
+            isDefault: true,
+          });
+          initialBalanceCategory = createdCategory;
+          console.log('✅ [AccountsScreen] Категория создана:', createdCategory);
+        }
+
+        if (initialBalanceCategory) {
+          await createTransaction({
+            amount: data.balance,
+            type: 'income',
+            accountId: newAccount.id,
+            categoryId: initialBalanceCategory.id,
+            description: t('accounts.initialBalance') || 'Начальный баланс',
+            date: new Date().toISOString(),
+          });
+          console.log('✅ [AccountsScreen] Транзакция начального баланса создана через систему бюджетирования');
+        } else {
+          console.error('❌ [AccountsScreen] Не удалось создать или найти категорию для начального баланса!');
+        }
+      }
 
       // РџРћРЎР›Р• СЃРѕР·РґР°РЅРёСЏ РєСЂРµРґРёС‚Р° СЃРѕР·РґР°С‘Рј С‚СЂР°РЅР·Р°РєС†РёСЋ Р·Р°С‡РёСЃР»РµРЅРёСЏ
       if (shouldCreateDepositTransaction && depositAccountData) {

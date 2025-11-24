@@ -18,7 +18,7 @@ interface DataContextType {
   isLoading: boolean;
   
   // Методы для работы со счетами
-  createAccount: (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  createAccount: (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Account>;
   updateAccount: (id: string, updates: Partial<Account>) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
   
@@ -268,11 +268,59 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   const createAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       console.log('➕ [DataContext] Создаем новый счет:', account.name);
-      
-      await LocalDatabaseService.createAccount(account);
+
+      // Сохраняем начальный баланс для транзакции
+      const initialBalance = account.balance || 0;
+      const includeBudget = (account as any).includeBudget;
+
+      // Создаем счет с балансом 0 (баланс установится через транзакцию)
+      const accountToCreate = {
+        ...account,
+        balance: 0
+      };
+
+      const createdAccount = await LocalDatabaseService.createAccount(accountToCreate);
+
+      // Если у счета есть начальный баланс > 0, создаем транзакцию
+      // НО только если НЕ включен учет в бюджете (иначе транзакция будет создана через processIncome)
+      if (initialBalance > 0 && account.type !== 'savings' && account.type !== 'credit' && !includeBudget) {
+        console.log('💰 [DataContext] Создаем транзакцию начального баланса:', initialBalance);
+
+        // Находим категорию "Другое" или первую доходную категорию
+        const allCategories = await LocalDatabaseService.getCategories();
+        let initialBalanceCategory = allCategories.find(
+          cat => cat.type === 'income' && cat.name.toLowerCase().includes(t('categories.other').toLowerCase())
+        );
+
+        if (!initialBalanceCategory) {
+          initialBalanceCategory = allCategories.find(cat => cat.type === 'income');
+        }
+
+        if (initialBalanceCategory) {
+          await LocalDatabaseService.createTransaction({
+            amount: initialBalance,
+            type: 'income',
+            accountId: createdAccount.id,
+            categoryId: initialBalanceCategory.id,
+            description: t('accounts.initialBalance') || 'Начальный баланс',
+            date: new Date().toISOString(),
+          });
+          console.log('✅ [DataContext] Транзакция начального баланса создана');
+        } else {
+          console.warn('⚠️ [DataContext] Не найдена категория дохода для начального баланса');
+        }
+      } else if (initialBalance > 0 && includeBudget) {
+        console.log('💰 [DataContext] Начальный баланс будет обработан через систему бюджетирования');
+      } else if (initialBalance !== 0) {
+        // Для savings и credit устанавливаем баланс напрямую (без транзакции)
+        await LocalDatabaseService.updateAccount(createdAccount.id, { balance: initialBalance });
+        console.log('💰 [DataContext] Баланс установлен напрямую для счета типа', account.type);
+      }
+
       await refreshData();
-      
+
       console.log('✅ [DataContext] Счет успешно создан');
+      return createdAccount;
     } catch (error) {
       console.error('❌ [DataContext] Ошибка создания счета:', error);
       throw error;
@@ -296,30 +344,102 @@ export const DataProvider: React.FC<{ children: ReactNode; userId?: string | nul
   const deleteAccount = async (id: string) => {
     try {
       console.log('🗑️ [DataContext] Начинаем удаление счёта с ID:', id);
-      
+
       const accountToDelete = accounts.find(acc => acc.id === id);
       if (!accountToDelete) {
         console.log('❌ [DataContext] Счет не найден для удаления');
         return;
       }
-      
+
       console.log('📋 [DataContext] Найден счёт для удаления:', {
         id: accountToDelete.id,
         name: accountToDelete.name,
         balance: accountToDelete.balance,
         type: accountToDelete.type
       });
-      
+
+      // Получаем все транзакции дохода этого счета для пересчета бюджета
+      const accountTransactions = transactions.filter(t => t.accountId === id && t.type === 'income');
+      const totalIncomeToSubtract = accountTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+      if (totalIncomeToSubtract > 0) {
+        console.log('💰 [DataContext] Нужно вычесть из бюджета доходы удаленного счета:', totalIncomeToSubtract);
+      }
+
       // Удаляем из локальной базы данных
       console.log('📱 [DataContext] Удаляем счёт из локальной базы данных...');
       await LocalDatabaseService.deleteAccount(id);
       console.log('✅ [DataContext] Счёт удалён из локальной базы данных');
-      
+
       // Обновляем локальное состояние
       console.log('🔄 [DataContext] Обновляем локальное состояние...');
       await refreshData();
       console.log('✅ [DataContext] Локальное состояние обновлено');
-      
+
+      // Пересчитываем бюджет, вычитая доходы удаленного счета
+      if (totalIncomeToSubtract > 0) {
+        console.log('📊 [DataContext] Обновляем бюджет после удаления счета...');
+        const AsyncStorage = await import('@react-native-async-storage/async-storage');
+        const BUDGET_TRACKING_KEY = '@cashcraft_budget_tracking';
+        const BUDGET_SETTINGS_KEY = '@cashcraft_budget_settings';
+
+        const [trackingDataRaw, settingsDataRaw] = await Promise.all([
+          AsyncStorage.default.getItem(BUDGET_TRACKING_KEY),
+          AsyncStorage.default.getItem(BUDGET_SETTINGS_KEY)
+        ]);
+
+        if (trackingDataRaw && settingsDataRaw) {
+          const trackingData = JSON.parse(trackingDataRaw);
+          const settings = JSON.parse(settingsDataRaw);
+          const newIncome = Math.max(0, trackingData.totalIncomeThisMonth - totalIncomeToSubtract);
+
+          // Пересчитываем распределение бюджета
+          const savingsReduction = (totalIncomeToSubtract * 20) / 100; // 20% от удаленного дохода
+
+          // Пересчитываем дневной бюджет
+          const essential = (newIncome * settings.essentialPercentage) / 100;
+          const nonEssential = (newIncome * settings.nonEssentialPercentage) / 100;
+          const remainingEssential = Math.max(0, essential - trackingData.essentialSpent);
+          const remainingNonEssential = Math.max(0, nonEssential - trackingData.nonEssentialSpent);
+          const totalRemaining = remainingEssential + remainingNonEssential;
+
+          // Вычисляем дни до следующего периода
+          const now = new Date();
+          const periodStartDay = settings.periodStartDay || 1;
+          const currentDay = now.getDate();
+          const actualDayThisMonth = Math.min(periodStartDay, new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate());
+
+          let daysRemaining;
+          if (currentDay < actualDayThisMonth) {
+            const nextPeriodStart = new Date(now.getFullYear(), now.getMonth(), actualDayThisMonth);
+            daysRemaining = Math.ceil((nextPeriodStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          } else {
+            const actualDayNextMonth = Math.min(periodStartDay, new Date(now.getFullYear(), now.getMonth() + 2, 0).getDate());
+            const nextPeriodStart = new Date(now.getFullYear(), now.getMonth() + 1, actualDayNextMonth);
+            daysRemaining = Math.ceil((nextPeriodStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          }
+
+          const newDailyBudget = daysRemaining > 0 ? totalRemaining / daysRemaining : 0;
+
+          const updatedTracking = {
+            ...trackingData,
+            totalIncomeThisMonth: newIncome,
+            savingsAmount: Math.max(0, trackingData.savingsAmount - savingsReduction),
+            dailyBudget: newDailyBudget,
+          };
+
+          await AsyncStorage.default.setItem(BUDGET_TRACKING_KEY, JSON.stringify(updatedTracking));
+          console.log('✅ [DataContext] Бюджет обновлен:', {
+            oldIncome: trackingData.totalIncomeThisMonth,
+            newIncome: updatedTracking.totalIncomeThisMonth,
+            subtracted: totalIncomeToSubtract,
+            oldDailyBudget: trackingData.dailyBudget,
+            newDailyBudget: newDailyBudget,
+            daysRemaining
+          });
+        }
+      }
+
       console.log('✅ [DataContext] Счёт успешно удалён локально');
     } catch (error) {
       console.error('❌ [DataContext] Ошибка удаления счета:', error);

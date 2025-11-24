@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,11 +17,52 @@ import { useLocalization } from '../context/LocalizationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useBudgetContext } from '../context/BudgetContext';
 import { PlansStackParamList } from '../navigation/PlansNavigator';
+import Svg, { Circle } from 'react-native-svg';
 
 type PlansScreenNavigationProp = StackNavigationProp<PlansStackParamList, 'PlansMain'>;
 
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48) / 2; // 2 columns with 16px padding on sides and 16px gap
+
+// Circular Progress Component
+const CircularProgress: React.FC<{
+  size: number;
+  strokeWidth: number;
+  progress: number;
+  color: string;
+  backgroundColor: string;
+}> = ({ size, strokeWidth, progress, color, backgroundColor }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const progressOffset = circumference - (Math.min(progress, 100) / 100) * circumference;
+
+  return (
+    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={backgroundColor}
+        strokeWidth={strokeWidth}
+        fill="none"
+      />
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={progressOffset}
+        strokeLinecap="round"
+        fill="none"
+      />
+    </Svg>
+  );
+};
+
 export const PlansScreen: React.FC = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLocalization();
   const { formatAmount } = useCurrency();
   const navigation = useNavigation<PlansScreenNavigationProp>();
@@ -47,7 +89,7 @@ export const PlansScreen: React.FC = () => {
     return (trackingData.totalIncomeThisMonth * percentage) / 100;
   };
 
-  const renderBudgetCard = (
+  const renderCompactBudgetCard = (
     title: string,
     percentage: number,
     color: string,
@@ -62,7 +104,7 @@ export const PlansScreen: React.FC = () => {
     } else if (type === 'nonEssential') {
       spent = trackingData.nonEssentialSpent || 0;
     } else if (type === 'savings') {
-      spent = trackingData.savingsAllocated || 0;
+      spent = trackingData.savingsAmount || 0;
     }
 
     const remaining = allocated - spent;
@@ -70,61 +112,57 @@ export const PlansScreen: React.FC = () => {
     const isOverspent = spent > allocated;
 
     return (
-      <View style={[styles.budgetCard, { backgroundColor: colors.card }]}>
-        <View style={styles.budgetHeader}>
-          <View style={[styles.budgetIcon, { backgroundColor: color + '20' }]}>
-            <Ionicons name={icon} size={24} color={color} />
+      <View style={[styles.compactCard, {
+        backgroundColor: colors.card,
+        width: CARD_WIDTH,
+      }]}>
+        {/* Icon and Title */}
+        <View style={styles.compactHeader}>
+          <View style={[styles.compactIcon, { backgroundColor: color + '15' }]}>
+            <Ionicons name={icon} size={20} color={color} />
           </View>
-          <Text style={[styles.budgetTitle, { color: colors.text }]}>{title}</Text>
         </View>
 
-        <View style={styles.budgetDetails}>
-          <View style={styles.budgetRow}>
-            <Text style={[styles.budgetLabel, { color: colors.textSecondary }]}>
-              {t('plans.allocated')}:
-            </Text>
-            <Text style={[styles.budgetValue, { color: colors.text }]}>
-              {formatAmount(allocated)}
-            </Text>
-          </View>
-
-          <View style={styles.budgetRow}>
-            <Text style={[styles.budgetLabel, { color: colors.textSecondary }]}>
-              {type === 'savings' ? t('plans.saved') : t('plans.spent')}:
-            </Text>
-            <Text style={[styles.budgetValue, { color: isOverspent ? '#F44336' : color }]}>
-              {formatAmount(spent)}
-            </Text>
-          </View>
-
-          <View style={styles.budgetRow}>
-            <Text style={[styles.budgetLabel, { color: colors.textSecondary }]}>
-              {t('plans.remaining')}:
-            </Text>
-            <Text style={[styles.budgetValue, {
-              color: remaining >= 0 ? '#4CAF50' : '#F44336',
-              fontWeight: '600'
-            }]}>
-              {formatAmount(remaining)}
+        {/* Circular Progress */}
+        <View style={styles.progressContainer}>
+          <CircularProgress
+            size={80}
+            strokeWidth={8}
+            progress={progress}
+            color={isOverspent ? '#F44336' : color}
+            backgroundColor={isDark ? '#2A2A2A' : '#F0F0F0'}
+          />
+          <View style={styles.progressCenter}>
+            <Text style={[styles.progressPercentage, { color: isOverspent ? '#F44336' : color }]}>
+              {Math.round(progress)}%
             </Text>
           </View>
         </View>
 
-        {/* Progress Bar */}
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBarBackground, { backgroundColor: colors.border }]}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  backgroundColor: isOverspent ? '#F44336' : color,
-                  width: `${Math.min(progress, 100)}%`
-                }
-              ]}
-            />
-          </View>
-          <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-            {progress.toFixed(0)}%
+        {/* Title */}
+        <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={2}>
+          {title}
+        </Text>
+
+        {/* Amounts */}
+        <View style={styles.amountRow}>
+          <Text style={[styles.amountLabel, { color: colors.textSecondary }]}>
+            {type === 'savings' ? t('plans.saved') : t('plans.spent')}
+          </Text>
+          <Text style={[styles.amountValue, { color: isOverspent ? '#F44336' : colors.text }]}>
+            {formatAmount(spent)}
+          </Text>
+        </View>
+
+        <View style={styles.amountRow}>
+          <Text style={[styles.amountLabel, { color: colors.textSecondary }]}>
+            {t('plans.remaining')}
+          </Text>
+          <Text style={[styles.amountValue, {
+            color: remaining >= 0 ? '#4CAF50' : '#F44336',
+            fontWeight: '700'
+          }]}>
+            {formatAmount(remaining)}
           </Text>
         </View>
       </View>
@@ -141,113 +179,146 @@ export const PlansScreen: React.FC = () => {
 
         {/* Budget System Card - Clickable */}
         <TouchableOpacity
-          style={[styles.card, styles.firstCard, { backgroundColor: colors.card, marginHorizontal: 16 }]}
+          style={[styles.settingsCard, { backgroundColor: colors.card }]}
           onPress={() => navigation.navigate('BudgetSystemSettings')}
           activeOpacity={0.7}
         >
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleInfo}>
-              <Text style={[styles.toggleTitle, { color: colors.text }]}>
+          <View style={styles.settingsRow}>
+            <View style={[styles.settingsIconContainer, { backgroundColor: budgetSettings.enabled ? '#4CAF50' + '15' : colors.border }]}>
+              <Ionicons
+                name={budgetSettings.enabled ? "checkmark-circle" : "settings-outline"}
+                size={24}
+                color={budgetSettings.enabled ? '#4CAF50' : colors.textSecondary}
+              />
+            </View>
+            <View style={styles.settingsInfo}>
+              <Text style={[styles.settingsTitle, { color: colors.text }]}>
                 {t('plans.budgetSystem')}
               </Text>
-              <Text style={[styles.toggleSubtitle, { color: colors.textSecondary }]}>
+              <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>
                 {budgetSettings.enabled
                   ? t('plans.budgetEnabled')
                   : t('plans.budgetDisabled')
                 }
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </View>
         </TouchableOpacity>
 
         {/* Category Management Card */}
         <TouchableOpacity
-          style={[styles.card, styles.regularCard, { backgroundColor: colors.card, marginHorizontal: 16 }]}
+          style={[styles.settingsCard, { backgroundColor: colors.card, marginTop: 12 }]}
           onPress={() => navigation.navigate('CategorySettings')}
           activeOpacity={0.7}
         >
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleInfo}>
-              <Text style={[styles.toggleTitle, { color: colors.text }]}>
+          <View style={styles.settingsRow}>
+            <View style={[styles.settingsIconContainer, { backgroundColor: '#2196F3' + '15' }]}>
+              <Ionicons name="pricetags-outline" size={24} color="#2196F3" />
+            </View>
+            <View style={styles.settingsInfo}>
+              <Text style={[styles.settingsTitle, { color: colors.text }]}>
                 {t('plans.categoryManagement')}
               </Text>
-              <Text style={[styles.toggleSubtitle, { color: colors.textSecondary }]}>
+              <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>
                 {t('plans.categoryManagementDescription')}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </View>
         </TouchableOpacity>
 
         {budgetSettings.enabled && (
           <>
-            {/* Income Summary */}
-            <View style={[styles.card, styles.regularCard, { backgroundColor: colors.card, marginHorizontal: 16, marginTop: 16 }]}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>
-                {t('plans.currentMonth')}
-              </Text>
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
-                  {t('transactions.income')}:
+            {/* Income Summary - Compact */}
+            <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+              <View style={styles.summaryHeader}>
+                <Text style={[styles.summaryTitle, { color: colors.text }]}>
+                  {t('plans.currentMonth')}
                 </Text>
-                <Text style={[styles.summaryAmount, { color: '#4CAF50' }]}>
-                  {formatAmount(trackingData.totalIncomeThisMonth)}
-                </Text>
+                <View style={[styles.incomeBadge, { backgroundColor: '#4CAF50' + '15' }]}>
+                  <Ionicons name="trending-up" size={16} color="#4CAF50" />
+                  <Text style={[styles.incomeBadgeText, { color: '#4CAF50' }]}>
+                    {formatAmount(trackingData.totalIncomeThisMonth)}
+                  </Text>
+                </View>
               </View>
+
               {trackingData.totalIncomeThisMonth > 0 && (
-                <>
-                  <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
-                      {t('plans.dailyBudget')}:
-                    </Text>
-                    <Text style={[styles.summaryAmount, { color: '#45B7D1' }]}>
-                      {formatAmount(getDailyBudget())}
-                    </Text>
+                <View style={styles.dailyStatsGrid}>
+                  <View style={styles.dailyStatItem}>
+                    <Ionicons name="calendar-outline" size={18} color="#45B7D1" />
+                    <View style={styles.dailyStatInfo}>
+                      <Text style={[styles.dailyStatLabel, { color: colors.textSecondary }]}>
+                        {t('plans.dailyBudget')}
+                      </Text>
+                      <Text style={[styles.dailyStatValue, { color: colors.text }]}>
+                        {formatAmount(getDailyBudget())}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
-                      {t('plans.spentToday')}:
-                    </Text>
-                    <Text style={[styles.summaryAmount, { color: '#FF5722' }]}>
-                      {formatAmount(getSpentToday())}
-                    </Text>
+
+                  <View style={styles.dailyStatItem}>
+                    <Ionicons name="remove-circle-outline" size={18} color="#FF5722" />
+                    <View style={styles.dailyStatInfo}>
+                      <Text style={[styles.dailyStatLabel, { color: colors.textSecondary }]}>
+                        {t('plans.spentToday')}
+                      </Text>
+                      <Text style={[styles.dailyStatValue, { color: colors.text }]}>
+                        {formatAmount(getSpentToday())}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
-                      {t('plans.canSpendToday')}:
-                    </Text>
-                    <Text style={[styles.summaryAmount, { color: getDailyAllowance() >= 0 ? '#4CAF50' : '#F44336' }]}>
-                      {formatAmount(getDailyAllowance())}
-                    </Text>
+
+                  <View style={styles.dailyStatItem}>
+                    <Ionicons
+                      name={getDailyAllowance() >= 0 ? "checkmark-circle-outline" : "alert-circle-outline"}
+                      size={18}
+                      color={getDailyAllowance() >= 0 ? '#4CAF50' : '#F44336'}
+                    />
+                    <View style={styles.dailyStatInfo}>
+                      <Text style={[styles.dailyStatLabel, { color: colors.textSecondary }]}>
+                        {t('plans.canSpendToday')}
+                      </Text>
+                      <Text style={[styles.dailyStatValue, {
+                        color: getDailyAllowance() >= 0 ? '#4CAF50' : '#F44336',
+                        fontWeight: '700'
+                      }]}>
+                        {formatAmount(getDailyAllowance())}
+                      </Text>
+                    </View>
                   </View>
-                </>
+                </View>
               )}
+
               {trackingData.totalIncomeThisMonth === 0 && (
-                <Text style={[styles.incomeHint, { color: colors.textSecondary }]}>
-                  {t('plans.addIncomeToStart')}
-                </Text>
+                <View style={styles.emptyState}>
+                  <Ionicons name="information-circle-outline" size={32} color={colors.textSecondary} />
+                  <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                    {t('plans.addIncomeToStart')}
+                  </Text>
+                </View>
               )}
             </View>
 
-            {/* Budget Cards */}
+            {/* Budget Cards Grid - Compact */}
             {trackingData.totalIncomeThisMonth > 0 && (
-              <View style={[styles.budgetGrid, { paddingHorizontal: 16 }]}>
-                {renderBudgetCard(
+              <View style={styles.budgetGrid}>
+                {renderCompactBudgetCard(
                   t('plans.essentialExpenses'),
                   budgetSettings.essentialPercentage,
                   '#FF6B6B',
                   'home-outline',
                   'essential'
                 )}
-                {renderBudgetCard(
+                {renderCompactBudgetCard(
                   t('plans.nonEssentialExpenses'),
                   budgetSettings.nonEssentialPercentage,
                   '#4ECDC4',
                   'gift-outline',
                   'nonEssential'
                 )}
-                {renderBudgetCard(
+                {renderCompactBudgetCard(
                   t('plans.savings'),
                   budgetSettings.savingsPercentage,
                   '#45B7D1',
@@ -258,6 +329,7 @@ export const PlansScreen: React.FC = () => {
             )}
           </>
         )}
+        <View style={{ height: 20 }} />
       </ScrollView>
       </SafeAreaView>
     </>
@@ -270,8 +342,6 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingTop: 0,
-    paddingBottom: 16,
   },
   topCard: {
     height: 50,
@@ -283,117 +353,165 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  card: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  firstCard: {
+  settingsCard: {
+    marginHorizontal: 16,
     marginTop: 16,
-  },
-  regularCard: {
-    marginTop: 0,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  toggleInfo: {
-    flex: 1,
-  },
-  toggleTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  toggleSubtitle: {
-    fontSize: 14,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  incomeHint: {
-    fontSize: 14,
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 16,
-  },
-  summaryAmount: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  budgetGrid: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  budgetCard: {
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  budgetHeader: {
+  settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  budgetIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  settingsIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  budgetTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  settingsInfo: {
     flex: 1,
   },
-  budgetDetails: {
-    marginBottom: 16,
+  settingsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
   },
-  budgetRow: {
+  settingsSubtitle: {
+    fontSize: 13,
+  },
+  summaryCard: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  summaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  budgetLabel: {
-    fontSize: 14,
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
   },
-  budgetValue: {
-    fontSize: 16,
-    fontWeight: '500',
+  incomeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
   },
-  progressBarContainer: {
+  incomeBadgeText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dailyStatsGrid: {
+    gap: 12,
+  },
+  dailyStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  progressBarBackground: {
+  dailyStatInfo: {
     flex: 1,
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
+  dailyStatLabel: {
+    fontSize: 14,
   },
-  progressText: {
-    fontSize: 12,
+  dailyStatValue: {
+    fontSize: 16,
     fontWeight: '600',
-    width: 40,
-    textAlign: 'right',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    gap: 12,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  budgetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    marginTop: 16,
+    gap: 16,
+  },
+  compactCard: {
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  compactHeader: {
+    marginBottom: 12,
+  },
+  compactIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  progressCenter: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressPercentage: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  compactTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+    minHeight: 36,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  amountLabel: {
+    fontSize: 12,
+  },
+  amountValue: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

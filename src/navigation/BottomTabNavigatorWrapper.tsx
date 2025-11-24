@@ -21,8 +21,8 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
   const { isFABMenuOpen, closeFABMenu, setTargetTab } = useFAB();
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { createAccount, createGoal, accounts, updateAccount, createTransaction } = useData();
-  const { reloadData: reloadBudgetData, isEnabled: isBudgetEnabled } = useBudgetContext();
+  const { createAccount, createGoal, accounts, categories, updateAccount, createTransaction } = useData();
+  const { reloadData: reloadBudgetData, isEnabled: isBudgetEnabled, processIncome } = useBudgetContext();
   const { trackAccountCreation } = useInterstitialAd();
 
   // Modals state
@@ -145,10 +145,77 @@ export const BottomTabNavigatorWrapper: React.FC = () => {
       }
 
       // Создаём кредитный счёт
-      await createAccount(accountWithType);
+      const newAccount = await createAccount(accountWithType);
+
+      console.log('🔍 [BottomTabNavigatorWrapper] Созданный счет:', newAccount);
 
       // Отслеживаем создание счета для показа рекламы (каждый 3-й счет)
       await trackAccountCreation();
+
+      // Если включена система бюджетирования и начальный баланс должен учитываться в бюджете
+      if (accountData.includeBudget && accountData.balance > 0 && selectedAccountType !== 'savings' && selectedAccountType !== 'credit') {
+        console.log('💰 [BottomTabNavigatorWrapper] Обрабатываем начальный баланс через систему бюджетирования:', {
+          balance: accountData.balance,
+          includeBudget: accountData.includeBudget,
+          accountId: newAccount?.id
+        });
+
+        if (!newAccount || !newAccount.id) {
+          console.error('❌ [BottomTabNavigatorWrapper] Ошибка: newAccount не содержит ID!', newAccount);
+          setShowAddAccountModal(false);
+          return;
+        }
+
+        // Сначала обрабатываем доход в системе бюджетирования
+        await processIncome(accountData.balance, true);
+
+        // Затем создаем транзакцию начального баланса
+        console.log('📋 [BottomTabNavigatorWrapper] Все категории:', categories.map(c => ({ name: c.name, type: c.type })));
+        const incomeCategories = categories.filter(cat => cat.type === 'income');
+        console.log('📋 [BottomTabNavigatorWrapper] Категории дохода:', incomeCategories.map(c => c.name));
+
+        let initialBalanceCategory = incomeCategories.find(
+          cat => cat.name.toLowerCase().includes(t('categories.other').toLowerCase())
+        );
+
+        if (!initialBalanceCategory && incomeCategories.length > 0) {
+          initialBalanceCategory = incomeCategories[0];
+        }
+
+        console.log('📋 [BottomTabNavigatorWrapper] Выбранная категория:', initialBalanceCategory?.name);
+
+        // Если категория не найдена, создаем её
+        if (!initialBalanceCategory) {
+          console.warn('⚠️ [BottomTabNavigatorWrapper] Категория дохода не найдена, создаем новую...');
+
+          // Создаем простую категорию "Другое" для дохода
+          const { LocalDatabaseService } = await import('../services/localDatabase');
+          const createdCategory = await LocalDatabaseService.createCategory({
+            name: t('categories.otherIncome') || t('categories.other') || 'Другое',
+            type: 'income',
+            icon: 'cash-outline',
+            color: '#4CAF50',
+            isDefault: true,
+          });
+
+          initialBalanceCategory = createdCategory;
+          console.log('✅ [BottomTabNavigatorWrapper] Категория создана:', createdCategory);
+        }
+
+        if (initialBalanceCategory) {
+          await createTransaction({
+            amount: accountData.balance,
+            type: 'income',
+            accountId: newAccount.id,
+            categoryId: initialBalanceCategory.id,
+            description: t('accounts.initialBalance') || 'Начальный баланс',
+            date: new Date().toISOString(),
+          });
+          console.log('✅ [BottomTabNavigatorWrapper] Транзакция начального баланса создана через систему бюджетирования');
+        } else {
+          console.error('❌ [BottomTabNavigatorWrapper] Не удалось создать или найти категорию для начального баланса!');
+        }
+      }
 
       // ПОСЛЕ создания кредита создаём транзакцию зачисления
       if (shouldCreateDepositTransaction && depositAccountData) {

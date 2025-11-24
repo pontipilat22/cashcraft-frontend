@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useData } from '../context/DataContext';
+import { useBudgetContext } from '../context/BudgetContext';
 import { K2D_400Regular, K2D_600SemiBold, useFonts } from '@expo-google-fonts/k2d';
 
 // Type workaround for React 19 compatibility
@@ -98,8 +99,11 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
   const { defaultCurrency, formatAmount, getCurrencyInfo } = useCurrency();
   const { t } = useLocalization();
   const { accounts, getAccountReservedAmount } = useData();
+  const { trackingData, isEnabled: isBudgetEnabled } = useBudgetContext();
   const [isPressed, setIsPressed] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const expandAnim = React.useRef(new Animated.Value(0)).current;
 
   // Логируем для отладки
   React.useEffect(() => {
@@ -133,6 +137,18 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
       onLongPress();
     }
   }, [onLongPress]);
+
+  const toggleExpand = useCallback((e: any) => {
+    e.stopPropagation();
+    const toValue = isExpanded ? 0 : 1;
+    setIsExpanded(!isExpanded);
+    Animated.spring(expandAnim, {
+      toValue,
+      useNativeDriver: false,
+      tension: 80,
+      friction: 12,
+    }).start();
+  }, [isExpanded, expandAnim]);
 
   // Объединенная мемоизация всех вычислений
   const computed = useMemo(() => {
@@ -175,10 +191,17 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
       return Math.min((saved / account.targetAmount) * 100, 100);
     };
 
-    // getReservedAmount
+    // getReservedAmount (в целях)
     const getReservedAmount = () => {
       if (account.type === 'savings') return 0;
       return getAccountReservedAmount(account.id);
+    };
+
+    // getBudgetReservedAmount (зарезервировано бюджетом как сбережения)
+    const getBudgetReservedAmount = () => {
+      if (!isBudgetEnabled || account.type === 'savings') return 0;
+      // Возвращаем сумму сбережений из бюджетной системы
+      return trackingData?.savingsAmount || 0;
     };
 
     // calculateMonthlyPayment
@@ -289,6 +312,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
       formatBalance,
       progress: getProgress(),
       reservedAmount: getReservedAmount(),
+      budgetReservedAmount: getBudgetReservedAmount(),
       monthlyPayment: calculateMonthlyPayment(),
       totalPayment: calculateTotalPayment(),
       iconColor: getIconColor(),
@@ -304,6 +328,8 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
     colors.textSecondary,
     accounts,
     getAccountReservedAmount,
+    isBudgetEnabled,
+    trackingData,
   ]);
 
   // Условный возврат ПОСЛЕ всех хуков
@@ -419,10 +445,25 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
                   isDark={isDark}
                 />
                 <View style={styles.textBlock}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Text style={[styles.title, { color: isDark ? '#fff' : '#232323' }]} numberOfLines={1}>
                       {account.name}
                     </Text>
+                    {/* Стрелка для раскрытия, показываем только если есть что показывать */}
+                    {(computed.reservedAmount > 0 || computed.budgetReservedAmount > 0) && account.type !== 'credit' && (
+                      <TouchableOpacity onPress={toggleExpand} style={{ padding: 4, marginLeft: 8 }}>
+                        <Animated.View style={{
+                          transform: [{
+                            rotate: expandAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0deg', '180deg']
+                            })
+                          }]
+                        }}>
+                          <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                        </Animated.View>
+                      </TouchableOpacity>
+                    )}
                   </View>
                   {account.type === 'card' && account.cardNumber && (
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -471,20 +512,72 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
                   ) : (
                     <>
                       {computed.getBalanceDisplay(account.balance, true)}
-                      {computed.reservedAmount > 0 ? (
-                        <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
-                          <Text style={{ fontSize: 12, color: colors.textSecondary, fontFamily: 'K2D_400Regular' }}>
-                            {t('accounts.available')}: {computed.formatBalance(account.balance - computed.reservedAmount)}
-                          </Text>
-                          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1, fontFamily: 'K2D_400Regular' }}>
-                            {t('accounts.inGoals')}: {computed.formatBalance(computed.reservedAmount)}
-                          </Text>
-                        </View>
-                      ) : null}
                     </>
                   )}
                 </View>
               </View>
+
+              {/* Раскрывающийся блок с детальной информацией о средствах */}
+              {(computed.reservedAmount > 0 || computed.budgetReservedAmount > 0) && account.type !== 'credit' && (
+                <Animated.View style={{
+                  maxHeight: expandAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 200]
+                  }),
+                  opacity: expandAnim,
+                  overflow: 'hidden',
+                }}>
+                  <View style={{
+                    marginTop: 16,
+                    paddingTop: 16,
+                    borderTopWidth: 1,
+                    borderTopColor: isDark ? '#2C2C2C' : '#E5E7EB',
+                  }}>
+                    {/* Свободные средства */}
+                    <View style={styles.detailRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="wallet-outline" size={16} color={colors.textSecondary} />
+                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+                          {t('accounts.available')}
+                        </Text>
+                      </View>
+                      <Text style={[styles.detailValue, { color: isDark ? '#fff' : '#232323' }]}>
+                        {computed.formatBalance(account.balance - computed.reservedAmount - computed.budgetReservedAmount)}
+                      </Text>
+                    </View>
+
+                    {/* В целях (накоплениях) */}
+                    {computed.reservedAmount > 0 && (
+                      <View style={styles.detailRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Ionicons name="flag-outline" size={16} color={colors.textSecondary} />
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+                            {t('accounts.inGoals')}
+                          </Text>
+                        </View>
+                        <Text style={[styles.detailValue, { color: isDark ? '#FF9800' : '#3B82F6' }]}>
+                          {computed.formatBalance(computed.reservedAmount)}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Зарезервировано бюджетом */}
+                    {computed.budgetReservedAmount > 0 && (
+                      <View style={styles.detailRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Ionicons name="shield-checkmark-outline" size={16} color={colors.textSecondary} />
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+                            Зарезервировано бюджетом
+                          </Text>
+                        </View>
+                        <Text style={[styles.detailValue, { color: isDark ? '#4CAF50' : '#10B981' }]}>
+                          {computed.formatBalance(computed.budgetReservedAmount)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </Animated.View>
+              )}
             </View>
           )}
         </TouchableOpacity>
@@ -615,4 +708,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-}); 
+
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  detailLabel: {
+    fontSize: 13,
+    fontFamily: 'K2D_400Regular',
+    marginLeft: 8,
+  },
+
+  detailValue: {
+    fontSize: 15,
+    fontFamily: 'K2D_600SemiBold',
+  },
+});
