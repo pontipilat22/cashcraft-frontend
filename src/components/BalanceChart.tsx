@@ -9,12 +9,13 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
-import Svg, { Path, Circle, Line, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import { Canvas, Path as SkiaPath, LinearGradient, vec, Circle as SkiaCircle, Line as SkiaLine, Shadow, BlurMask, Group } from '@shopify/react-native-skia';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useData } from '../context/DataContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useTheme } from '../context/ThemeContext';
+import * as d3 from 'd3-shape';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -40,10 +41,10 @@ const BalanceChart: React.FC = () => {
   });
 
   const cardWidth = SCREEN_WIDTH;
-  const chartHeight = 240;
+  const chartHeight = 280;
 
-  // Размеры графика
-  const padding = { top: 60, right: 20, bottom: 30, left: 0 };
+  // Размеры графика - линия на всю ширину
+  const padding = { top: 70, right: 0, bottom: 40, left: 0 };
   const graphWidth = cardWidth - padding.left - padding.right;
   const graphHeight = chartHeight - padding.top - padding.bottom;
 
@@ -225,23 +226,59 @@ const BalanceChart: React.FC = () => {
     return padding.top + graphHeight - ((value - yMin) / range) * graphHeight;
   }, [yMin, yMax, padding.top, graphHeight]);
 
-  // Создание пути для линии - МЕМОИЗИРОВАНО
+  // Создание пути для линии с использованием d3 для плавных кривых
   const linePath = useMemo(() => {
-    return data
-      .map((point, index) => {
-        const x = xScale(index);
-        const y = yScale(point.value);
-        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
+    if (data.length === 0) return '';
+
+    const points = data.map((point, index) => ({
+      x: xScale(index),
+      y: yScale(point.value),
+    }));
+
+    // Используем d3 для создания плавной кривой
+    const lineGenerator = d3.line<{x: number, y: number}>()
+      .x(d => d.x)
+      .y(d => d.y)
+      .curve(d3.curveCatmullRom.alpha(0.5));
+
+    return lineGenerator(points) || '';
   }, [data, xScale, yScale]);
 
-  // Создание области под графиком - МЕМОИЗИРОВАНО
+  // Создание области под графиком с градиентом
   const areaPath = useMemo(() => {
-    return data.length > 0
-      ? `${linePath} L ${xScale(data.length - 1)} ${chartHeight - padding.bottom} L ${xScale(0)} ${chartHeight - padding.bottom} Z`
-      : '';
-  }, [data.length, linePath, xScale, chartHeight, padding.bottom]);
+    if (data.length === 0) return '';
+
+    const points = data.map((point, index) => ({
+      x: xScale(index),
+      y: yScale(point.value),
+    }));
+
+    const areaGenerator = d3.area<{x: number, y: number}>()
+      .x(d => d.x)
+      .y0(chartHeight - padding.bottom)
+      .y1(d => d.y)
+      .curve(d3.curveCatmullRom.alpha(0.5));
+
+    return areaGenerator(points) || '';
+  }, [data, xScale, yScale, chartHeight, padding.bottom]);
+
+  // Создание пути для сетки
+  const gridLines = useMemo(() => {
+    const lines = [];
+    const gridCount = 4;
+
+    for (let i = 0; i <= gridCount; i++) {
+      const y = padding.top + (graphHeight / gridCount) * i;
+      lines.push({
+        x1: 0,
+        y1: y,
+        x2: cardWidth,
+        y2: y,
+      });
+    }
+
+    return lines;
+  }, [graphHeight, padding, cardWidth]);
 
   // Обработка жестов
   const updateHoveredIndex = (index: number | null) => {
@@ -300,81 +337,167 @@ const BalanceChart: React.FC = () => {
 
   // Цвета для темной и светлой темы
   const lineColor = colors.primary;
-  const gradientStart = colors.primary;
-  const gradientEnd = colors.primary;
+  const lineColorRgb = hexToRgb(lineColor);
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.card }]}>
       {/* График */}
       <GestureDetector gesture={panGesture}>
         <View style={styles.chartWrapper}>
-          <Svg width={cardWidth} height={chartHeight}>
-            {/* Градиент для области */}
-            <Defs>
-              <SvgLinearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor={gradientStart} stopOpacity={isDark ? 0.2 : 0.3} />
-                <Stop offset="100%" stopColor={gradientEnd} stopOpacity="0.02" />
-              </SvgLinearGradient>
-            </Defs>
-
-            {/* Область под графиком */}
-            {areaPath && (
-              <Path
-                d={areaPath}
-                fill="url(#areaGradient)"
+          <Canvas style={{ width: cardWidth, height: chartHeight }}>
+            {/* Сетка на фоне */}
+            {gridLines.map((line, index) => (
+              <SkiaLine
+                key={`grid-${index}`}
+                p1={vec(line.x1, line.y1)}
+                p2={vec(line.x2, line.y2)}
+                color={gridColor}
+                style="stroke"
+                strokeWidth={1}
               />
+            ))}
+
+            {/* Область под графиком с градиентом */}
+            {areaPath && (
+              <Group>
+                <SkiaPath path={areaPath} style="fill">
+                  <LinearGradient
+                    start={vec(0, padding.top)}
+                    end={vec(0, chartHeight - padding.bottom)}
+                    colors={[
+                      `${lineColor}${isDark ? '40' : '50'}`,
+                      `${lineColor}05`,
+                    ]}
+                  />
+                </SkiaPath>
+              </Group>
             )}
 
-            {/* Линия графика */}
+            {/* Свечение под линией графика */}
             {linePath && (
-              <Path
-                d={linePath}
-                fill="none"
-                stroke={lineColor}
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              <Group>
+                <SkiaPath
+                  path={linePath}
+                  style="stroke"
+                  strokeWidth={8}
+                  color={`${lineColor}30`}
+                >
+                  <BlurMask blur={12} style="solid" />
+                </SkiaPath>
+              </Group>
+            )}
+
+            {/* Основная линия графика */}
+            {linePath && (
+              <Group>
+                <SkiaPath
+                  path={linePath}
+                  style="stroke"
+                  strokeWidth={3.5}
+                  strokeCap="round"
+                  strokeJoin="round"
+                  color={lineColor}
+                />
+              </Group>
             )}
 
             {/* Индикатор при наведении */}
             {hoveredIndex !== null && data[hoveredIndex] && (
-              <>
-                {/* Вертикальная линия */}
-                <Line
-                  x1={xScale(hoveredIndex)}
-                  y1={padding.top}
-                  x2={xScale(hoveredIndex)}
-                  y2={chartHeight - padding.bottom}
-                  stroke={lineColor}
-                  strokeWidth="1.5"
-                  strokeDasharray="4 4"
-                  opacity="0.6"
+              <Group>
+                {/* Вертикальная линия с градиентом */}
+                <SkiaLine
+                  p1={vec(xScale(hoveredIndex), padding.top)}
+                  p2={vec(xScale(hoveredIndex), chartHeight - padding.bottom)}
+                  color={`${lineColor}40`}
+                  style="stroke"
+                  strokeWidth={2}
                 />
-                {/* Точка на линии */}
-                <Circle
+
+                {/* Свечение точки */}
+                <SkiaCircle
                   cx={xScale(hoveredIndex)}
                   cy={yScale(data[hoveredIndex].value)}
-                  r="7"
-                  fill={lineColor}
-                  stroke={colors.card}
-                  strokeWidth="3"
+                  r={14}
+                  color={`${lineColor}30`}
+                >
+                  <BlurMask blur={8} style="solid" />
+                </SkiaCircle>
+
+                {/* Внешнее кольцо */}
+                <SkiaCircle
+                  cx={xScale(hoveredIndex)}
+                  cy={yScale(data[hoveredIndex].value)}
+                  r={10}
+                  style="stroke"
+                  strokeWidth={2.5}
+                  color={lineColor}
+                  opacity={0.4}
                 />
-              </>
+
+                {/* Основная точка */}
+                <SkiaCircle
+                  cx={xScale(hoveredIndex)}
+                  cy={yScale(data[hoveredIndex].value)}
+                  r={7}
+                  color={lineColor}
+                >
+                  <Shadow dx={0} dy={2} blur={6} color="rgba(0,0,0,0.25)" />
+                </SkiaCircle>
+
+                {/* Центральная точка */}
+                <SkiaCircle
+                  cx={xScale(hoveredIndex)}
+                  cy={yScale(data[hoveredIndex].value)}
+                  r={3}
+                  color={colors.card}
+                />
+              </Group>
             )}
 
             {/* Точка на последнем значении (когда не наведено) */}
             {hoveredIndex === null && data.length > 0 && (
-              <Circle
-                cx={xScale(data.length - 1)}
-                cy={yScale(data[data.length - 1].value)}
-                r="7"
-                fill={lineColor}
-                stroke={colors.card}
-                strokeWidth="3"
-              />
+              <Group>
+                {/* Пульсирующее свечение */}
+                <SkiaCircle
+                  cx={xScale(data.length - 1)}
+                  cy={yScale(data[data.length - 1].value)}
+                  r={16}
+                  color={`${lineColor}20`}
+                >
+                  <BlurMask blur={10} style="solid" />
+                </SkiaCircle>
+
+                {/* Внешнее кольцо */}
+                <SkiaCircle
+                  cx={xScale(data.length - 1)}
+                  cy={yScale(data[data.length - 1].value)}
+                  r={10}
+                  style="stroke"
+                  strokeWidth={2}
+                  color={`${lineColor}60`}
+                />
+
+                {/* Основная точка */}
+                <SkiaCircle
+                  cx={xScale(data.length - 1)}
+                  cy={yScale(data[data.length - 1].value)}
+                  r={7}
+                  color={lineColor}
+                >
+                  <Shadow dx={0} dy={3} blur={8} color="rgba(0,0,0,0.3)" />
+                </SkiaCircle>
+
+                {/* Центральная точка */}
+                <SkiaCircle
+                  cx={xScale(data.length - 1)}
+                  cy={yScale(data[data.length - 1].value)}
+                  r={3}
+                  color={colors.card}
+                />
+              </Group>
             )}
-          </Svg>
+          </Canvas>
 
           {/* Всплывающая подсказка */}
           {tooltipData && (
@@ -430,6 +553,18 @@ const BalanceChart: React.FC = () => {
   );
 };
 
+// Вспомогательная функция для конвертации hex в rgb
+const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+    : { r: 0, g: 0, b: 0 };
+};
+
 export default BalanceChart;
 
 const styles = StyleSheet.create({
@@ -452,15 +587,15 @@ const styles = StyleSheet.create({
   },
   tooltip: {
     position: 'absolute',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-    minWidth: 90,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 10,
+    minWidth: 100,
   },
   tooltipAmount: {
     color: '#FFFFFF',
@@ -486,19 +621,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   periodButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
   periodButtonActive: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
   },
   periodText: {
     fontSize: 13,

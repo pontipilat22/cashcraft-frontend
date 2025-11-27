@@ -29,10 +29,21 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ maxDuration = 10000 
 
   // Инициализация с плавным появлением
   useEffect(() => {
+    // Скрываем нативный splash screen сразу после монтирования кастомного
+    const initSplash = async () => {
+      try {
+        await ExpoSplashScreen.hideAsync();
+      } catch (error) {
+        console.warn('Error hiding native splash:', error);
+      }
+    };
+
+    initSplash();
+
     // Небольшая задержка для инициализации
     const initTimer = setTimeout(() => {
       setIsReady(true);
-      
+
       // Плавное появление
       Animated.timing(fadeInAnim, {
         toValue: 1,
@@ -54,7 +65,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ maxDuration = 10000 
   }
 
   return (
-    <Animated.View style={[styles.loader, { opacity: fadeInAnim }]}>
+    <Animated.View style={[
+      styles.loader,
+      {
+        opacity: fadeInAnim,
+        backgroundColor: systemIsDark ? '#0B1220' : '#EAF4FF'
+      }
+    ]}>
       {/* Iridescence shader — на весь экран */}
       <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
         <SpiderWebLoader isDark={systemIsDark} />

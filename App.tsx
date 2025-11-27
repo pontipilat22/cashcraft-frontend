@@ -125,11 +125,6 @@ function AppContent() {
 
   console.log('✅ [AppContent] All hooks initialized');
 
-  // Скрываем нативный сплэш-скрин сразу
-  useEffect(() => {
-    SplashScreenExpo.hideAsync();
-  }, []);
-
   // Проверяем, был ли пройден onboarding
   useEffect(() => {
     const checkOnboardingStatus = async () => {
